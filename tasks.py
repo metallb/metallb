@@ -26,14 +26,16 @@ all_binaries = set(["controller", "speaker", "configmaptocrs"])
 all_architectures = set(["amd64", "arm", "arm64", "ppc64le", "s390x"])
 default_network = "kind"
 extra_network = "network2"
-controller_gen_version = "v0.16.3"
+controller_gen_version = "v0.17.2"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
 kind_path = os.path.join(build_path, "kind")
 ginkgo_path = os.path.join(build_path, "bin", "ginkgo")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
+yq_path = os.path.join(build_path, "bin", "yq")
 kubectl_version = "v1.31.0"
 kind_version = "v0.24.0"
+yq_version = "v4.45.1"
 
 
 def _check_architectures(architectures):
@@ -559,7 +561,7 @@ apiServer:
     frr_k8s_ns = "frr-k8s-system"
     if bgp_type == "frr-k8s-external":
         run(
-            "{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.16/config/all-in-one/frr-k8s.yaml".format(
+            "{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.18/config/all-in-one/frr-k8s.yaml".format(
                 kubectl_path
             ),
             echo=True,
@@ -1128,7 +1130,7 @@ def lint(ctx, env="container"):
     convenient to install the golangci-lint binaries on the host. This can be
     achieved by running `inv lint --env host`.
     """
-    version = "1.59.1"
+    version = "1.64.7"
     golangci_cmd = "golangci-lint run --timeout 10m0s ./..."
 
     if env == "container":
@@ -1466,10 +1468,9 @@ def generate_deepcopy():
 
 
 def _align_helm_crds(source, output):
+    fetch_yq()
     run(
-        """yq eval-all 'select(.kind == "CustomResourceDefinition")' {} > {}""".format(
-            source, output
-        )
+        f"""{yq_path} eval-all 'select(.kind == "CustomResourceDefinition")' {source} > {output}"""
     )
     run("sed -i 's/metallb-system/{{{{ .Release.Namespace }}}}/g' {}".format(output))
 
@@ -1530,7 +1531,7 @@ def fetch_kubectl():
     curl_command = "curl -o {} -LO https://dl.k8s.io/release/{}/bin/$(go env GOOS)/$(go env GOARCH)/kubectl".format(
         kubectl_path, kubectl_version
     )
-    get_version_command = f"{kubectl_path} version --short"
+    get_version_command = f"{kubectl_path} version"
     fetch_dependency(
         kubectl_path,
         kubectl_version,
@@ -1587,6 +1588,22 @@ def fetch_ginkgo():
         fetch_command,
         get_version_command,
         "Ginkgo Version ",
+    )
+
+
+@cache
+def fetch_yq():
+    fetch_command = (
+        f"GOBIN={build_path}/bin/ GOPATH={build_path} go install github.com/mikefarah"
+        f"/yq/v4@{yq_version}"
+    )
+    get_version_command = f"{yq_path} --version"
+    fetch_dependency(
+        yq_path,
+        yq_version,
+        fetch_command,
+        get_version_command,
+        "yq (https://github.com/mikefarah/yq/) version ",
     )
 
 

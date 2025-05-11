@@ -88,6 +88,12 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	if svc.Spec.IPFamilyPolicy != nil {
 		familyPolicy = *(svc.Spec.IPFamilyPolicy)
 	}
+	if familyPolicy == v1.IPFamilyPolicyRequireDualStack && len(svc.Spec.ClusterIPs) < 2 {
+		level.Error(l).Log("event", "clearAssignment", "reason", "requires dual stack but clusterips are not dual stack", "clusterips", svc.Spec.ClusterIPs)
+		c.client.Errorf(svc, "not enough clusterips", "Service requires dual stack but not enough clusterips %v", svc.Spec.ClusterIPs)
+		c.clearServiceState(key, svc)
+		return ErrConverge
+	}
 
 	if len(lbIPs) == 0 {
 		c.clearServiceState(key, svc)

@@ -108,6 +108,8 @@ func (s *testK8S) gotService(in *v1.Service) *v1.Service {
 	return ret
 }
 
+func noopCallback(_ string) {}
+
 func TestControllerMutation(t *testing.T) {
 	testSelector, err := labels.Parse("team=metallb")
 	if err != nil {
@@ -115,7 +117,7 @@ func TestControllerMutation(t *testing.T) {
 	}
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 	pools := &config.Pools{ByName: map[string]*config.Pool{
@@ -845,6 +847,51 @@ func TestControllerMutation(t *testing.T) {
 			},
 		},
 		{
+			desc: "request IPs from dualstack pool with PreferDualStack policy but single stack clusterip",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+		},
+		{
+			desc: "request IPs from dualstack pool with RequireDualStack policy but single stack clusterip",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4"},
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
+				},
+			},
+			wantErr: true,
+		},
+
+		{
 			desc: "request specific loadbalancer IP with dual-stack",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
@@ -1105,7 +1152,7 @@ func TestControllerMutation(t *testing.T) {
 func TestControllerConfig(t *testing.T) {
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 
@@ -1202,7 +1249,7 @@ func TestControllerConfig(t *testing.T) {
 func TestDeleteRecyclesIP(t *testing.T) {
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 
@@ -1272,7 +1319,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 func TestControllerReassign(t *testing.T) {
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 
@@ -1368,7 +1415,7 @@ func TestControllerReassign(t *testing.T) {
 func TestControllerDualStackConfig(t *testing.T) {
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 

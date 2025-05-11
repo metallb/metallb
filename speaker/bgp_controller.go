@@ -19,8 +19,10 @@ import (
 	"net"
 	"reflect"
 	"sort"
-	"strconv"
+	"sync"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 	bgpfrrk8s "go.universe.tf/metallb/internal/bgp/frrk8s"
@@ -31,9 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/labels"
-
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"errors"
 )
@@ -58,18 +58,22 @@ const (
 type peer struct {
 	cfg     *config.Peer
 	session bgp.Session
+	id      string
 }
 
 type bgpController struct {
-	logger          log.Logger
-	myNode          string
-	nodeLabels      labels.Set
-	peers           []*peer
-	svcAds          map[string][]*bgp.Advertisement
-	bgpType         bgpImplementation
-	secretHandling  SecretHandling
-	sessionManager  bgp.SessionManager
-	ignoreExcludeLB bool
+	logger             log.Logger
+	myNode             string
+	nodeLabels         labels.Set
+	peers              []*peer
+	svcAds             map[string][]*bgp.Advertisement
+	activeAds          map[string]sets.Set[string] // svc -> the peers it is advertised to
+	activeAdsMutex     sync.RWMutex
+	adsChangedCallback func(string)
+	bgpType            bgpImplementation
+	secretHandling     SecretHandling
+	sessionManager     bgp.SessionManager
+	ignoreExcludeLB    bool
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -86,9 +90,15 @@ newPeers:
 				continue newPeers
 			}
 		}
+		id := p.Iface
+		if p.Addr != nil {
+			id = p.Addr.String()
+		}
+
 		// No existing peers match, create a new one.
 		newPeers = append(newPeers, &peer{
 			cfg: p,
+			id:  id,
 		})
 	}
 
@@ -99,14 +109,14 @@ newPeers:
 		if p == nil {
 			continue
 		}
-		level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
+		level.Info(l).Log("event", "peerRemoved", "peer", p.id, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
 
 		if p.session != nil {
 			if err := p.session.Close(); err != nil {
-				level.Error(l).Log("op", "setConfig", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
+				level.Error(l).Log("op", "setConfig", "error", err, "peer", p.id, "msg", "failed to shut down BGP session")
 			}
 		}
-		level.Debug(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, BGP session closed")
+		level.Debug(l).Log("event", "peerRemoved", "peer", p.id, "reason", "removedFromConfig", "msg", "peer deconfigured, BGP session closed")
 	}
 
 	err := c.syncBFDProfiles(cfg.BFDProfiles)
@@ -164,9 +174,9 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 		return "notOwner"
 	}
 
-	if err := k8snodes.IsNodeAvailable(nodes[c.myNode]); err != nil {
-		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", err)
-		return err.Error()
+	if k8snodes.IsNetworkUnavailable(nodes[c.myNode]) {
+		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
+		return "nodeNetworkUnavailable"
 	}
 
 	if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[c.myNode]) {
@@ -218,22 +228,28 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		// Now, compare current state to intended state, and correct.
 		if p.session != nil && !shouldRun {
 			// Oops, session is running but shouldn't be. Shut it down.
-			level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "filteredByNodeSelector", "msg", "peer deconfigured, closing BGP session")
+			level.Info(l).Log("event", "peerRemoved", "peer", p.id, "reason", "filteredByNodeSelector", "msg", "peer deconfigured, closing BGP session")
 			if err := p.session.Close(); err != nil {
-				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
+				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.id, "msg", "failed to shut down BGP session")
 			}
 			p.session = nil
 		} else if p.session == nil && shouldRun {
 			// Session doesn't exist, but should be running. Create
 			// it.
-			level.Info(l).Log("event", "peerAdded", "peer", p.cfg.Addr, "msg", "peer configured, starting BGP session")
+			level.Info(l).Log("event", "peerAdded", "peer", p.id, "msg", "peer configured, starting BGP session")
 			var routerID net.IP
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
 
+			peerAddr := "" // we need because otherwise the value will "<nil>"
+			if p.cfg.Addr != nil {
+				peerAddr = p.cfg.Addr.String()
+			}
 			sessionParams := bgp.SessionParameters{
-				PeerAddress:     net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))),
+				PeerAddress:     peerAddr,
+				PeerPort:        p.cfg.Port,
+				PeerInterface:   p.cfg.Iface,
 				SourceAddress:   p.cfg.SrcAddr,
 				MyASN:           p.cfg.MyASN,
 				RouterID:        routerID,
@@ -255,7 +271,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			s, err := c.sessionManager.NewSession(c.logger, sessionParams)
 
 			if err != nil {
-				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
+				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.id, "msg", "failed to create BGP session")
 				errs++
 			} else {
 				p.session = s
@@ -348,6 +364,15 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 }
 
 func (c *bgpController) updateAds() error {
+	newAds, err := c.publishAds()
+	if err != nil {
+		return err
+	}
+	c.notifyAdsChanged(newAds)
+	return nil
+}
+
+func (c *bgpController) publishAds() (map[string][]*bgp.Advertisement, error) {
 	var allAds []*bgp.Advertisement
 	for _, ads := range c.svcAds {
 		// This list might contain duplicates, but that's fine,
@@ -358,16 +383,75 @@ func (c *bgpController) updateAds() error {
 		// and detecting conflicting advertisements.
 		allAds = append(allAds, ads...)
 	}
+	adsSet := map[string][]*bgp.Advertisement{}
 	for _, peer := range c.peers {
 		if peer.session == nil {
 			continue
 		}
 		ads := adsForPeer(peer.cfg.Name, allAds)
 		if err := peer.session.Set(ads...); err != nil {
-			return err
+			return nil, err
+		}
+		adsSet[peer.cfg.Name] = ads
+	}
+	return adsSet, nil
+}
+
+func (c *bgpController) notifyAdsChanged(newAds map[string][]*bgp.Advertisement) {
+	changedSvcs := []string{} // the services that their advs changed
+	defer func() {
+		for _, k := range changedSvcs {
+			c.adsChangedCallback(k)
+		}
+	}()
+
+	c.activeAdsMutex.Lock()
+	defer c.activeAdsMutex.Unlock()
+
+	pfxToSvc := map[string]sets.Set[string]{} // prefix -> the services that use it
+	for svcKey, ads := range c.svcAds {
+		for _, ad := range ads {
+			if _, ok := pfxToSvc[ad.Prefix.String()]; !ok {
+				pfxToSvc[ad.Prefix.String()] = sets.New(svcKey)
+				continue
+			}
+			pfxToSvc[ad.Prefix.String()].Insert(svcKey)
 		}
 	}
-	return nil
+
+	oldActiveAds := c.activeAds
+	newActiveAds := map[string]sets.Set[string]{}
+	for peer, ads := range newAds {
+		for _, ad := range ads {
+			adSvcs := pfxToSvc[ad.Prefix.String()]
+			for svc := range adSvcs {
+				if _, ok := newActiveAds[svc]; !ok {
+					newActiveAds[svc] = sets.New(peer)
+					continue
+				}
+				newActiveAds[svc].Insert(peer)
+			}
+		}
+	}
+
+	for svc, oldPeers := range oldActiveAds {
+		newPeers, ok := newActiveAds[svc]
+		if !ok {
+			changedSvcs = append(changedSvcs, svc)
+			continue
+		}
+		if !oldPeers.Equal(newPeers) {
+			changedSvcs = append(changedSvcs, svc)
+		}
+	}
+	for svc := range newActiveAds {
+		_, ok := oldActiveAds[svc]
+		if !ok {
+			changedSvcs = append(changedSvcs, svc)
+			continue
+		}
+	}
+	c.activeAds = newActiveAds
 }
 
 func adsForPeer(peerName string, ads []*bgp.Advertisement) []*bgp.Advertisement {
@@ -430,4 +514,10 @@ func poolMatchesNodeBGP(pool *config.Pool, node string) bool {
 		}
 	}
 	return false
+}
+
+func (c *bgpController) PeersForService(key string) sets.Set[string] {
+	c.activeAdsMutex.RLock()
+	defer c.activeAdsMutex.RUnlock()
+	return c.activeAds[key]
 }

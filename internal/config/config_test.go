@@ -636,6 +636,44 @@ func TestParse(t *testing.T) {
 		},
 
 		{
+			desc: "ip address pool with only priority",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.50.0.0/24",
+							},
+							AvoidBuggyIPs: true,
+							AutoAssign:    ptr.To(false),
+							AllocateTo:    &v1beta1.ServiceAllocation{Priority: 1},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{
+					ByName: map[string]*Pool{
+						"pool1": {
+							Name:               "pool1",
+							CIDR:               []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+							AvoidBuggyIPs:      true,
+							AutoAssign:         false,
+							ServiceAllocations: &ServiceAllocation{Priority: 1, ServiceSelectors: []labels.Selector{labels.Everything()}},
+						},
+					},
+					ByServiceSelector: []string{"pool1"},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+
+		{
 			desc: "peer-only",
 			crs: ClusterResources{
 
@@ -1355,7 +1393,37 @@ func TestParse(t *testing.T) {
 					},
 				},
 			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("10.20.30.40/24"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   24,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           200,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
 		},
+
 		{
 			desc: "different local pref - different aggregation lengths",
 			crs: ClusterResources{
@@ -3494,6 +3562,72 @@ func TestParse(t *testing.T) {
 							MyASN:      42,
 							ASN:        42,
 							DynamicASN: v1beta2.InternalASNMode,
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "unnumbered peer without address with interface ok",
+			crs: ClusterResources{
+
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:      42,
+							DynamicASN: v1beta2.InternalASNMode,
+							Interface:  "net0",
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: map[string]*Peer{
+					"peer1": {
+						Name:          "peer1",
+						Iface:         "net0",
+						MyASN:         42,
+						DynamicASN:    "internal",
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  false,
+					},
+				},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "unnumbered peer without address without interface nok",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "invalid",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:      42,
+							DynamicASN: "internal",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "unnumbered peer with address with interface nok",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "invalid",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							Address:    "1.2.3.4",
+							Interface:  "net0",
+							MyASN:      42,
+							DynamicASN: "internal",
 						},
 					},
 				},

@@ -1,0 +1,86 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: servicebgpstatuses.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: ServiceBGPStatus
+    listKind: ServiceBGPStatusList
+    plural: servicebgpstatuses
+    singular: servicebgpstatus
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.node
+      name: Node
+      type: string
+    - jsonPath: .status.serviceName
+      name: Service Name
+      type: string
+    - jsonPath: .status.serviceNamespace
+      name: Service Namespace
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: ServiceBGPStatus exposes the BGP peers a service is configured
+          to be advertised to, per relevant node.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ServiceBGPStatusSpec defines the desired state of ServiceBGPStatus.
+            type: object
+          status:
+            description: MetalLBServiceBGPStatus defines the observed state of ServiceBGPStatus.
+            properties:
+              node:
+                description: Node indicates the node announcing the service.
+                type: string
+                x-kubernetes-validations:
+                - message: Value is immutable
+                  rule: self == oldSelf
+              peers:
+                description: |-
+                  Peers indicate the BGP peers for which the service is configured to be advertised to.
+                  The service being actually advertised to a given peer depends on the session state and is not indicated here.
+                items:
+                  type: string
+                type: array
+              serviceName:
+                description: ServiceName indicates the service this status represents.
+                type: string
+                x-kubernetes-validations:
+                - message: Value is immutable
+                  rule: self == oldSelf
+              serviceNamespace:
+                description: ServiceNamespace indicates the namespace of the service.
+                type: string
+                x-kubernetes-validations:
+                - message: Value is immutable
+                  rule: self == oldSelf
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

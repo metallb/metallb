@@ -85,6 +85,9 @@ load balancers work. You can do this with:
 oc adm policy add-scc-to-user privileged -n metallb-system -z speaker
 ```
 
+Please note that if you are deploying MetalLB via helm, the ServiceAccount
+name is metallb-speaker.
+
 After that, MetalLB should work normally.
 
 ### MetalLB on OpenStack

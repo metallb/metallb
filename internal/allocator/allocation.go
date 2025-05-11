@@ -58,6 +58,14 @@ func (a *Allocation) selectIPsForFamilyAndPolicy(
 	ipv4 := a.getIPForFamily(ipfamily.IPv4)
 	ipv6 := a.getIPForFamily(ipfamily.IPv6)
 
+	// if we don't have dual cluster ips, we should align the lb ip to the clusterip
+	if serviceIPFamily == ipfamily.IPv4 {
+		return []net.IP{ipv4}, nil
+	}
+	if serviceIPFamily == ipfamily.IPv6 {
+		return []net.IP{ipv6}, nil
+	}
+
 	switch serviceIPFamilyPolicy {
 	case v1.IPFamilyPolicySingleStack:
 		if ip := a.getIPForFamily(serviceIPFamily); ip != nil {

@@ -27,6 +27,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -78,9 +79,17 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	syncStateRes := controllers.SyncStateSuccess
 
 	prevIPs := c.ips.IPs(name)
+	prevAllocKey := c.ips.AllocationKey(name)
 
 	if c.convergeBalancer(l, name, svc) != nil {
 		syncStateRes = controllers.SyncStateErrorNoRetry
+	}
+
+	newAllocKey := c.ips.AllocationKey(name)
+
+	if prevAllocKey != newAllocKey {
+		level.Debug(l).Log("event", "allocation key changed", "msg", "allocation changed for shared service, reprocessing")
+		syncStateRes = controllers.SyncStateReprocessAll
 	}
 
 	if reflect.DeepEqual(svcRo, svc) {
@@ -203,8 +212,11 @@ func main() {
 		*namespace = string(bs)
 	}
 
+	poolStatusChan := make(chan event.GenericEvent)
 	c := &controller{
-		ips: allocator.New(),
+		ips: allocator.New(func(name string) {
+			poolStatusChan <- controllers.NewPoolStatusEvent(*namespace, name)
+		}),
 	}
 
 	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
@@ -235,6 +247,8 @@ func main() {
 		CertDir:             *certDir,
 		CertServiceName:     *certServiceName,
 		LoadBalancerClass:   *loadBalancerClass,
+		PoolStatusChan:      poolStatusChan,
+		PoolCountersFetcher: c.ips.CountersForPool,
 	}
 	switch *webhookMode {
 	case "enabled":

@@ -31,6 +31,8 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
+	"go.universe.tf/metallb/internal/ipfamily"
+	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -100,6 +102,9 @@ type Peer struct {
 	DynamicASN string
 	// Address to dial when establishing the session.
 	Addr net.IP
+	// Iface is the Interface to use for Unnumbered BGP peering.
+	// Addr field must be nil.
+	Iface string
 	// Source address to use when establishing the session.
 	SrcAddr net.IP
 	// Port to dial when establishing the session.
@@ -278,7 +283,7 @@ func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) (m
 	for _, p := range resources.Peers {
 		peer, err := peerFromCR(p, resources.PasswordSecrets)
 		if err != nil {
-			return nil, errors.Join(err, fmt.Errorf("parsing peer %s", p.Name))
+			return nil, fmt.Errorf("parsing peer %s %w", p.Name, err)
 		}
 		if peer.BFDProfile != "" {
 			if _, ok := BFDProfiles[peer.BFDProfile]; !ok {
@@ -322,6 +327,13 @@ func poolsFor(resources ClusterResources) (*Pools, error) {
 			for _, m := range allCIDRs {
 				if cidrsOverlap(cidr, m) {
 					return nil, fmt.Errorf("CIDR %q in pool %q overlaps with already defined CIDR %q", cidr, p.Name, m)
+				}
+			}
+			// Check pool CIDR is not overlapping with Node IPs
+			nodeIps := k8snodes.NodeIPsForFamily(resources.Nodes, ipfamily.ForCIDR(cidr))
+			for _, nodeIP := range nodeIps {
+				if cidr.Contains(nodeIP) {
+					return nil, fmt.Errorf("pool cidr %q contains nodeIp %q", cidr, nodeIP)
 				}
 			}
 			allCIDRs = append(allCIDRs, cidr)
@@ -389,14 +401,25 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	if p.Spec.ASN == p.Spec.MyASN && p.Spec.EBGPMultiHop {
 		return nil, errors.New("invalid ebgp-multihop parameter set for an ibgp peer")
 	}
-	ip := net.ParseIP(p.Spec.Address)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid BGPPeer address %q", p.Spec.Address)
+	if p.Spec.Address == "" && p.Spec.Interface == "" {
+		return nil, fmt.Errorf("peer has no Address or Interface specified")
+	}
+
+	if p.Spec.Address != "" && p.Spec.Interface != "" {
+		return nil, fmt.Errorf("peer has both Address and Interface specified")
 	}
 
 	holdTime, keepaliveTime, err := parseTimers(p.Spec.HoldTime, p.Spec.KeepaliveTime)
 	if err != nil {
 		return nil, fmt.Errorf("invalid BGPPeer timers: %w", err)
+	}
+
+	var ip net.IP
+	if p.Spec.Address != "" {
+		ip = net.ParseIP(p.Spec.Address)
+		if ip == nil {
+			return nil, fmt.Errorf("invalid BGPPeer address %q", p.Spec.Address)
+		}
 	}
 
 	// Ideally we would set a default RouterID here, instead of having
@@ -421,7 +444,6 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 
 	var nodeSels []labels.Selector
 	for _, s := range p.Spec.NodeSelectors {
-		s := s // so we can use &s
 		labelSelector, err := metav1.LabelSelectorAsSelector(&s)
 		if err != nil {
 			return nil, errors.Join(err, fmt.Errorf("failed to convert peer %s node selector", p.Name))
@@ -455,6 +477,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		ASN:                   p.Spec.ASN,
 		DynamicASN:            string(p.Spec.DynamicASN),
 		Addr:                  ip,
+		Iface:                 p.Spec.Interface,
 		SrcAddr:               src,
 		Port:                  p.Spec.Port,
 		HoldTime:              holdTime,
@@ -541,6 +564,12 @@ func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespa
 		}
 		poolNamespaces.Insert(poolNs)
 	}
+	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority, Namespaces: poolNamespaces}
+	if len(poolNamespaces) == 0 && len(p.Spec.AllocateTo.NamespaceSelectors) == 0 && len(p.Spec.AllocateTo.ServiceSelectors) == 0 {
+		// If no specific namespaces or service selectors are set, match everything
+		serviceAllocations.ServiceSelectors = []labels.Selector{labels.Everything()}
+		return serviceAllocations, nil
+	}
 	err := validateLabelSelectorDuplicate(p.Spec.AllocateTo.NamespaceSelectors, "namespaceSelectors")
 	if err != nil {
 		return nil, err
@@ -549,7 +578,6 @@ func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespa
 	if err != nil {
 		return nil, err
 	}
-	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority, Namespaces: poolNamespaces}
 	for i := range p.Spec.AllocateTo.NamespaceSelectors {
 		l, err := metav1.LabelSelectorAsSelector(&p.Spec.AllocateTo.NamespaceSelectors[i])
 		if err != nil {
@@ -870,7 +898,7 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 	// Verify that BGP ADVs set a unique local preference value per BGP update.
 	for _, bgpAdv := range pool.BGPAdvertisements {
 		if adv.LocalPref != bgpAdv.LocalPref {
-			if !advertisementsAreCompatible(adv, bgpAdv) {
+			if !advertisementsAreCompatible(adv, bgpAdv, pool) {
 				return fmt.Errorf("invalid local preference %d: local preferernce %d was "+
 					"already set for the same type of BGP update. Check existing BGP advertisements "+
 					"with common pools and aggregation lengths", adv.LocalPref, bgpAdv.LocalPref)
@@ -881,8 +909,8 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 	return nil
 }
 
-func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement) bool {
-	if adv.AggregationLength != newAdv.AggregationLength && adv.AggregationLengthV6 != newAdv.AggregationLengthV6 {
+func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+	if isAggrLengthDifferent(newAdv, adv, pool) {
 		return true
 	}
 
@@ -908,6 +936,37 @@ func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement) bool {
 	}
 
 	return true
+}
+
+func isAggrLengthDifferent(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+	var hasV4, hasV6 bool
+	for _, cidrs := range pool.cidrsPerAddresses {
+		family := ipfamily.ForCIDR(cidrs[0])
+		if family == ipfamily.IPv4 {
+			hasV4 = true
+		}
+		if family == ipfamily.IPv6 {
+			hasV6 = true
+		}
+		if hasV4 && hasV6 {
+			break
+		}
+	}
+
+	if !hasV6 && !hasV4 { // compatible?!
+		return true
+	}
+	if adv.AggregationLength != newAdv.AggregationLength && !hasV6 {
+		return true
+	}
+	if adv.AggregationLengthV6 != newAdv.AggregationLengthV6 && !hasV4 {
+		return true
+	}
+	// has both, both must be different
+	if adv.AggregationLength != newAdv.AggregationLength && adv.AggregationLengthV6 != newAdv.AggregationLengthV6 {
+		return true
+	}
+	return false
 }
 
 func ParseCIDR(cidr string) ([]*net.IPNet, error) {
@@ -1017,7 +1076,6 @@ func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bo
 func selectedNodes(nodes []corev1.Node, selectors []metav1.LabelSelector) (map[string]bool, error) {
 	labelSelectors := []labels.Selector{}
 	for _, selector := range selectors {
-		selector := selector // so we can use &selector
 		l, err := metav1.LabelSelectorAsSelector(&selector)
 		if err != nil {
 			return nil, errors.Join(err, fmt.Errorf("invalid label selector %v", selector))
@@ -1045,7 +1103,6 @@ OUTER:
 func selectedPools(pools []metallbv1beta1.IPAddressPool, selectors []metav1.LabelSelector) ([]string, error) {
 	labelSelectors := []labels.Selector{}
 	for _, selector := range selectors {
-		selector := selector // so we can use &selector
 		l, err := metav1.LabelSelectorAsSelector(&selector)
 		if err != nil {
 			return nil, errors.Join(err, fmt.Errorf("invalid label selector %v", selector))

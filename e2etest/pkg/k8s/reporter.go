@@ -63,6 +63,7 @@ func InitReporter(kubeconfig, path string, namespaces ...string) *k8sreporter.Ku
 		{Cr: &corev1.ServiceList{}},
 		{Cr: &frrk8sv1beta1.FRRConfigurationList{}},
 		{Cr: &frrk8sv1beta1.FRRNodeStateList{}},
+		{Cr: &metallbv1beta1.ServiceBGPStatusList{}},
 	}
 
 	reporter, err := k8sreporter.New(kubeconfig, addToScheme, dumpNamespace, path, crds...)

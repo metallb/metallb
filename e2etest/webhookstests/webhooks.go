@@ -21,6 +21,7 @@ package webhookstests
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/k8s"
@@ -30,9 +31,12 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
 
+	"go.universe.tf/e2etest/pkg/ipfamily"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -44,7 +48,10 @@ var (
 )
 
 var _ = ginkgo.Describe("Webhooks", func() {
+	var cs clientset.Interface
 	ginkgo.BeforeEach(func() {
+		cs = k8sclient.New()
+
 		ginkgo.By("Clearing any previous configuration")
 		err := ConfigUpdater.Clean()
 		Expect(err).NotTo(HaveOccurred())
@@ -106,6 +113,45 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
 		})
+
+		ginkgo.DescribeTable("IPAddressPool with overlapping addresses of the nodes",
+			func(ipFamily ipfamily.Family) {
+				nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				nodeIps, err := k8s.NodeIPsForFamily(nodes.Items, ipFamily, "")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(nodeIps)).To(BeNumerically(">", 0), "empty node ips list")
+				nodeIP := net.ParseIP(nodeIps[0])
+				cidr := &net.IPNet{
+					IP:   nodeIP,
+					Mask: net.CIDRMask(32, 32),
+				}
+				if ipFamily == ipfamily.IPv6 {
+					cidr.Mask = net.CIDRMask(128, 128)
+				}
+
+				ginkgo.By("Creating IPAddressPool")
+				var nodeCIDRs []string
+				nodeCIDRs = append(nodeCIDRs, cidr.String())
+				resources := config.Resources{
+					Pools: []metallbv1beta1.IPAddressPool{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "webhooks-test3",
+							},
+							Spec: metallbv1beta1.IPAddressPoolSpec{
+								Addresses: nodeCIDRs,
+							},
+						},
+					},
+				}
+				err = ConfigUpdater.Update(resources)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("contains nodeIp"))
+			},
+			ginkgo.Entry("IPV4", ipfamily.IPv4),
+			ginkgo.Entry("IPV6", ipfamily.IPv6),
+		)
 	})
 
 	ginkgo.Context("for BGPAdvertisement", func() {
