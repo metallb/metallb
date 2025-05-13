@@ -124,9 +124,16 @@ type BGPPeerSpec struct {
 	// Add future BGP configuration here
 
 	// To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.
+	// Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily.
 	// +optional
 	// +kubebuilder:default:=false
 	DisableMP bool `json:"disableMP,omitempty"`
+
+	// To set if we want to enable the neighbor not only for the ipfamily related to its session,
+	// but also the other one. This allows to advertise/receive IPv4 prefixes over IPv6 sessions and vice versa.
+	// +optional
+	// +kubebuilder:default:=false
+	DualStackAddressFamily bool `json:"dualStackAddressFamily,omitempty"`
 }
 
 // BGPPeerStatus defines the observed state of Peer.

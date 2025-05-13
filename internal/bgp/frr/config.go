@@ -91,7 +91,6 @@ type neighborConfig struct {
 	// It has at least one advertisement with these local preferences
 	LocalPrefsV4 []uint32
 	LocalPrefsV6 []uint32
-	DisableMP    bool
 }
 
 func (n *neighborConfig) ID() string {
@@ -156,8 +155,8 @@ func templateConfig(data interface{}) (string, error) {
 				}
 				return "ip"
 			},
-			"activateNeighborFor": func(ipFamily string, neighbourFamily ipfamily.Family, disableMP bool) bool {
-				return !disableMP || (disableMP && neighbourFamily.String() == ipFamily)
+			"activateNeighborFor": func(ipFamily string, neighbourFamily ipfamily.Family) bool {
+				return neighbourFamily.String() == ipFamily || neighbourFamily == ipfamily.DualStack
 			},
 			"localPrefPrefixList": func(neighbor *neighborConfig, localPreference uint32) string {
 				return fmt.Sprintf("%s-%d-%s-localpref-prefixes", neighbor.ID(), localPreference, neighbor.IPFamily)

@@ -30,11 +30,6 @@ router bgp 100
   neighbor 10:2:2::254 password password
   neighbor 10:2:2::254 update-source 10:1:1::254
 
-  address-family ipv4 unicast
-    neighbor 10:2:2::254 activate
-    neighbor 10:2:2::254 route-map 10:2:2::254-in in
-    neighbor 10:2:2::254 route-map 10:2:2::254-out out
-  exit-address-family
   address-family ipv6 unicast
     neighbor 10:2:2::254 activate
     neighbor 10:2:2::254 route-map 10:2:2::254-in in
