@@ -46,11 +46,6 @@ router bgp 100
     neighbor 10.2.2.254 route-map 10.2.2.254-in in
     neighbor 10.2.2.254 route-map 10.2.2.254-out out
   exit-address-family
-  address-family ipv6 unicast
-    neighbor 10.2.2.254 activate
-    neighbor 10.2.2.254 route-map 10.2.2.254-in in
-    neighbor 10.2.2.254 route-map 10.2.2.254-out out
-  exit-address-family
 router bgp 100 vrf red
   no bgp ebgp-requires-policy
   no bgp network import-check
@@ -65,11 +60,6 @@ router bgp 100 vrf red
   
 
   address-family ipv4 unicast
-    neighbor 10.2.2.254 activate
-    neighbor 10.2.2.254 route-map 10.2.2.254-red-in in
-    neighbor 10.2.2.254 route-map 10.2.2.254-red-out out
-  exit-address-family
-  address-family ipv6 unicast
     neighbor 10.2.2.254 activate
     neighbor 10.2.2.254 route-map 10.2.2.254-red-in in
     neighbor 10.2.2.254 route-map 10.2.2.254-red-out out
