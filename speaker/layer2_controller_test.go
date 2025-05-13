@@ -363,9 +363,10 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 		},
 	}
 	c1, err := newController(controllerConfig{
-		MyNode: "iris1",
-		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
-		SList:  fakeSL,
+		MyNode:  "iris1",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -373,9 +374,10 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 	c1.client = &testK8S{t: t}
 
 	c2, err := newController(controllerConfig{
-		MyNode: "iris2",
-		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
-		SList:  fakeSL,
+		MyNode:  "iris2",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -499,10 +501,10 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				},
 			},
 			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
+				"10.20.30.1": "noActiveEndpoints",
 			},
 			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
+				"10.20.30.1": "noActiveEndpoints",
 			},
 		}, {
 			desc: "One service, two endpoints across two hosts, controller2 should announce",
@@ -602,10 +604,10 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				},
 			},
 			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
+				"10.20.30.1": "noActiveEndpoints",
 			},
 			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
+				"10.20.30.1": "noActiveEndpoints",
 			},
 		}, {
 			desc: "One service, two endpoints across two hosts, controller 2 is not ready, controller 1 should announce",
