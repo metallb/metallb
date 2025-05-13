@@ -407,7 +407,7 @@ func TestTwoIPv6Sessions(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
-func TestIPv4AndIPv6SessionsDisableMP(t *testing.T) {
+func TestIPv4AndIPv6SessionsDualStackFamily(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
@@ -416,19 +416,19 @@ func TestIPv4AndIPv6SessionsDisableMP(t *testing.T) {
 
 	session1, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10:2:2::254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10:1:1::254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  false,
-			SessionName:   "test-peer1",
-			DisableMP:     true},
+			PeerAddress:            "10:2:2::254",
+			PeerPort:               179,
+			SourceAddress:          net.ParseIP("10:1:1::254"),
+			MyASN:                  100,
+			RouterID:               net.ParseIP("10.1.1.254"),
+			PeerASN:                200,
+			HoldTime:               ptr.To(time.Second),
+			KeepAliveTime:          ptr.To(time.Second),
+			Password:               "password",
+			CurrentNode:            "hostname",
+			EBGPMultiHop:           false,
+			SessionName:            "test-peer1",
+			DualStackAddressFamily: true},
 	)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
@@ -436,19 +436,19 @@ func TestIPv4AndIPv6SessionsDisableMP(t *testing.T) {
 	defer session1.Close()
 	session2, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.4.4.255",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.3.3.254"),
-			MyASN:         300,
-			RouterID:      net.ParseIP("10.3.3.254"),
-			PeerASN:       400,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer2",
-			DisableMP:     true})
+			PeerAddress:            "10.4.4.255",
+			PeerPort:               179,
+			SourceAddress:          net.ParseIP("10.3.3.254"),
+			MyASN:                  300,
+			RouterID:               net.ParseIP("10.3.3.254"),
+			PeerASN:                400,
+			HoldTime:               ptr.To(time.Second),
+			KeepAliveTime:          ptr.To(time.Second),
+			Password:               "password",
+			CurrentNode:            "hostname",
+			EBGPMultiHop:           true,
+			SessionName:            "test-peer2",
+			DualStackAddressFamily: true})
 
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)

@@ -266,7 +266,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
 			family := ipfamily.ForAddress(net.ParseIP(s.PeerAddress))
 
-			if s.PeerInterface != "" {
+			if s.PeerInterface != "" || s.DualStackAddressFamily {
 				family = ipfamily.DualStack
 			}
 
@@ -302,7 +302,6 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				GracefulRestart: s.GracefulRestart,
 				EBGPMultiHop:    s.EBGPMultiHop,
 				VRFName:         s.VRFName,
-				DisableMP:       s.DisableMP,
 			}
 			if s.SourceAddress != nil {
 				neighbor.SrcAddr = s.SourceAddress.String()

@@ -37,11 +37,6 @@ router bgp 100 vrf red
     neighbor 10.2.2.254 route-map 10.2.2.254-red-in in
     neighbor 10.2.2.254 route-map 10.2.2.254-red-out out
   exit-address-family
-  address-family ipv6 unicast
-    neighbor 10.2.2.254 activate
-    neighbor 10.2.2.254 route-map 10.2.2.254-red-in in
-    neighbor 10.2.2.254 route-map 10.2.2.254-red-out out
-  exit-address-family
   address-family ipv4 unicast
     network 172.16.1.11/24
   exit-address-family

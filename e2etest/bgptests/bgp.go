@@ -1655,7 +1655,6 @@ var _ = ginkgo.Describe("BGP", func() {
 			resources := config.Resources{
 				Peers: metallb.PeersForContainers(FRRContainers, ipfamily.IPv4, func(p *metallbv1beta2.BGPPeer) {
 					p.Spec.ConnectTime = ptr.To(metav1.Duration{Duration: connectTime})
-					p.Spec.DisableMP = true
 				}),
 			}
 			err := ConfigUpdater.Update(resources)
