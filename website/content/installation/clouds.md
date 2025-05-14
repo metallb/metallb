@@ -93,15 +93,29 @@ After that, MetalLB should work normally.
 ### MetalLB on OpenStack
 
 You can run a Kubernetes cluster on OpenStack VMs, and use MetalLB as
-the load balancer. However you have to disable OpenStack's ARP
-spoofing protection if you want to use L2 mode. You must disable it on
-all the VMs that are running Kubernetes.
+the load balancer. However you have to account for OpenStack's ARP
+spoofing protection if you want to use L2 mode.
 
 By design, MetalLB's L2 mode looks like an ARP spoofing attempt to
 OpenStack, because we're announcing IP addresses that OpenStack
-doesn't know about. There's currently no way to make OpenStack
-cooperate with MetalLB here, so we have to turn off the spoofing
-protection entirely.
+doesn't know about.
+
+In order to account for this, you must add those IP addresses to the allowed 
+addresses for the network ports of kubernetes nodes that may host a MetalLB 
+speaker pod.
+
+You must also create network ports for the addresses that MetalLB will hold.
+These ports are not to be attached to an OpenStack server.
+
+To these ports, associate floating IP addresses. The floating IP lisitng will
+present you with pairs of floating IP address and fixed IP address. Assign
+the fixed IP addresses to MetalLB IPAddressPool resources. Also, add the fixed
+ip addresses as allowed addresses to the ports that may hold the IP address.
+
+Traffic to the floating IP address will be routed to the port holding the 
+floating IP address. The port is down, but the traffic is routed to the 
+correct network. The L2 advertisement ensures the packets are then routed
+to the port of the node holding the fixed IP address.
 
 ### MetalLB on Equinix Metal
 
