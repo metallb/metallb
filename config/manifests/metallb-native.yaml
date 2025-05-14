@@ -1989,10 +1989,10 @@ spec:
       volumes:
       - name: memberlist
         secret:
-          defaultMode: 420
+          defaultMode: 256
           secretName: memberlist
       - configMap:
-          defaultMode: 256
+          defaultMode: 416
           name: metallb-excludel2
         name: metallb-excludel2
 ---
