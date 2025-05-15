@@ -6,15 +6,16 @@ ipv6 nht resolve-via-default
 route-map 10.2.2.254-in deny 20
 
 
+ip prefix-list 10.2.2.254-allowed-ipv4 seq 1 deny any
 
 
-ip prefix-list 10.2.2.254-pl-ipv4 seq 1 deny any
-ipv6 prefix-list 10.2.2.254-pl-ipv4 seq 2 deny any
+ipv6 prefix-list 10.2.2.254-allowed-ipv6 seq 1 deny any
 
 route-map 10.2.2.254-out permit 1
-  match ip address prefix-list 10.2.2.254-pl-ipv4
+  match ip address prefix-list 10.2.2.254-allowed-ipv4
+
 route-map 10.2.2.254-out permit 2
-  match ipv6 address prefix-list 10.2.2.254-pl-ipv4
+  match ipv6 address prefix-list 10.2.2.254-allowed-ipv6
 
 router bgp 100
   no bgp ebgp-requires-policy
@@ -30,11 +31,6 @@ router bgp 100
   neighbor 10.2.2.254 update-source 10.1.1.254
 
   address-family ipv4 unicast
-    neighbor 10.2.2.254 activate
-    neighbor 10.2.2.254 route-map 10.2.2.254-in in
-    neighbor 10.2.2.254 route-map 10.2.2.254-out out
-  exit-address-family
-  address-family ipv6 unicast
     neighbor 10.2.2.254 activate
     neighbor 10.2.2.254 route-map 10.2.2.254-in in
     neighbor 10.2.2.254 route-map 10.2.2.254-out out

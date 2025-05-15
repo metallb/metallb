@@ -17,6 +17,7 @@ import (
 	"go.universe.tf/e2etest/pkg/metallb"
 	testservice "go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -77,7 +78,9 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 						},
 					},
 				},
-				Peers:   metallb.PeersForContainers(FRRContainers, pairingFamily),
+				Peers: metallb.PeersForContainers(FRRContainers, pairingFamily, func(p *metallbv1beta2.BGPPeer) {
+					p.Spec.DualStackAddressFamily = true
+				}),
 				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 			}
 			err := ConfigUpdater.Update(resources)
@@ -150,7 +153,9 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 				}
 
 				resources := config.Resources{
-					Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
+					Peers: metallb.PeersForContainers(FRRContainers, ipFamily, func(p *metallbv1beta2.BGPPeer) {
+						p.Spec.DualStackAddressFamily = true
+					}),
 					Pools: []metallbv1beta1.IPAddressPool{pool},
 					BGPAdvs: []metallbv1beta1.BGPAdvertisement{
 						emptyAdvertisement,

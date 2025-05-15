@@ -280,7 +280,6 @@ func (sm *sessionManager) updateConfig() error {
 					Name:      s.PasswordRef.Name,
 					Namespace: s.PasswordRef.Namespace,
 				},
-				DisableMP: s.DisableMP,
 			}
 		}
 

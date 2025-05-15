@@ -11,16 +11,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/log"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/bgp/community"
-	"go.universe.tf/metallb/internal/ipfamily"
 	"go.universe.tf/metallb/internal/logging"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
@@ -407,7 +404,7 @@ func TestTwoIPv6Sessions(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
-func TestIPv4AndIPv6SessionsDisableMP(t *testing.T) {
+func TestIPv4AndIPv6SessionsDualStackFamily(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
@@ -416,19 +413,19 @@ func TestIPv4AndIPv6SessionsDisableMP(t *testing.T) {
 
 	session1, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10:2:2::254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10:1:1::254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  false,
-			SessionName:   "test-peer1",
-			DisableMP:     true},
+			PeerAddress:            "10:2:2::254",
+			PeerPort:               179,
+			SourceAddress:          net.ParseIP("10:1:1::254"),
+			MyASN:                  100,
+			RouterID:               net.ParseIP("10.1.1.254"),
+			PeerASN:                200,
+			HoldTime:               ptr.To(time.Second),
+			KeepAliveTime:          ptr.To(time.Second),
+			Password:               "password",
+			CurrentNode:            "hostname",
+			EBGPMultiHop:           false,
+			SessionName:            "test-peer1",
+			DualStackAddressFamily: true},
 	)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
@@ -436,19 +433,19 @@ func TestIPv4AndIPv6SessionsDisableMP(t *testing.T) {
 	defer session1.Close()
 	session2, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.4.4.255",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.3.3.254"),
-			MyASN:         300,
-			RouterID:      net.ParseIP("10.3.3.254"),
-			PeerASN:       400,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer2",
-			DisableMP:     true})
+			PeerAddress:            "10.4.4.255",
+			PeerPort:               179,
+			SourceAddress:          net.ParseIP("10.3.3.254"),
+			MyASN:                  300,
+			RouterID:               net.ParseIP("10.3.3.254"),
+			PeerASN:                400,
+			HoldTime:               ptr.To(time.Second),
+			KeepAliveTime:          ptr.To(time.Second),
+			Password:               "password",
+			CurrentNode:            "hostname",
+			EBGPMultiHop:           true,
+			SessionName:            "test-peer2",
+			DualStackAddressFamily: true})
 
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
@@ -1179,185 +1176,6 @@ func TestSingleSessionWithZeroTimers(t *testing.T) {
 	defer session.Close()
 
 	testCheckConfigFile(t)
-}
-
-func TestAddToAdvertisements(t *testing.T) {
-	tests := []struct {
-		name      string
-		current   []*advertisementConfig
-		toAdd     *advertisementConfig
-		expected  []*advertisementConfig
-		shouldErr bool
-	}{
-		{
-			name:    "starting empty",
-			current: []*advertisementConfig{},
-			toAdd: &advertisementConfig{
-				Prefix:   "192.168.1.1/32",
-				IPFamily: ipfamily.IPv4,
-			},
-			expected: []*advertisementConfig{
-				{
-					Prefix:   "192.168.1.1/32",
-					IPFamily: ipfamily.IPv4,
-				},
-			},
-		},
-		{
-			name: "mismatch localpref",
-			current: []*advertisementConfig{{
-				Prefix:    "192.168.1.1/32",
-				IPFamily:  ipfamily.IPv4,
-				LocalPref: uint32(12),
-			}},
-			toAdd: &advertisementConfig{
-				Prefix:    "192.168.1.1/32",
-				IPFamily:  ipfamily.IPv4,
-				LocalPref: uint32(13),
-			},
-			shouldErr: true,
-		},
-		{
-			name: "adding to back",
-			current: []*advertisementConfig{
-				{
-					Prefix:   "192.168.1.1/32",
-					IPFamily: ipfamily.IPv4,
-				},
-			},
-			toAdd: &advertisementConfig{
-				Prefix:   "192.168.1.2/32",
-				IPFamily: ipfamily.IPv4,
-			},
-			expected: []*advertisementConfig{
-				{
-					Prefix:   "192.168.1.1/32",
-					IPFamily: ipfamily.IPv4,
-				},
-				{
-					Prefix:   "192.168.1.2/32",
-					IPFamily: ipfamily.IPv4,
-				},
-			},
-		},
-		{
-			name: "adding to head",
-			current: []*advertisementConfig{
-				{
-					Prefix:   "192.168.1.2/32",
-					IPFamily: ipfamily.IPv4,
-				},
-			},
-			toAdd: &advertisementConfig{
-				Prefix:   "192.168.1.1/32",
-				IPFamily: ipfamily.IPv4,
-			},
-			expected: []*advertisementConfig{
-				{
-					Prefix:   "192.168.1.1/32",
-					IPFamily: ipfamily.IPv4,
-				},
-				{
-					Prefix:   "192.168.1.2/32",
-					IPFamily: ipfamily.IPv4,
-				},
-			},
-		},
-		{
-			name: "adding in the middle",
-			current: []*advertisementConfig{
-				{
-					Prefix:   "192.168.1.1/32",
-					IPFamily: ipfamily.IPv4,
-				},
-				{
-					Prefix:   "192.168.1.3/32",
-					IPFamily: ipfamily.IPv4,
-				},
-			},
-			toAdd: &advertisementConfig{
-				Prefix:   "192.168.1.2/32",
-				IPFamily: ipfamily.IPv4,
-			},
-			expected: []*advertisementConfig{
-				{
-					Prefix:   "192.168.1.1/32",
-					IPFamily: ipfamily.IPv4,
-				},
-				{
-					Prefix:   "192.168.1.2/32",
-					IPFamily: ipfamily.IPv4,
-				},
-				{
-					Prefix:   "192.168.1.3/32",
-					IPFamily: ipfamily.IPv4,
-				},
-			},
-		},
-		{
-			name: "should add communities",
-			current: []*advertisementConfig{
-				{
-					Prefix:   "192.168.1.1/32",
-					IPFamily: ipfamily.IPv4,
-				},
-				{
-					Prefix:   "192.168.1.3/32",
-					IPFamily: ipfamily.IPv4,
-					Communities: []string{
-						"1111:2222",
-						"3333:4444",
-					},
-				},
-			},
-			toAdd: &advertisementConfig{
-				Prefix:   "192.168.1.3/32",
-				IPFamily: ipfamily.IPv4,
-				Communities: []string{
-					"1111:2222",
-					"5555:6666",
-				},
-				LargeCommunities: []string{
-					"3333:4444:5555",
-					"6666:7777:8888",
-				},
-			},
-			expected: []*advertisementConfig{
-				{
-					Prefix:   "192.168.1.1/32",
-					IPFamily: ipfamily.IPv4,
-				},
-				{
-					Prefix:   "192.168.1.3/32",
-					IPFamily: ipfamily.IPv4,
-					Communities: []string{
-						"1111:2222",
-						"3333:4444",
-						"5555:6666",
-					},
-					LargeCommunities: []string{
-						"3333:4444:5555",
-						"6666:7777:8888",
-					},
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			res, err := addToAdvertisements(tt.current, tt.toAdd)
-			if err != nil && !tt.shouldErr {
-				t.Fatalf("unexpected error: %s", err)
-			}
-			if err == nil && tt.shouldErr {
-				t.Fatalf("expecting error")
-			}
-			if !reflect.DeepEqual(res, tt.expected) {
-				t.Fatalf("expecting %s got %s", spew.Sdump(tt.expected), spew.Sdump(res))
-			}
-		})
-	}
 }
 
 func TestSingleSessionWithInternalASN(t *testing.T) {

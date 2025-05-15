@@ -432,7 +432,8 @@ _Appears in:_
 | `enableGracefulRestart` _boolean_ | EnableGracefulRestart allows BGP peer to continue to forward data packets<br />along known routes while the routing protocol information is being<br />restored. This field is immutable because it requires restart of the BGP<br />session. Supported for FRR mode only. |
 | `ebgpMultiHop` _boolean_ | To set if the BGPPeer is multi-hops away. Needed for FRR mode only. |
 | `vrf` _string_ | To set if we want to peer with the BGPPeer using an interface belonging to<br />a host vrf |
-| `disableMP` _boolean_ | To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions. |
+| `disableMP` _boolean_ | To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.<br />Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily. |
+| `dualStackAddressFamily` _boolean_ | To set if we want to enable the neighbor not only for the ipfamily related to its session,<br />but also the other one. This allows to advertise/receive IPv4 prefixes over IPv6 sessions and vice versa. |
 
 
 
