@@ -11,9 +11,11 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/frr"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
 	"go.universe.tf/e2etest/pkg/metallb"
+	corev1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -22,6 +24,12 @@ func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace st
 	err := os.Mkdir(testPath, 0755)
 	if err != nil && !errors.Is(err, os.ErrExist) {
 		fmt.Fprintf(os.Stderr, "failed to create test dir: %v\n", err)
+		return
+	}
+
+	summaryFile, err := logFileFor(testPath, "summary")
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("External frr dump, failed to open summary file %v", err)
 		return
 	}
 
@@ -42,6 +50,7 @@ func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace st
 			ginkgo.GinkgoWriter.Printf("External frr dump for container %s, failed to write to file %v", c.Name, err)
 			continue
 		}
+		writeSummaryForContainer(summaryFile, c)
 	}
 
 	speakerPods, err := metallb.SpeakerPods(cs)
@@ -69,6 +78,7 @@ func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace st
 			ginkgo.GinkgoWriter.Printf("External frr dump for pod %s, failed to write to file %v", pod.Name, err)
 			continue
 		}
+		writeSummaryForSpeaker(summaryFile, pod)
 	}
 }
 
@@ -79,4 +89,23 @@ func logFileFor(base string, kind string) (*os.File, error) {
 		return nil, err
 	}
 	return f, nil
+}
+
+func writeSummaryForSpeaker(summaryFile *os.File, s *corev1.Pod) {
+	fmt.Fprintf(summaryFile, "Speaker %s running on node %s\n", s.Name, s.Spec.NodeName)
+	exec := executor.ForPod(s.Name, s.Namespace, "frr")
+	ipAddr, err := exec.Exec("bash", "-c", "ip address show")
+	_, err = fmt.Fprint(summaryFile, ipAddr)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("External frr dump for pod %s, failed to write to file %v", s.Name, err)
+	}
+}
+
+func writeSummaryForContainer(summaryFile *os.File, c *frrcontainer.FRR) {
+	fmt.Fprintf(summaryFile, "Container %s\n", c.Name)
+	ipAddr, err := c.Exec("bash", "-c", "ip address show")
+	_, err = fmt.Fprint(summaryFile, ipAddr)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("External frr dump for container %s, failed to write to file %v", c.Name, err)
+	}
 }

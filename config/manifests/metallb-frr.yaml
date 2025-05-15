@@ -550,8 +550,15 @@ spec:
                   rule: duration(self).getMilliseconds() % 1000 == 0
               disableMP:
                 default: false
-                description: To set if we want to disable MP BGP that will separate
-                  IPv4 and IPv6 route exchanges into distinct BGP sessions.
+                description: |-
+                  To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.
+                  Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily.
+                type: boolean
+              dualStackAddressFamily:
+                default: false
+                description: |-
+                  To set if we want to enable the neighbor not only for the ipfamily related to its session,
+                  but also the other one. This allows to advertise/receive IPv4 prefixes over IPv6 sessions and vice versa.
                 type: boolean
               dynamicASN:
                 description: |-
@@ -2021,7 +2028,7 @@ spec:
         env:
         - name: TINI_SUBREAPER
           value: "true"
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.1.3
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -2049,7 +2056,7 @@ spec:
           name: frr-conf
       - command:
         - /etc/frr_reloader/frr-reloader.sh
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.1.3
         name: reloader
         volumeMounts:
         - mountPath: /var/run/frr
@@ -2065,7 +2072,7 @@ spec:
         env:
         - name: VTYSH_HISTFILE
           value: /dev/null
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.1.3
         name: frr-metrics
         ports:
         - containerPort: 7473
@@ -2158,7 +2165,7 @@ spec:
         - /bin/sh
         - -c
         - cp -rLf /tmp/frr/* /etc/frr/
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.1.3
         name: cp-frr-files
         securityContext:
           runAsGroup: 101

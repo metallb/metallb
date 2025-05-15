@@ -193,8 +193,15 @@ spec:
                   rule: duration(self).getMilliseconds() % 1000 == 0
               disableMP:
                 default: false
-                description: To set if we want to disable MP BGP that will separate
-                  IPv4 and IPv6 route exchanges into distinct BGP sessions.
+                description: |-
+                  To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.
+                  Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily.
+                type: boolean
+              dualStackAddressFamily:
+                default: false
+                description: |-
+                  To set if we want to enable the neighbor not only for the ipfamily related to its session,
+                  but also the other one. This allows to advertise/receive IPv4 prefixes over IPv6 sessions and vice versa.
                 type: boolean
               dynamicASN:
                 description: |-
