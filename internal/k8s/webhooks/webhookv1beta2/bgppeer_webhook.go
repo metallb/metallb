@@ -73,9 +73,12 @@ func (v *BGPPeerValidator) Handle(ctx context.Context, req admission.Request) ad
 	}
 	switch req.Operation {
 	case v1.Create:
-		err := validatePeerCreate(&peer)
+		warning, err := validatePeerCreate(&peer)
 		if err != nil {
 			return admission.Denied(err.Error())
+		}
+		if warning != "" {
+			return admission.Allowed("").WithWarnings(warning)
 		}
 	case v1.Update:
 		err := validatePeerUpdate(&peer, &oldPeer)
@@ -92,24 +95,28 @@ func (v *BGPPeerValidator) Handle(ctx context.Context, req admission.Request) ad
 }
 
 // validatePeerCreate implements webhook.Validator so a webhook will be registered for BGPPeer.
-func validatePeerCreate(bgpPeer *v1beta2.BGPPeer) error {
+func validatePeerCreate(bgpPeer *v1beta2.BGPPeer) (string, error) {
 	level.Debug(Logger).Log("webhook", "bgppeer", "action", "create", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace)
 
+	if bgpPeer.Spec.DisableMP {
+		return "disable mp is deprecated and has no effect since it's the default behavior now", nil
+	}
+
 	if bgpPeer.Namespace != MetalLBNamespace {
-		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+		return "", fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
 	}
 	existingBGPPeers, err := GetExistingBGPPeers()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	toValidate := bgpPeerListWithUpdate(existingBGPPeers, bgpPeer)
 	err = Validator.Validate(toValidate)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgppeer", "action", "create", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace, "error", err)
-		return err
+		return "", err
 	}
-	return nil
+	return "", nil
 }
 
 // validatePeerUpdate implements webhook.Validator so a webhook will be registered for BGPPeer.

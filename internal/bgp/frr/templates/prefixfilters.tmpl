@@ -1,0 +1,50 @@
+{{- define "neighborfilters" -}}
+route-map {{.neighbor.ID}}-in deny 20
+
+{{- range $prefixList:=.neighbor.LocalPrefPrefixLists }}
+{{- range $prefix:=.Prefixes }}
+{{$prefixList.IPFamily}} prefix-list {{ $prefixList.Name }} seq {{counter $prefixList.Name}} permit {{$prefix}}
+{{- end }}
+
+route-map {{$.neighbor.ID}}-out permit {{counter $.neighbor.ID}}
+  match {{$prefixList.IPFamily}} address prefix-list {{$prefixList.Name }}
+  {{$prefixList.SetStatement}}
+  on-match next
+{{ end -}}
+
+{{- range $prefixList:=.neighbor.CommunityPrefixLists }}
+{{- range $prefix:=.Prefixes }}
+{{$prefixList.IPFamily}} prefix-list {{ $prefixList.Name }} seq {{counter $prefixList.Name}} permit {{$prefix}}
+{{- end }}
+
+route-map {{$.neighbor.ID}}-out permit {{counter $.neighbor.ID}}
+  match {{$prefixList.IPFamily}} address prefix-list {{$prefixList.Name }}
+  {{$prefixList.SetStatement}}
+  on-match next
+{{ end -}}
+
+{{$prefixListName:=.neighbor.ToAdvertisePrefixListV4}}
+
+{{ if not .neighbor.PrefixesV4 }}
+ip prefix-list {{$prefixListName}} seq {{counter $prefixListName}} deny any
+{{- end }}
+{{- range $a := .neighbor.PrefixesV4 }}
+ip prefix-list {{$prefixListName}} seq {{counter $prefixListName}} permit {{$a}}
+{{- end }}
+
+{{$prefixListName:=.neighbor.ToAdvertisePrefixListV6}}
+
+{{- if not .neighbor.PrefixesV6 }}
+ipv6 prefix-list {{$prefixListName}} seq {{counter $prefixListName}} deny any
+{{- end }}
+{{- range $a := .neighbor.PrefixesV6 }}
+ipv6 prefix-list {{$prefixListName}} seq {{counter $prefixListName}} permit {{$a}}
+{{- end }}
+
+route-map {{$.neighbor.ID}}-out permit {{counter $.neighbor.ID}}
+  match ip address prefix-list {{.neighbor.ToAdvertisePrefixListV4}}
+
+route-map {{$.neighbor.ID}}-out permit {{counter $.neighbor.ID}}
+  match ipv6 address prefix-list {{.neighbor.ToAdvertisePrefixListV6}}
+
+{{- end -}}  

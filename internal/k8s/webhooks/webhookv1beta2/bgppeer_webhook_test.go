@@ -129,9 +129,8 @@ func TestValidateBGPPeer(t *testing.T) {
 		mock := &mockValidator{}
 		Validator = mock
 		mock.forceError = test.failValidate
-
 		if test.isNew {
-			err = validatePeerCreate(test.bgpPeer)
+			_, err = validatePeerCreate(test.bgpPeer)
 		} else {
 			err = validatePeerUpdate(test.bgpPeer, nil)
 		}

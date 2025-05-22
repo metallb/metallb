@@ -5,14 +5,14 @@
   {{- $peer = .Iface }}
 {{- end }}
 {{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
-{{- if activateNeighborFor "ipv4" .IPFamily .DisableMP}}
+{{- if activateNeighborFor "ipv4" .IPFamily}}
   address-family ipv4 unicast
     neighbor {{$peer}} activate
     neighbor {{$peer}} route-map {{.ID}}-in in
     neighbor {{$peer}} route-map {{.ID}}-out out
   exit-address-family
 {{- end -}}
-{{if activateNeighborFor "ipv6" .IPFamily .DisableMP}}
+{{if activateNeighborFor "ipv6" .IPFamily}}
   address-family ipv6 unicast
     neighbor {{$peer}} activate
     neighbor {{$peer}} route-map {{.ID}}-in in

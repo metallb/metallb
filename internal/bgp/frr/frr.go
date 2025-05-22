@@ -211,26 +211,13 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		ExtraConfig: sm.extraConfig,
 	}
 
-	type neighborProperties struct {
-		// It has at least one advertisement with these communities
-		CommunitiesV4 sets.Set[string]
-		CommunitiesV6 sets.Set[string]
-		// It has at least one advertisement with these large communities
-		LargeCommunitiesV4 sets.Set[string]
-		LargeCommunitiesV6 sets.Set[string]
-		// It has at least one advertisement with these local preferences
-		LocalPrefsV4 sets.Set[uint32]
-		LocalPrefsV6 sets.Set[uint32]
-	}
-
 	type router struct {
-		myASN               uint32
-		routerID            string
-		neighbors           map[string]*neighborConfig
-		neighborsProperties map[string]*neighborProperties
-		vrf                 string
-		ipV4Prefixes        map[string]string
-		ipV6Prefixes        map[string]string
+		myASN        uint32
+		routerID     string
+		neighbors    map[string]*neighborConfig
+		vrf          string
+		ipV4Prefixes map[string]string
+		ipV6Prefixes map[string]string
 	}
 
 	routers := make(map[string]*router)
@@ -249,12 +236,11 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		routerName := RouterName(s.RouterID.String(), s.MyASN, s.VRFName)
 		if rout, exist = routers[routerName]; !exist {
 			rout = &router{
-				myASN:               s.MyASN,
-				neighbors:           make(map[string]*neighborConfig),
-				neighborsProperties: make(map[string]*neighborProperties),
-				ipV4Prefixes:        make(map[string]string),
-				ipV6Prefixes:        make(map[string]string),
-				vrf:                 s.VRFName,
+				myASN:        s.MyASN,
+				neighbors:    make(map[string]*neighborConfig),
+				ipV4Prefixes: make(map[string]string),
+				ipV6Prefixes: make(map[string]string),
+				vrf:          s.VRFName,
 			}
 			if s.RouterID != nil {
 				rout.routerID = s.RouterID.String()
@@ -266,7 +252,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
 			family := ipfamily.ForAddress(net.ParseIP(s.PeerAddress))
 
-			if s.PeerInterface != "" {
+			if s.PeerInterface != "" || s.DualStackAddressFamily {
 				family = ipfamily.DualStack
 			}
 
@@ -287,97 +273,106 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			}
 
 			neighbor = &neighborConfig{
-				Name:            neighborName,
-				IPFamily:        family,
-				ASN:             asnFor(s.PeerASN, s.DynamicASN),
-				Addr:            s.PeerAddress,
-				Iface:           s.PeerInterface,
-				Port:            s.PeerPort,
-				HoldTime:        holdTime,
-				KeepaliveTime:   keepaliveTime,
-				ConnectTime:     connectTime,
-				Password:        s.Password,
-				Advertisements:  make([]*advertisementConfig, 0),
-				BFDProfile:      s.BFDProfile,
-				GracefulRestart: s.GracefulRestart,
-				EBGPMultiHop:    s.EBGPMultiHop,
-				VRFName:         s.VRFName,
-				DisableMP:       s.DisableMP,
+				Name:                     neighborName,
+				IPFamily:                 family,
+				ASN:                      asnFor(s.PeerASN, s.DynamicASN),
+				Addr:                     s.PeerAddress,
+				Iface:                    s.PeerInterface,
+				Port:                     s.PeerPort,
+				HoldTime:                 holdTime,
+				KeepaliveTime:            keepaliveTime,
+				ConnectTime:              connectTime,
+				Password:                 s.Password,
+				BFDProfile:               s.BFDProfile,
+				GracefulRestart:          s.GracefulRestart,
+				EBGPMultiHop:             s.EBGPMultiHop,
+				VRFName:                  s.VRFName,
+				PrefixesV4:               []string{},
+				PrefixesV6:               []string{},
+				prefixesV4Set:            sets.New[string](),
+				prefixesV6Set:            sets.New[string](),
+				CommunityPrefixModifiers: make(map[string]CommunityPrefixList),
+				LocalPrefPrefixModifiers: make(map[string]LocalPrefPrefixList),
 			}
 			if s.SourceAddress != nil {
 				neighbor.SrcAddr = s.SourceAddress.String()
 			}
+
 			rout.neighbors[neighborName] = neighbor
-			rout.neighborsProperties[neighborName] = &neighborProperties{
-				CommunitiesV4:      sets.New[string](),
-				CommunitiesV6:      sets.New[string](),
-				LargeCommunitiesV4: sets.New[string](),
-				LargeCommunitiesV6: sets.New[string](),
-				LocalPrefsV4:       sets.New[uint32](),
-				LocalPrefsV6:       sets.New[uint32](),
-			}
 		}
 
-		properties := rout.neighborsProperties[neighborName]
-
 		for _, adv := range s.advertised {
+			prefix := adv.Prefix.String()
 			family := ipfamily.ForAddress(adv.Prefix.IP)
 
-			communities := make([]string, 0)
-			largeCommunities := make([]string, 0)
-
-			// Convert community 32bits value to : format
-			for _, c := range adv.Communities {
-				if community.IsLarge(c) {
-					largeCommunities = append(largeCommunities, c.String())
-					if family == ipfamily.IPv4 {
-						properties.LargeCommunitiesV4.Insert(c.String())
-						continue
-					}
-					properties.LargeCommunitiesV6.Insert(c.String())
-					continue
-				}
-				communities = append(communities, c.String())
-				if family == ipfamily.IPv4 {
-					properties.CommunitiesV4.Insert(c.String())
-					continue
-				}
-				properties.CommunitiesV6.Insert(c.String())
+			if neighbor.IPFamily != family &&
+				neighbor.IPFamily != ipfamily.DualStack {
+				continue
 			}
+			frrFamily := frrIPFamily(family)
 
-			prefix := adv.Prefix.String()
-			advConfig := advertisementConfig{
-				IPFamily:         family,
-				Prefix:           prefix,
-				Communities:      sort.StringSlice(communities),
-				LargeCommunities: sort.StringSlice(largeCommunities),
-				LocalPref:        adv.LocalPref,
+			for _, c := range adv.Communities {
+				prefixListName := communityPrefixList(neighbor, c.String(), frrFamily)
+				if community.IsLarge(c) {
+					prefixListName = largeCommunityPrefixList(neighbor, c.String(), frrFamily)
+				}
+				prefixList, ok := neighbor.CommunityPrefixModifiers[prefixListName]
+				if !ok {
+					prefixList = CommunityPrefixList{
+						PropertyPrefixList: PropertyPrefixList{
+							Name:        prefixListName,
+							IPFamily:    frrFamily,
+							prefixesSet: sets.New[string](),
+							Prefixes:    []string{},
+						},
+						Community: c,
+					}
+				}
+				prefixList.prefixesSet.Insert(prefix)
+				neighbor.CommunityPrefixModifiers[prefixListName] = prefixList
 			}
 			if adv.LocalPref != 0 {
-				if family == ipfamily.IPv4 {
-					properties.LocalPrefsV4.Insert(adv.LocalPref)
-				} else {
-					properties.LocalPrefsV6.Insert(adv.LocalPref)
+				prefixListName := localPrefPrefixList(neighbor, adv.LocalPref, frrFamily)
+				prefixList, ok := neighbor.LocalPrefPrefixModifiers[prefixListName]
+				if !ok {
+					prefixList = LocalPrefPrefixList{
+						PropertyPrefixList: PropertyPrefixList{
+							Name:        prefixListName,
+							IPFamily:    frrFamily,
+							prefixesSet: sets.New[string](),
+							Prefixes:    []string{},
+						},
+						LocalPreference: adv.LocalPref,
+					}
 				}
-			}
-
-			neighbor.Advertisements, err = addToAdvertisements(neighbor.Advertisements, &advConfig)
-			if err != nil {
-				return nil, err
+				prefixList.prefixesSet.Insert(prefix)
+				neighbor.LocalPrefPrefixModifiers[prefixListName] = prefixList
 			}
 
 			switch family {
 			case ipfamily.IPv4:
+				neighbor.prefixesV4Set.Insert(prefix)
 				rout.ipV4Prefixes[prefix] = prefix
-				neighbor.HasV4Advertisements = true
 			case ipfamily.IPv6:
+				neighbor.prefixesV6Set.Insert(prefix)
 				rout.ipV6Prefixes[prefix] = prefix
-				neighbor.HasV6Advertisements = true
 			}
 		}
 	}
 
 	for _, r := range sortMap(routers) {
+		for _, n := range r.neighbors {
+			n.PrefixesV4 = sets.List(n.prefixesV4Set)
+			n.PrefixesV6 = sets.List(n.prefixesV6Set)
+			for k, m := range n.CommunityPrefixModifiers {
+				m.Prefixes = sets.List(n.CommunityPrefixModifiers[k].prefixesSet)
+				n.CommunityPrefixModifiers[k] = m
+			}
+			for k, m := range n.LocalPrefPrefixModifiers {
+				m.Prefixes = sets.List(n.LocalPrefPrefixModifiers[k].prefixesSet)
+				n.LocalPrefPrefixModifiers[k] = m
+			}
+		}
 		toAdd := &routerConfig{
 			MyASN:        r.myASN,
 			RouterID:     r.routerID,
@@ -386,20 +381,28 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			IPV4Prefixes: sortMap(r.ipV4Prefixes),
 			IPV6Prefixes: sortMap(r.ipV6Prefixes),
 		}
-		// Filling in the neighbor properties
-		for _, n := range toAdd.Neighbors {
-			properties := r.neighborsProperties[n.Name]
-			n.CommunitiesV4 = sets.List(properties.CommunitiesV4)
-			n.CommunitiesV6 = sets.List(properties.CommunitiesV6)
-			n.LargeCommunitiesV4 = sets.List(properties.LargeCommunitiesV4)
-			n.LargeCommunitiesV6 = sets.List(properties.LargeCommunitiesV6)
-			n.LocalPrefsV4 = sets.List(properties.LocalPrefsV4)
-			n.LocalPrefsV6 = sets.List(properties.LocalPrefsV6)
-		}
-
 		config.Routers = append(config.Routers, toAdd)
 	}
 	return config, nil
+}
+
+func frrIPFamily(ipFamily ipfamily.Family) string {
+	if ipFamily == ipfamily.IPv6 {
+		return "ipv6"
+	}
+	return "ip"
+}
+
+func localPrefPrefixList(neighbor *neighborConfig, localPreference uint32, ipFamily string) string {
+	return fmt.Sprintf("%s-%d-%s-localpref-prefixes", neighbor.ID(), localPreference, ipFamily)
+}
+
+func communityPrefixList(neighbor *neighborConfig, community, ipFamily string) string {
+	return fmt.Sprintf("%s-%s-%s-community-prefixes", neighbor.ID(), community, ipFamily)
+}
+
+func largeCommunityPrefixList(neighbor *neighborConfig, community, ipFamily string) string {
+	return fmt.Sprintf("%s-large:%s-%s-community-prefixes", neighbor.ID(), community, ipFamily)
 }
 
 func (sm *sessionManager) SetEventCallback(func(interface{})) {}
@@ -532,52 +535,4 @@ func sortMap[T any](toSort map[string]T) []T {
 		res = append(res, toSort[k])
 	}
 	return res
-}
-
-func addToAdvertisements(current []*advertisementConfig, toAdd *advertisementConfig) ([]*advertisementConfig, error) {
-	i := sort.Search(len(current), func(i int) bool { return current[i].Prefix >= toAdd.Prefix })
-	if i == len(current) {
-		return append(current, toAdd), nil
-	}
-
-	if current[i].Prefix == toAdd.Prefix {
-		var err error
-		current[i], err = mergeAdvertisements(current[i], toAdd)
-		if err != nil {
-			return nil, err
-		}
-		return current, nil
-	}
-	res := make([]*advertisementConfig, len(current)+1)
-	copy(res[:i], current[:i])
-	copy(res[i+1:], current[i:])
-	res[i] = toAdd
-	return res, nil
-}
-
-func mergeAdvertisements(adv1, adv2 *advertisementConfig) (*advertisementConfig, error) {
-	res := &advertisementConfig{}
-	if adv1.Prefix != adv2.Prefix {
-		return nil, fmt.Errorf("cannot merge advertisements with different prefixes: %s != %s", adv1.Prefix, adv2.Prefix)
-	}
-	if adv1.IPFamily != adv2.IPFamily {
-		return nil, fmt.Errorf("cannot merge advertisements with different ipfamilies: %s != %s", adv1.IPFamily, adv2.IPFamily)
-	}
-	if adv1.LocalPref != adv2.LocalPref {
-		return nil, fmt.Errorf("cannot merge advertisements with different local preferences: %d != %d", adv1.LocalPref, adv2.LocalPref)
-	}
-
-	res.Prefix = adv1.Prefix
-	res.IPFamily = adv1.IPFamily
-	res.LocalPref = adv1.LocalPref
-	res.Communities = mergeCommunities(adv1.Communities, adv2.Communities)
-	res.LargeCommunities = mergeCommunities(adv1.LargeCommunities, adv2.LargeCommunities)
-	return res, nil
-}
-
-func mergeCommunities(c1, c2 []string) []string {
-	communities := sets.New[string]()
-	communities.Insert(c1...)
-	communities.Insert(c2...)
-	return sets.List(communities)
 }

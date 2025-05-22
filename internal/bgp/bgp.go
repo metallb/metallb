@@ -63,26 +63,26 @@ type Session interface {
 }
 
 type SessionParameters struct {
-	PeerAddress     string
-	PeerPort        uint16
-	PeerInterface   string
-	SourceAddress   net.IP
-	MyASN           uint32
-	RouterID        net.IP
-	PeerASN         uint32
-	DynamicASN      string
-	HoldTime        *time.Duration
-	KeepAliveTime   *time.Duration
-	ConnectTime     *time.Duration
-	Password        string
-	PasswordRef     v1.SecretReference
-	CurrentNode     string
-	BFDProfile      string
-	GracefulRestart bool
-	EBGPMultiHop    bool
-	VRFName         string
-	SessionName     string
-	DisableMP       bool
+	PeerAddress            string
+	PeerPort               uint16
+	PeerInterface          string
+	SourceAddress          net.IP
+	MyASN                  uint32
+	RouterID               net.IP
+	PeerASN                uint32
+	DynamicASN             string
+	HoldTime               *time.Duration
+	KeepAliveTime          *time.Duration
+	ConnectTime            *time.Duration
+	Password               string
+	PasswordRef            v1.SecretReference
+	CurrentNode            string
+	BFDProfile             string
+	GracefulRestart        bool
+	EBGPMultiHop           bool
+	VRFName                string
+	SessionName            string
+	DualStackAddressFamily bool
 }
 type SessionManager interface {
 	NewSession(logger log.Logger, args SessionParameters) (Session, error)

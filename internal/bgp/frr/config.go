@@ -17,7 +17,9 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/ipfamily"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var (
@@ -64,34 +66,27 @@ type BFDProfile struct {
 }
 
 type neighborConfig struct {
-	IPFamily            ipfamily.Family
-	Name                string
-	ASN                 string
-	Addr                string
-	Iface               string
-	SrcAddr             string
-	Port                uint16
-	HoldTime            *int64
-	KeepaliveTime       *int64
-	ConnectTime         int64
-	Password            string
-	Advertisements      []*advertisementConfig
-	BFDProfile          string
-	GracefulRestart     bool
-	EBGPMultiHop        bool
-	VRFName             string
-	HasV4Advertisements bool
-	HasV6Advertisements bool
-	// It has at least one advertisement with these communities
-	CommunitiesV4 []string
-	CommunitiesV6 []string
-	// It has at least one advertisement with these large communities
-	LargeCommunitiesV4 []string
-	LargeCommunitiesV6 []string
-	// It has at least one advertisement with these local preferences
-	LocalPrefsV4 []uint32
-	LocalPrefsV6 []uint32
-	DisableMP    bool
+	IPFamily                 ipfamily.Family
+	Name                     string
+	ASN                      string
+	Addr                     string
+	Iface                    string
+	SrcAddr                  string
+	Port                     uint16
+	HoldTime                 *int64
+	KeepaliveTime            *int64
+	ConnectTime              int64
+	Password                 string
+	BFDProfile               string
+	GracefulRestart          bool
+	EBGPMultiHop             bool
+	VRFName                  string
+	PrefixesV4               []string
+	PrefixesV6               []string
+	prefixesV4Set            sets.Set[string]
+	prefixesV6Set            sets.Set[string]
+	CommunityPrefixModifiers map[string]CommunityPrefixList
+	LocalPrefPrefixModifiers map[string]LocalPrefPrefixList
 }
 
 func (n *neighborConfig) ID() string {
@@ -106,12 +101,48 @@ func (n *neighborConfig) ID() string {
 	return id + vrf
 }
 
-type advertisementConfig struct {
-	IPFamily         ipfamily.Family
-	Prefix           string
-	Communities      []string
-	LargeCommunities []string
-	LocalPref        uint32
+func (n *neighborConfig) CommunityPrefixLists() []CommunityPrefixList {
+	return sortMap(n.CommunityPrefixModifiers)
+}
+
+func (n *neighborConfig) LocalPrefPrefixLists() []LocalPrefPrefixList {
+	return sortMap(n.LocalPrefPrefixModifiers)
+}
+
+func (n *neighborConfig) ToAdvertisePrefixListV4() string {
+	return fmt.Sprintf("%s-allowed-%s", n.ID(), "ipv4")
+}
+
+func (n *neighborConfig) ToAdvertisePrefixListV6() string {
+	return fmt.Sprintf("%s-allowed-%s", n.ID(), "ipv6")
+}
+
+type PropertyPrefixList struct {
+	Name        string
+	IPFamily    string
+	prefixesSet sets.Set[string]
+	Prefixes    []string
+}
+
+type CommunityPrefixList struct {
+	PropertyPrefixList
+	Community community.BGPCommunity
+}
+
+func (c CommunityPrefixList) SetStatement() string {
+	if community.IsLarge(c.Community) {
+		return fmt.Sprintf("set large-community %s additive", c.Community.String())
+	}
+	return fmt.Sprintf("set community %s additive", c.Community.String())
+}
+
+type LocalPrefPrefixList struct {
+	PropertyPrefixList
+	LocalPreference uint32
+}
+
+func (l LocalPrefPrefixList) SetStatement() string {
+	return fmt.Sprintf("set local-preference %d", l.LocalPreference)
 }
 
 // RouterName() defines the format of the key of the "Routers" map in the
@@ -156,20 +187,11 @@ func templateConfig(data interface{}) (string, error) {
 				}
 				return "ip"
 			},
-			"activateNeighborFor": func(ipFamily string, neighbourFamily ipfamily.Family, disableMP bool) bool {
-				return !disableMP || (disableMP && neighbourFamily.String() == ipFamily)
+			"activateNeighborFor": func(ipFamily string, neighbourFamily ipfamily.Family) bool {
+				return neighbourFamily.String() == ipFamily || neighbourFamily == ipfamily.DualStack
 			},
-			"localPrefPrefixList": func(neighbor *neighborConfig, localPreference uint32) string {
-				return fmt.Sprintf("%s-%d-%s-localpref-prefixes", neighbor.ID(), localPreference, neighbor.IPFamily)
-			},
-			"communityPrefixList": func(neighbor *neighborConfig, community string) string {
-				return fmt.Sprintf("%s-%s-%s-community-prefixes", neighbor.ID(), community, neighbor.IPFamily)
-			},
-			"largeCommunityPrefixList": func(neighbor *neighborConfig, community string) string {
-				return fmt.Sprintf("%s-large:%s-%s-community-prefixes", neighbor.ID(), community, neighbor.IPFamily)
-			},
-			"allowedPrefixList": func(neighbor *neighborConfig) string {
-				return fmt.Sprintf("%s-pl-%s", neighbor.ID(), neighbor.IPFamily)
+			"allowedPrefixList": func(neighbor *neighborConfig, ipFamily string) string {
+				return fmt.Sprintf("%s-pl-%s", neighbor.ID(), ipFamily)
 			},
 			"mustDisableConnectedCheck": func(ipFamily ipfamily.Family, myASN uint32, asn, iface string, eBGPMultiHop bool) bool {
 				// return true only for non-multihop IPv6 eBGP sessions
