@@ -199,7 +199,7 @@ controller:
   # -- Controller log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none`
   logLevel: info
   # command: /controller
-  # webhookMode: enabled
+  webhookMode: enabled
   image:
     repository: quay.io/metallb/controller
     tag:
@@ -368,3 +368,8 @@ frrk8s:
   enabled: false
   external: false
   namespace: ""
+
+# networkpolicies
+networkpolicies:
+  # if set, networkpolicy in the metallb namespaces will be installed
+  enabled: false

@@ -7,4 +7,5 @@ resources:
 - ../rbac
 - ../controllers
 - ../webhook
+- ../networkpolicies
 namespace: metallb-system
