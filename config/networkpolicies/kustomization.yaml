@@ -1,3 +1,2 @@
 resources:
-- deny_all.yaml
 - controller.yaml
