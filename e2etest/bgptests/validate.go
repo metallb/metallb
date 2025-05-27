@@ -186,6 +186,7 @@ func checkBFDConfigPropagated(nodeConfig metallbv1beta1.BFDProfile, peerConfig f
 }
 
 func checkServiceOnlyOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
+	ginkgo.GinkgoHelper()
 	if len(expectedNodes) == 0 {
 		return
 	}
