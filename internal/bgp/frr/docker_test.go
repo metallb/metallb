@@ -23,7 +23,7 @@ var (
 )
 
 const (
-	frrImageTag = "9.1.0"
+	frrImageTag = "9.1.3"
 )
 
 func TestMain(m *testing.M) {
