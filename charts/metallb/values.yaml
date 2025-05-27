@@ -371,5 +371,7 @@ frrk8s:
 
 # networkpolicies
 networkpolicies:
-  # if set, networkpolicy in the metallb namespaces will be installed
+  # if set, networkpolicies for metallb components will be installed in the metallb namespace
   enabled: false
+  # if set, a default deny network policy will be installed in the metallb namespace
+  defaultDeny: false

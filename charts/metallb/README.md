@@ -68,6 +68,7 @@ Kubernetes: `>= 1.19.0-0`
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
 | nameOverride | string | `""` |  |
+| networkpolicies.defaultDeny | bool | `false` |  |
 | networkpolicies.enabled | bool | `false` |  |
 | prometheus.controllerMetricsTLSSecret | string | `""` |  |
 | prometheus.metricsPort | int | `7472` |  |

@@ -612,7 +612,8 @@ apiServer:
         run(
             "helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
             "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "
-            "--set controller.logLevel=debug --set networkpolicies.enabled=true {} {}  --namespace metallb-system".format(
+            "--set networkpolicies.enabled=true --set networkpolicies.defaultDeny=true "
+            "--set controller.logLevel=debug {} {} --namespace metallb-system".format(
                 architecture, architecture, prometheus_values, frr_values
             ),
             echo=True,
@@ -620,7 +621,7 @@ apiServer:
     else:
         run("{} delete po -n metallb-system --all".format(kubectl_path), echo=True)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(delete=False) as tmpdir:
             manifest_file = tmpdir + "/metallb.yaml"
 
             generate_manifest(
@@ -649,6 +650,12 @@ apiServer:
                 f.flush()
 
             run("{} apply -f {}".format(kubectl_path, manifest_file), echo=True)
+            run(
+                "{} apply -f {}".format(
+                    kubectl_path, "config/networkpolicies/deny_all.yaml"
+                ),
+                echo=True,
+            )
 
     # Kind puts the remove exclusions annotation on the master node while
     # the e2e tests expect master to be serviceable, so we remove the annotations
