@@ -621,7 +621,7 @@ apiServer:
     else:
         run("{} delete po -n metallb-system --all".format(kubectl_path), echo=True)
 
-        with tempfile.TemporaryDirectory(delete=False) as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:
             manifest_file = tmpdir + "/metallb.yaml"
 
             generate_manifest(
