@@ -277,6 +277,10 @@ func main() {
 		}
 	}
 
+	if msg, err := checkNetworkPolicies(*namespace); err != nil || msg != "" {
+		level.Warn(logger).Log("op", "startup", "error", err, "msg", msg)
+	}
+
 	c.client = client
 	if err := client.Run(nil); err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to run k8s client")
