@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"reflect"
 	"sort"
 	"strconv"
@@ -18,6 +19,7 @@ import (
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/bgp/frr"
 	metallbconfig "go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/ipfamily"
 	"go.universe.tf/metallb/internal/logging"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -257,17 +259,18 @@ func (sm *sessionManager) updateConfig() error {
 			}
 
 			neighbor = frrv1beta1.Neighbor{
-				Address:               s.PeerAddress,
-				Interface:             s.PeerInterface,
-				ASN:                   s.PeerASN,
-				DynamicASN:            frrv1beta1.DynamicASNMode(s.DynamicASN),
-				Port:                  &s.PeerPort,
-				HoldTime:              holdTime,
-				KeepaliveTime:         keepaliveTime,
-				ConnectTime:           connectTime,
-				BFDProfile:            s.BFDProfile,
-				EnableGracefulRestart: s.GracefulRestart,
-				EBGPMultiHop:          s.EBGPMultiHop,
+				Address:                s.PeerAddress,
+				Interface:              s.PeerInterface,
+				ASN:                    s.PeerASN,
+				DynamicASN:             frrv1beta1.DynamicASNMode(s.DynamicASN),
+				Port:                   &s.PeerPort,
+				HoldTime:               holdTime,
+				KeepaliveTime:          keepaliveTime,
+				ConnectTime:            connectTime,
+				BFDProfile:             s.BFDProfile,
+				EnableGracefulRestart:  s.GracefulRestart,
+				EBGPMultiHop:           s.EBGPMultiHop,
+				DualStackAddressFamily: s.DualStackAddressFamily,
 				ToAdvertise: frrv1beta1.Advertise{
 					Allowed: frrv1beta1.AllowedOutPrefixes{
 						Prefixes: make([]string, 0),
@@ -283,12 +286,25 @@ func (sm *sessionManager) updateConfig() error {
 			}
 		}
 
+		neighborFamily := ipfamily.ForAddress(net.ParseIP(s.PeerAddress))
+
+		if s.PeerInterface != "" || s.DualStackAddressFamily {
+			neighborFamily = ipfamily.DualStack
+		}
+
 		/* As 'session.advertised' is a map, we can be sure there are no
 		   duplicate prefixes and can, therefore, just add them to the
 		   'neighbor.Advertisements' list. */
 		prefixesForCommunity := map[string][]string{}
 		prefixesForLocalPref := map[uint32][]string{}
 		for _, adv := range s.advertised {
+			family := ipfamily.ForAddress(adv.Prefix.IP)
+
+			if neighborFamily != family &&
+				neighborFamily != ipfamily.DualStack {
+				continue
+			}
+
 			prefix := adv.Prefix.String()
 			neighbor.ToAdvertise.Allowed.Prefixes = append(neighbor.ToAdvertise.Allowed.Prefixes, prefix)
 			rout.prefixes[prefix] = prefix
