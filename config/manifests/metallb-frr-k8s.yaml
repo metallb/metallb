@@ -3426,6 +3426,30 @@ spec:
           name: metallb-excludel2
         name: metallb-excludel2
 ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: controller
+  namespace: metallb-system
+spec:
+  egress:
+  - ports:
+    - port: 6443
+      protocol: TCP
+  ingress:
+  - ports:
+    - port: 9120
+      protocol: TCP
+    - port: 9443
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app: metallb
+      component: controller
+  policyTypes:
+  - Egress
+  - Ingress
+---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
