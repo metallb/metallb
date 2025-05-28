@@ -26,7 +26,7 @@ require (
 )
 
 require (
-	github.com/openshift-kni/k8sreporter v1.0.3
+	github.com/openshift-kni/k8sreporter v1.0.7
 	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.63.0
 	go.universe.tf/metallb v0.13.7
