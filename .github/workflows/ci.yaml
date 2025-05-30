@@ -232,6 +232,7 @@ jobs:
           SKIP="none"
           WITH_VRF="--with-vrf"
           FOCUS=""
+          FRRK8S_NAMESPACE=""
           if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|FRR-MODE|FRRK8S-MODE|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
@@ -239,11 +240,11 @@ jobs:
           if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP|BGP"; fi
           if [ "${{ matrix.bgp-type }}" == "frr" ]; then SKIP="$SKIP|FRRK8S-MODE"; fi
           if [ "${{ matrix.bgp-type }}" == "frr-k8s" ]; then SKIP="$SKIP|FRR-MODE"; fi
-          if [ "${{ matrix.bgp-type }}" == "frr-k8s-external" ]; then SKIP="$SKIP|FRR-MODE|metrics"; fi
+          if [ "${{ matrix.bgp-type }}" == "frr-k8s-external" ]; then SKIP="$SKIP|FRR-MODE|metrics"; FRRK8NAMESPACE="--frr-k8s-namespace=frr-k8s-system"; fi
 
           echo "Skipping $SKIP"
           echo "With VRF $WITH_VRF"
-          sudo -E env "PATH=$PATH" inv e2etest $FOCUS --skip $SKIP --bgp-mode ${{ matrix.bgp-type }} $WITH_VRF -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest $FOCUS --skip $SKIP --bgp-mode ${{ matrix.bgp-type }} $WITH_VRF $FRRK8NAMESPACE -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}

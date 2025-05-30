@@ -173,6 +173,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		fallthrough
 	case "frr-k8s-external":
 		bgptests.FRRProvider, err = frrprovider.NewFRRK8SMode(clientconfig, frrK8sNamespace)
+		metallb.FRRK8sNamespace = frrK8sNamespace
 		Expect(err).NotTo(HaveOccurred())
 	default:
 		ginkgo.Fail(fmt.Sprintf("unsupported --bgp-mode %s - supported options are: native, frr, frr-k8s, frr-k8s-external", bgpMode))

@@ -18,7 +18,10 @@ const (
 	defaultNameSpace = "metallb-system"
 )
 
-var Namespace = defaultNameSpace
+var (
+	Namespace       = defaultNameSpace
+	FRRK8sNamespace string
+)
 
 func init() {
 	if ns := os.Getenv("OO_INSTALL_NAMESPACE"); len(ns) != 0 {
