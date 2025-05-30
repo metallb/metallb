@@ -1226,7 +1226,7 @@ def e2etest(
     ginkgo_params="",
     junit_report="junit-report.xml",
     host_bgp_mode="ibgp",
-    frr_k8s_namespace="",
+    frr_k8s_namespace="metallb-system",
 ):
     """Run E2E tests against development cluster."""
     fetch_kubectl()
