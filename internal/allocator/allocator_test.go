@@ -1229,12 +1229,17 @@ func TestPoolAllocation(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s: AllocateFromPool(%q, \"test\"): %s", test.desc, test.svcKey, err)
 		}
-		validIPs := validIP4s
-		if test.ipFamily == ipfamily.IPv6 {
+
+		var validIPs map[string]bool
+		switch test.ipFamily {
+		case ipfamily.IPv6:
 			validIPs = validIP6s
-		} else if test.ipFamily == ipfamily.DualStack {
+		case ipfamily.DualStack:
 			validIPs = validIPDualStacks
+		default:
+			validIPs = validIP4s
 		}
+
 		for _, ip := range ips {
 			if !validIPs[ip.String()] {
 				t.Errorf("%s: allocated unexpected IP %q", test.desc, ip)
@@ -1605,12 +1610,16 @@ func TestAllocation(t *testing.T) {
 			t.Errorf("%s: Allocate(%q, \"test\"): %s", test.desc, test.svcKey, err)
 		}
 
-		validIPs := validIP4s
-		if test.ipFamily == ipfamily.IPv6 {
+		var validIPs map[string]bool
+		switch test.ipFamily {
+		case ipfamily.IPv6:
 			validIPs = validIP6s
-		} else if test.ipFamily == ipfamily.DualStack {
+		case ipfamily.DualStack:
 			validIPs = validIPDualStacks
+		default:
+			validIPs = validIP4s
 		}
+
 		for _, ip := range ips {
 			if !validIPs[ip.String()] {
 				t.Errorf("%s allocated unexpected IP %q", test.desc, ip)
@@ -2022,11 +2031,14 @@ func TestAutoAssign(t *testing.T) {
 		if err != nil {
 			t.Errorf("#%d Allocate(%q, \"test\"): %s", i+1, test.svcKey, err)
 		}
-		validIPs := validIP4s
-		if test.ipFamily == ipfamily.IPv6 {
+		var validIPs map[string]bool
+		switch test.ipFamily {
+		case ipfamily.IPv6:
 			validIPs = validIP6s
-		} else if test.ipFamily == ipfamily.DualStack {
+		case ipfamily.DualStack:
 			validIPs = validIPDualStacks
+		default:
+			validIPs = validIP4s
 		}
 		for _, ip := range ips {
 			if !validIPs[ip.String()] {

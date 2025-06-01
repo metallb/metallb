@@ -61,8 +61,8 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	level.Info(r.Logger).Log("controller", "ServiceReconciler", "start reconcile", req.NamespacedName.String())
-	defer level.Info(r.Logger).Log("controller", "ServiceReconciler", "end reconcile", req.NamespacedName.String())
+	level.Info(r.Logger).Log("controller", "ServiceReconciler", "start reconcile", req.String())
+	defer level.Info(r.Logger).Log("controller", "ServiceReconciler", "end reconcile", req.String())
 	updates.Inc()
 
 	var service *v1.Service
@@ -94,14 +94,14 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 	if service != nil {
 		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "processing service", dumpResource(service))
 	} else {
-		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "processing deletion on service", req.NamespacedName.String())
+		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "processing deletion on service", req.String())
 	}
 
-	res := r.Handler(r.Logger, req.NamespacedName.String(), service, epSlices)
+	res := r.Handler(r.Logger, req.String(), service, epSlices)
 	switch res {
 	case SyncStateError:
 		updateErrors.Inc()
-		level.Info(r.Logger).Log("controller", "ServiceReconciler", "name", req.NamespacedName.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
+		level.Info(r.Logger).Log("controller", "ServiceReconciler", "name", req.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
 		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "ServiceReconciler", "event", "force service reload")
@@ -109,7 +109,7 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, nil
 	case SyncStateErrorNoRetry:
 		updateErrors.Inc()
-		level.Error(r.Logger).Log("controller", "ServiceReconciler", "name", req.NamespacedName.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
+		level.Error(r.Logger).Log("controller", "ServiceReconciler", "name", req.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
 		return ctrl.Result{}, nil
 	}
 	return ctrl.Result{}, nil

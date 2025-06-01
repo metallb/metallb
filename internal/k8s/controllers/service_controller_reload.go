@@ -60,8 +60,8 @@ func isReloadReq(req ctrl.Request) bool {
 }
 
 func (r *ServiceReconciler) reprocessAll(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	level.Info(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "start reconcile", req.NamespacedName.String())
-	defer level.Info(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "end reconcile", req.NamespacedName.String())
+	level.Info(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "start reconcile", req.String())
+	defer level.Info(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "end reconcile", req.String())
 
 	var services v1.ServiceList
 	if err := r.List(ctx, &services); err != nil {
