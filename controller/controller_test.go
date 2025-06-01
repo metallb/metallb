@@ -29,13 +29,13 @@ func diffService(a, b *v1.Service) string {
 	if a != nil {
 		newA := new(v1.Service)
 		*newA = *a
-		newA.ObjectMeta.DeletionTimestamp = &metav1.Time{}
+		newA.DeletionTimestamp = &metav1.Time{}
 		a = newA
 	}
 	if b != nil {
 		newB := new(v1.Service)
 		*newB = *b
-		newB.ObjectMeta.DeletionTimestamp = &metav1.Time{}
+		newB.DeletionTimestamp = &metav1.Time{}
 		b = newB
 	}
 	return cmp.Diff(a, b)

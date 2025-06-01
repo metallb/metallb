@@ -55,8 +55,8 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.NamespacedName.String())
-	defer level.Info(r.Logger).Log("controller", "ConfigReconciler", "end reconcile", req.NamespacedName.String())
+	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.String())
+	defer level.Info(r.Logger).Log("controller", "ConfigReconciler", "end reconcile", req.String())
 	updates.Inc()
 
 	var ipAddressPools metallbv1beta1.IPAddressPoolList

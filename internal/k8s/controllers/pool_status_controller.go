@@ -50,8 +50,8 @@ type PoolStatusReconciler struct {
 }
 
 func (r *PoolStatusReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	level.Info(r.Logger).Log("controller", "PoolStatusReconciler", "start reconcile", req.NamespacedName.String())
-	defer level.Info(r.Logger).Log("controller", "PoolStatusReconciler", "end reconcile", req.NamespacedName.String())
+	level.Info(r.Logger).Log("controller", "PoolStatusReconciler", "start reconcile", req.String())
+	defer level.Info(r.Logger).Log("controller", "PoolStatusReconciler", "end reconcile", req.String())
 
 	var pool v1beta1.IPAddressPool
 	err := r.Get(ctx, req.NamespacedName, &pool)
