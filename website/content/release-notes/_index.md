@@ -3,6 +3,41 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.15.0
+
+### Features
+
+- Add IPAddressPool Status, exposing the available/assignment counters for the pool. (#2643, @oribon)
+- Add the ServiceBGPStatus resource, allowing a simple way to understand which service is advertised to which peers via BGP. (#2650, @oribon)
+- Add unnumbered BGP peering for frrk8s backend (#2605, @karampok)
+- Deprecate the disableMP flag, and make the v4 over v4 and v6 over v6 behavior the default. Additionally, add a dualStackFamily flag per neighbor, where we enable the v4 family over a v6 link and viceversa. (#2766, @fedepaol)
+- Helm: Add option to exclude pools from triggering the relevant prometheus alerts (#2761, @oribon)
+- Publish charts to quay, along side existing publishing methods. (#2647, @a1994sc)
+- Support Unnumbered BGP for frr backend (#2673, @karampok)
+
+### Documentation
+
+- Docs: clarify how to install on Openshift via Helm. (#2694, @fedepaol)
+- Docs: replace deprecated metallb.universe.tf annotation prefix with metallb.io (#2639, @tamcore)
+
+### Bugs or Regressions
+
+- Allow different local preferences if referring to different aggregation lengths. The previous check was too restrictive and was checking that both aggregation length were empty (even with v4 only addresses). (#2693, @fedepaol)
+- Bug Fix : When both namespace and service selectors are absent in ServiceAllocation spec of IPAddressPool, we now default to selecting everything using `labels.Everything()` for ServiceSelectors. (#2714, @ashikjm)
+- Don't allow IPAddressPools providing IPs overlapping with node IPs. (#2585, @tyiying)
+- Even if the service is prefer dual stack and dual stack pools are available, provide loadbalancer ips that match address family (single, dual) of the service's cluster ip. (#2726, @fedepaol)
+- Fix the ServiceL2Status controller attempting to overwrite resources that do not belong to its node. (#2712, @oribon)
+- Layer2 mode does not work when memberlist is disabled. Here we restore the original operating mode that assumes all the speakers are running on all the nodes if memberlist is disabled. (#2549, @karampok)
+- Limit the frr processes' file descriptors limit to 100000 instead of defaulting to host's ulimit value. (#2725, @fedepaol)
+- Remove valid, but expired "placeholder" caBundle from the BGPPeers CRD conversion webhook configuration. (#2696, @dlipovetsky)
+- Reprocess the services and reassign IPs if the sharing criteria of a given service changes (ie, the external traffic policy changes and suddenly another service in pending becomes compatible). (#2692, @fedepaol)
+- Revert `Remove advertisements from peers when local node is cordoned` behavior (#2715, @karampok)
+
+This release includes contributions from:
+
+Adriano Pezzuto, Allen Conlon, Ashik J M, Christopher Dziomba, Daniel Lipovetsky, Eduardo Minguez, Federico Paolinelli, Konstantinos Karampogias, Ori Braunshtein, Philipp Born, Raoul Scarazzini, Roman Dodin, Stephan, Tyler Auerbeck, Yi-Ying Tan
+
+
 ## Version 0.14.9
 
 ### Features
