@@ -34,10 +34,15 @@ func TestValidateIPAddressPool(t *testing.T) {
 	getExistingNodes = func() (*v1core.NodeList, error) {
 		return &v1core.NodeList{}, nil
 	}
+	toRestoreBGPAdvertisementList := getExistingBGPAdvertisements
+	getExistingBGPAdvertisements = func() (*v1beta1.BGPAdvertisementList, error) {
+		return &v1beta1.BGPAdvertisementList{}, nil
+	}
 
 	defer func() {
 		getExistingIPAddressPools = toRestoreIPAddressPools
 		getExistingNodes = toRestoreNodes
+		getExistingBGPAdvertisements = toRestoreBGPAdvertisementList
 	}()
 
 	tests := []struct {
