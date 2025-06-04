@@ -219,7 +219,15 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	}
 
 	res += "####### Network setup for host\n"
+	res += "####### Routes\n"
 	out, err = exec.Exec("bash", "-c", "ip -6 route; ip -4 route")
+	if err != nil {
+		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec to print network setup: %v", err))
+	}
+	res += out
+
+	res += "####### Interfaces\n"
+	out, err = exec.Exec("bash", "-c", "ip address show; ip link show")
 	if err != nil {
 		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec to print network setup: %v", err))
 	}
