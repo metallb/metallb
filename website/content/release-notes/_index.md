@@ -159,7 +159,7 @@ BugFixes:
 
 New features:
 
-- Add a new experimental "FRR-K8s" based BGP backend ([PR 2162](https://github.com/metallb/metallb/pull/2162), ([PR 2183](https://github.com/metallb/metallb/pull/2183)) and others,  [Design proposal](https://github.com/metallb/metallb/blob/v0.15.0/design/splitfrr-proposal.md): an instance of FRR can be shared between FRR and other actors, allowing multiple FRR configurations (as long as they don't conflict), via the [FRR-K8s](https://github.com/metallb/frr-k8s) API
+- Add a new experimental "FRR-K8s" based BGP backend ([PR 2162](https://github.com/metallb/metallb/pull/2162), ([PR 2183](https://github.com/metallb/metallb/pull/2183)) and others,  [Design proposal](https://github.com/metallb/metallb/blob/main/design/splitfrr-proposal.md): an instance of FRR can be shared between FRR and other actors, allowing multiple FRR configurations (as long as they don't conflict), via the [FRR-K8s](https://github.com/metallb/frr-k8s) API
 - Remove IP verification: don't stale the config if it removes / reassign an IP belonging to a service but honor the configuration ([PR 2097](https://github.com/metallb/metallb/pull/2097), [Issue 462](https://github.com/metallb/metallb/issues/462)
 - Drop the support for endpoints and rely on endpoint slices only ([Issue 2253](https://github.com/metallb/metallb/issues/2253), [PR 2254](https://github.com/metallb/metallb/pull/2254))
 **NOTE:** this will make MetalLB not compatible with clusters older than 1.21
@@ -1118,7 +1118,7 @@ New features:
   topologies.
 - MetalLB now has
   a
-  [Helm chart](https://github.com/metallb/metallb/tree/v0.15.0/helm/metallb). If
+  [Helm chart](https://github.com/metallb/metallb/tree/main/helm/metallb). If
   you use [Helm](https://helm.sh) on your cluster, this should make it
   easier to track and manage your MetalLB installation. The chart will
   be submitted for inclusion in the main Helm stable repository
@@ -1176,7 +1176,7 @@ Action required if upgrading from 0.2.x:
   ds/bgp-speaker`. This will take down your load balancers until you
   deploy the new DaemonSet.
 - The
-  [configuration file format](https://raw.githubusercontent.com/metallb/metallb/v0.15.0/manifests/example-config.yaml) has
+  [configuration file format](https://raw.githubusercontent.com/metallb/metallb/main/manifests/example-config.yaml) has
   changed in a few backwards-incompatible ways. You need to update
   your ConfigMap by hand:
   - Each `address-pool` must now have a `protocol` field, to select
