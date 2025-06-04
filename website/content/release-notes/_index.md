@@ -2,6 +2,11 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.15.1
+
+### Bugs or Regressions
+
+- Revert refusing ips overlapping with node cidrs as ip ranges are not handled correctly. (#2780, @fedepaol)
 
 ## Version 0.15.0
 
