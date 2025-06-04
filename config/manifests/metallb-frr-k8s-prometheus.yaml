@@ -2133,6 +2133,13 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - get
+  - list
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -3660,6 +3667,30 @@ spec:
   selector:
     matchLabels:
       name: speaker-monitor-service
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: controller
+  namespace: metallb-system
+spec:
+  egress:
+  - ports:
+    - port: 6443
+      protocol: TCP
+  ingress:
+  - ports:
+    - port: 9120
+      protocol: TCP
+    - port: 9443
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app: metallb
+      component: controller
+  policyTypes:
+  - Egress
+  - Ingress
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration

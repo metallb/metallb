@@ -1,0 +1,49 @@
+{{- if .Values.networkpolicies.enabled }}
+{{- if .Values.networkpolicies.defaultDeny }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: metallb-system
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: metallb-controller
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "metallb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443
+  ingress:
+    - ports:
+        {{- if .Values.controller.webhookMode }}
+        - protocol: TCP
+          port: 9443
+        - protocol: TCP
+          port: 443
+        {{- end }}
+        - protocol: TCP
+          {{- if .Values.prometheus.secureMetricsPort }}
+          port: {{ .Values.prometheus.secureMetricsPort }}
+          {{ else }}
+          port: {{ .Values.prometheus.metricsPort }}
+          {{- end }}
+  policyTypes:
+    - Egress
+    - Ingress
+{{- end }}
