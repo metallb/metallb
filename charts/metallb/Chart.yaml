@@ -8,7 +8,7 @@ icon: https://metallb.universe.tf/images/logo/metallb-white.png
 dependencies:
 - name: crds
   condition: crds.enabled
-  version: 0.15.1
+  version: 0.15.2
 - name: frr-k8s
   repository: https://metallb.github.io/frr-k8s
   condition: frrk8s.enabled
@@ -35,10 +35,10 @@ kubeVersion: ">= 1.19.0-0"
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
 # NOTE: this value is updated by the metallb release process
 # MetalLB chart version
-version: 0.15.1
+version: 0.15.2
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # NOTE: this value is updated by the metallb release process
-appVersion: v0.15.1
+appVersion: v0.15.2

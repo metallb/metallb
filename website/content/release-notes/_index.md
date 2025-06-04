@@ -2,6 +2,12 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.15.2
+
+### Bugs or Regressions
+
+- Publish the chart to quay as too (#2782, @fedepaol)
+
 ## Version 0.15.1
 
 ### Bugs or Regressions
