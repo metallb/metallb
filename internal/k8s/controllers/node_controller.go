@@ -42,8 +42,8 @@ type NodeReconciler struct {
 }
 
 func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	level.Info(r.Logger).Log("controller", "NodeReconciler", "start reconcile", req.NamespacedName.String())
-	defer level.Info(r.Logger).Log("controller", "NodeReconciler", "end reconcile", req.NamespacedName.String())
+	level.Info(r.Logger).Log("controller", "NodeReconciler", "start reconcile", req.String())
+	defer level.Info(r.Logger).Log("controller", "NodeReconciler", "end reconcile", req.String())
 	updates.Inc()
 
 	var n corev1.Node

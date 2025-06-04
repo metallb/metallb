@@ -59,27 +59,27 @@ type ServiceBGPStatusReconciler struct {
 }
 
 func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	level.Info(r.Logger).Log("controller", "ServiceBGPStatus", "start reconcile", req.NamespacedName.String())
-	defer level.Info(r.Logger).Log("controller", "ServiceBGPStatus", "end reconcile", req.NamespacedName.String())
+	level.Info(r.Logger).Log("controller", "ServiceBGPStatus", "start reconcile", req.String())
+	defer level.Info(r.Logger).Log("controller", "ServiceBGPStatus", "end reconcile", req.String())
 
 	serviceName, serviceNamespace := req.Name, req.Namespace
 
 	var serviceBGPStatuses v1beta1.ServiceBGPStatusList
-	err := r.Client.List(ctx, &serviceBGPStatuses, client.MatchingFields{
+	err := r.List(ctx, &serviceBGPStatuses, client.MatchingFields{
 		serviceIndexName: indexFor(serviceNamespace, serviceName, r.NodeName),
 	})
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	peers := r.PeersFetcher(req.NamespacedName.String())
+	peers := r.PeersFetcher(req.String())
 	if peers.Len() == 0 {
 		errs := []error{}
 		for i := range serviceBGPStatuses.Items {
 			if serviceBGPStatuses.Items[i].Labels[LabelAnnounceNode] != r.NodeName { // shouldn't happen because of the indexing, just in case
 				continue
 			}
-			if err := r.Client.Delete(ctx, &serviceBGPStatuses.Items[i]); err != nil && !apierrors.IsNotFound(err) {
+			if err := r.Delete(ctx, &serviceBGPStatuses.Items[i]); err != nil && !apierrors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
 		}
@@ -94,7 +94,7 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			if serviceBGPStatuses.Items[i+1].Labels[LabelAnnounceNode] != r.NodeName {
 				continue
 			}
-			if err := r.Client.Delete(ctx, &serviceBGPStatuses.Items[i+1]); err != nil && !apierrors.IsNotFound(err) {
+			if err := r.Delete(ctx, &serviceBGPStatuses.Items[i+1]); err != nil && !apierrors.IsNotFound(err) {
 				deleteRedundantErrs = append(deleteRedundantErrs, err)
 			}
 		}

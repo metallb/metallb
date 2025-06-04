@@ -65,14 +65,14 @@ type Layer2StatusReconciler struct {
 }
 
 func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	level.Info(r.Logger).Log("controller", "Layer2StatusReconciler", "start reconcile", req.NamespacedName.String())
-	defer level.Info(r.Logger).Log("controller", "Layer2StatusReconciler", "end reconcile", req.NamespacedName.String())
+	level.Info(r.Logger).Log("controller", "Layer2StatusReconciler", "start reconcile", req.String())
+	defer level.Info(r.Logger).Log("controller", "Layer2StatusReconciler", "end reconcile", req.String())
 
 	serviceName, serviceNamespace := req.Name, req.Namespace
 
 	ipAdvS := r.StatusFetcher(types.NamespacedName{Name: serviceName, Namespace: serviceNamespace})
 	var serviceL2statuses v1beta1.ServiceL2StatusList
-	if err := r.Client.List(ctx, &serviceL2statuses, client.MatchingFields{
+	if err := r.List(ctx, &serviceL2statuses, client.MatchingFields{
 		serviceIndexName: types.NamespacedName{Name: serviceName, Namespace: serviceNamespace}.String(),
 	}); err != nil {
 		return ctrl.Result{}, err
@@ -84,7 +84,7 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if item.Labels[LabelAnnounceNode] != r.NodeName {
 				continue
 			}
-			if err := r.Client.Delete(ctx, &serviceL2statuses.Items[key]); err != nil && !errors.IsNotFound(err) {
+			if err := r.Delete(ctx, &serviceL2statuses.Items[key]); err != nil && !errors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
 		}
@@ -98,7 +98,7 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if serviceL2statuses.Items[i+1].Labels[LabelAnnounceNode] != r.NodeName {
 				continue
 			}
-			if err := r.Client.Delete(ctx, &serviceL2statuses.Items[i+1]); err != nil && !errors.IsNotFound(err) {
+			if err := r.Delete(ctx, &serviceL2statuses.Items[i+1]); err != nil && !errors.IsNotFound(err) {
 				deleteRedundantErrs = append(deleteRedundantErrs, err)
 			}
 		}

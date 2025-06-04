@@ -75,8 +75,8 @@ type FRRK8sReconciler struct {
 }
 
 func (r *FRRK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	level.Info(r.Logger).Log("controller", "FRRK8sReconciler", "start reconcile", req.NamespacedName.String())
-	defer level.Info(r.Logger).Log("controller", "FRRK8sReconciler", "end reconcile", req.NamespacedName.String())
+	level.Info(r.Logger).Log("controller", "FRRK8sReconciler", "start reconcile", req.String())
+	defer level.Info(r.Logger).Log("controller", "FRRK8sReconciler", "end reconcile", req.String())
 	updates.Inc()
 
 	r.Lock()

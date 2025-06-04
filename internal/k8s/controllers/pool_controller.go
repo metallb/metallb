@@ -45,8 +45,8 @@ type PoolReconciler struct {
 }
 
 func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	level.Info(r.Logger).Log("controller", "PoolReconciler", "start reconcile", req.NamespacedName.String())
-	defer level.Info(r.Logger).Log("controller", "PoolReconciler", "end reconcile", req.NamespacedName.String())
+	level.Info(r.Logger).Log("controller", "PoolReconciler", "start reconcile", req.String())
+	defer level.Info(r.Logger).Log("controller", "PoolReconciler", "end reconcile", req.String())
 	updates.Inc()
 
 	var ipAddressPools metallbv1beta1.IPAddressPoolList

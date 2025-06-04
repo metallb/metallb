@@ -197,10 +197,11 @@ func main() {
 		validateConfig = config.DiscardNativeOnly
 	}
 
-	listenFRRK8s := false
-	if bgpType == string(bgpFrrK8s) {
-		listenFRRK8s = true
-	}
+	// listenFRRK8s := false
+	listenFRRK8s := bgpType == string(bgpFrrK8s)
+	// if bgpType == string(bgpFrrK8s) {
+	// 	listenFRRK8s = true
+	// }
 	client, err := k8s.New(&k8s.Config{
 		ProcessName: "metallb-speaker",
 		NodeName:    *myNode,

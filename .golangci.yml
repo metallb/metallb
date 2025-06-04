@@ -1,54 +1,72 @@
+version: "2"
 run:
   issues-exit-code: 2
 linters:
   enable:
-  - godot
-  - goimports
-  - gofmt
-  - ginkgolinter
-  - dogsled
-  - copyloopvar
-  - gocritic
-  - misspell
-  - nolintlint
-  - stylecheck
-  - unconvert
-  - unparam
-  - whitespace
-  - revive
-  - unused
-  - wastedassign
-linters-settings:
-  errcheck:
-    exclude-functions:
-      - (github.com/go-kit/log.Logger).Log
-  godot:
-    scope: toplevel
-    capital: true
-    exclude:
-    - 'SPDX-License-Identifier.*'
-    - '\+groupName.*'
-  misspell:
-    locale: US
-    ignore-words:
-      - neighbours
-      - neighbour
-  stylecheck:
-    dot-import-whitelist:
-    - github.com/onsi/ginkgo
-    - github.com/onsi/gomega
-  gocritic:
-    disabled-checks:
-      - captLocal
-      - exitAfterDefer
-  revive:
+    - copyloopvar
+    - dogsled
+    - ginkgolinter
+    - gocritic
+    - godot
+    - misspell
+    - nolintlint
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - wastedassign
+    - whitespace
+  settings:
+    errcheck:
+      exclude-functions:
+        - (github.com/go-kit/log.Logger).Log
+    gocritic:
+      disabled-checks:
+        - captLocal
+        - exitAfterDefer
+    godot:
+      scope: toplevel
+      exclude:
+        - SPDX-License-Identifier.*
+        - \+groupName.*
+      capital: true
+    misspell:
+      locale: US
+      ignore-rules:
+        - neighbours
+        - neighbour
+    revive:
+      rules:
+        - name: receiver-naming
+          disabled: true
+        - name: dot-imports
+          disabled: true
+    staticcheck:
+      dot-import-whitelist:
+        - github.com/onsi/ginkgo
+        - github.com/onsi/gomega
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-    - name: receiver-naming
-      disabled: true
-    - name: dot-imports
-      disabled: true
-issues:
-  exclude-rules:
-    - path: 'api'
-      linters:
-        - stylecheck
+      - linters:
+          - staticcheck
+        path: api
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

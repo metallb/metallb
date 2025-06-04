@@ -562,7 +562,7 @@ func (a *Allocator) IPs(svc string) []net.IP {
 
 func (a *Allocator) AllocationKey(svc string) string {
 	if alloc := a.allocated[svc]; alloc != nil {
-		return alloc.key.backend + alloc.key.sharing
+		return alloc.backend + alloc.sharing
 	}
 	return ""
 }
