@@ -82,12 +82,12 @@ func nodesWithEndpoint(eps []discovery.EndpointSlice, speakers map[string]bool) 
 func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, pool *config.Pool, svc *v1.Service, eps []discovery.EndpointSlice, nodes map[string]*v1.Node) string {
 	if !activeEndpointExists(eps) { // no active endpoints, just return
 		level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "message", "failed no active endpoints", "service", name)
-		return "notOwner"
+		return "noActiveEndpoints"
 	}
 
 	if !poolMatchesNodeL2(pool, c.myNode) {
 		level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "pool not matching my node")
-		return "notOwner"
+		return "poolNotMatchingNode"
 	}
 
 	speakerMap := c.speakersForPool(l, name, pool, nodes)
@@ -98,7 +98,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 
 	if len(availableNodes) == 0 {
 		level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "no available nodes")
-		return "notOwner"
+		return "nodesUnavailable"
 	}
 
 	level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "nodes", availableNodes, "service", name)
