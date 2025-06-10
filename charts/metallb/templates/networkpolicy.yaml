@@ -1,0 +1,47 @@
+{{- if .Values.networkpolicies.enabled }}
+{{- if .Values.networkpolicies.defaultDeny }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: controller
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "metallb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+  egress:
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.networkpolicies.apiPort }}
+  ingress:
+    - ports:
+        - protocol: TCP
+          {{- if .Values.prometheus.secureMetricsPort }}
+          port: metricshttps
+          {{ else }}
+          port: {{ .Values.prometheus.metricsPort }}
+          {{- end }}
+        {{- if .Values.controller.webhookMode }}
+        - protocol: TCP
+          port: webhook-server
+        {{- end }}
+
+  policyTypes:
+    - Egress
+    - Ingress
+# speaker pods do not need network policy because they are hostnetworked
+{{- end }}
