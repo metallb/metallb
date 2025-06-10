@@ -199,7 +199,7 @@ controller:
   # -- Controller log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none`
   logLevel: info
   # command: /controller
-  # webhookMode: enabled
+  webhookMode: enabled
   image:
     repository: quay.io/metallb/controller
     tag:
@@ -368,3 +368,12 @@ frrk8s:
   enabled: false
   external: false
   namespace: ""
+
+# networkpolicies
+networkpolicies:
+  # if set, networkpolicies for metallb components will be installed in the metallb namespace
+  enabled: false
+  # if set, a default deny network policy will be installed in the metallb namespace
+  defaultDeny: false
+  # to override internal k8s api targetPort
+  apiPort: 6443

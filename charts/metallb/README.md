@@ -58,6 +58,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.tlsCipherSuites | string | `""` |  |
 | controller.tlsMinVersion | string | `"VersionTLS12"` |  |
 | controller.tolerations | list | `[]` |  |
+| controller.webhookMode | string | `"enabled"` |  |
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
 | frrk8s.enabled | bool | `false` |  |
@@ -67,6 +68,9 @@ Kubernetes: `>= 1.19.0-0`
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
 | nameOverride | string | `""` |  |
+| networkpolicies.apiPort | int | `6443` |  |
+| networkpolicies.defaultDeny | bool | `false` |  |
+| networkpolicies.enabled | bool | `false` |  |
 | prometheus.controllerMetricsTLSSecret | string | `""` |  |
 | prometheus.metricsPort | int | `7472` |  |
 | prometheus.namespace | string | `""` |  |
