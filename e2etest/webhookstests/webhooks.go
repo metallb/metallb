@@ -30,8 +30,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
 
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,7 +45,32 @@ var (
 	Reporter             *k8sreporter.KubernetesReporter
 )
 
+var _ = ginkgo.Describe("DUALSTACK Webhook service", func() {
+	ginkgo.It("should verify metallb-webhook-service has dual stack IP family", func() {
+		cs := k8sclient.New()
+		service, err := cs.CoreV1().Services(metallb.Namespace).Get(
+			context.TODO(),
+			"metallb-webhook-service",
+			metav1.GetOptions{},
+		)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(service).NotTo(BeNil())
+
+		ginkgo.By("Checking dual stack IP family configuration")
+		Expect(service.Spec.IPFamilyPolicy).NotTo(BeNil())
+		Expect(*service.Spec.IPFamilyPolicy).To(Equal(corev1.IPFamilyPolicyPreferDualStack))
+
+		ginkgo.By("Verifying both IPv4 and IPv6 families are present")
+		Expect(service.Spec.IPFamilies).To(HaveLen(2))
+		Expect(service.Spec.IPFamilies).To(ContainElements(
+			corev1.IPv4Protocol,
+			corev1.IPv6Protocol,
+		))
+	})
+})
+
 var _ = ginkgo.Describe("Webhooks", func() {
+
 	ginkgo.BeforeEach(func() {
 		ginkgo.By("Clearing any previous configuration")
 		err := ConfigUpdater.Clean()

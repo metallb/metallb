@@ -517,6 +517,9 @@ apiServer:
         networking_config = {}
         if ip_family != "ipv4":
             networking_config["ipFamily"] = ip_family
+            # if need ipv6 preference
+            # networking_config["podSubnet"] = "2001:db8:42:0::/56,10.244.0.0/16"
+            # networking_config["serviceSubnet"] = "2001:db8:42:1::/112,10.96.0.0/16"
 
         if len(networking_config) > 0:
             config["networking"] = networking_config

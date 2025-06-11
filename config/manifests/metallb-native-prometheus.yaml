@@ -1877,6 +1877,7 @@ metadata:
   name: metallb-webhook-service
   namespace: metallb-system
 spec:
+  ipFamilyPolicy: PreferDualStack
   ports:
   - port: 443
     targetPort: 9443

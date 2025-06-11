@@ -134,6 +134,7 @@ metadata:
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
 spec:
+  ipFamilyPolicy: PreferDualStack
   ports:
   - port: 443
     targetPort: 9443
