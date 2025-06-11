@@ -1,0 +1,4 @@
+resources:
+- controller.yaml
+- deny_all.yaml
+# speaker pods do not need network policy because they are hostnetworked
