@@ -580,7 +580,6 @@ apiServer:
         if with_prometheus:
             prometheus_values = (
                 "--set prometheus.serviceMonitor.enabled=true "
-                "--set prometheus.secureMetricsPort=9120 "
                 "--set speaker.frr.secureMetricsPort=9121 "
                 "--set prometheus.serviceAccount=prometheus-k8s "
                 "--set prometheus.namespace=monitoring "
@@ -612,7 +611,7 @@ apiServer:
         run(
             "helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
             "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "
-            "--set networkpolicies.enabled=true --set networkpolicies.defaultDeny=true "
+            "--set networkpolicies.enabled=true --set networkpolicies.defaultDeny=true --set prometheus.secureMetricsPort=9120 "
             "--set controller.logLevel=debug {} {} --namespace metallb-system".format(
                 architecture, architecture, prometheus_values, frr_values
             ),
