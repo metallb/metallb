@@ -4,12 +4,11 @@ package metallb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
 	"time"
-
-	"errors"
 
 	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/k8s"
@@ -149,4 +148,27 @@ func FRRK8SPods(cs clientset.Interface, namespace string) ([]*corev1.Pod, error)
 		res = append(res, &i)
 	}
 	return res, nil
+}
+
+func CreatePod(cs clientset.Interface, p *corev1.Pod) (*corev1.Pod, error) {
+	pod, err := cs.CoreV1().Pods(p.GetObjectMeta().GetNamespace()).Create(context.TODO(), p, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return WaitForPodReady(cs, pod.Namespace, pod.Name)
+}
+
+func WaitForPodReady(cs clientset.Interface, ns, name string) (*corev1.Pod, error) {
+	var ret *corev1.Pod
+	err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 20*time.Second, false, func(context.Context) (bool, error) {
+		var err error
+		ret, err = cs.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		isReady := (ret.Status.Phase == corev1.PodRunning) && (k8s.PodIsReady(ret))
+		return isReady, nil
+	})
+	return ret, err
 }

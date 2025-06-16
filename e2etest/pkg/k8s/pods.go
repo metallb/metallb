@@ -40,7 +40,8 @@ func PodLogs(cs clientset.Interface, pod *corev1.Pod, podLogOpts corev1.PodLogOp
 
 // PodIsReady returns the given pod's PodReady and ContainersReady condition.
 func PodIsReady(p *corev1.Pod) bool {
-	return podConditionStatus(p, corev1.PodReady) == corev1.ConditionTrue && podConditionStatus(p, corev1.ContainersReady) == corev1.ConditionTrue
+	return podConditionStatus(p, corev1.PodReady) == corev1.ConditionTrue &&
+		podConditionStatus(p, corev1.ContainersReady) == corev1.ConditionTrue
 }
 
 // podConditionStatus returns the status of the condition for a given pod.
