@@ -76,7 +76,8 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 						Spec: metallbv1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								IPV4ServiceRange,
-								IPV6ServiceRange},
+								IPV6ServiceRange,
+							},
 						},
 					},
 				},
@@ -157,9 +158,11 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 			}, 1*time.Minute, 1*time.Second).Should(Not(HaveOccurred()))
 			speakerPod, err := metallb.SpeakerPodInNode(cs, svcNode.Name)
 			Expect(err).NotTo(HaveOccurred())
-			selectorMac, err := mac.GetIfaceMac(NodeNics[0], executor.ForPodDebug(speakerPod.Namespace, speakerPod.Name, "speaker", agnostImage))
-			Expect(err).NotTo(HaveOccurred())
 
+			speakerExec, err := executor.ForPodDebug(cs, speakerPod.Namespace, speakerPod.Name, "speaker", agnostImage)
+			Expect(err).NotTo(HaveOccurred())
+			selectorMac, err := mac.GetIfaceMac(NodeNics[0], speakerExec)
+			Expect(err).NotTo(HaveOccurred())
 			ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 			err = mac.FlushIPNeigh(ingressIP, executor.Host)
 			Expect(err).NotTo(HaveOccurred())
