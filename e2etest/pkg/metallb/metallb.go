@@ -4,12 +4,11 @@ package metallb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
 	"time"
-
-	"errors"
 
 	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/k8s"

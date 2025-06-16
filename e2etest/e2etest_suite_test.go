@@ -30,6 +30,7 @@ import (
 
 	"go.universe.tf/e2etest/bgptests"
 	"go.universe.tf/e2etest/l2tests"
+	_ "go.universe.tf/e2etest/netpoltests"
 	testsconfig "go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
 	frrprovider "go.universe.tf/e2etest/pkg/frr/provider"

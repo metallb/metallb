@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -40,7 +42,8 @@ func PodLogs(cs clientset.Interface, pod *corev1.Pod, podLogOpts corev1.PodLogOp
 
 // PodIsReady returns the given pod's PodReady and ContainersReady condition.
 func PodIsReady(p *corev1.Pod) bool {
-	return podConditionStatus(p, corev1.PodReady) == corev1.ConditionTrue && podConditionStatus(p, corev1.ContainersReady) == corev1.ConditionTrue
+	return podConditionStatus(p, corev1.PodReady) == corev1.ConditionTrue &&
+		podConditionStatus(p, corev1.ContainersReady) == corev1.ConditionTrue
 }
 
 // podConditionStatus returns the status of the condition for a given pod.
@@ -56,4 +59,29 @@ func podConditionStatus(p *corev1.Pod, condition corev1.PodConditionType) corev1
 	}
 
 	return corev1.ConditionUnknown
+}
+
+// CreatePod creates the given Pod and waits until it is running and ready.
+// This ensures that status fields such as the Pod IP are populated and can be used by the caller.
+func CreatePod(cs clientset.Interface, p *corev1.Pod) (*corev1.Pod, error) {
+	pod, err := cs.CoreV1().Pods(p.GetObjectMeta().GetNamespace()).Create(context.TODO(), p, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return waitForPodReady(cs, pod.Namespace, pod.Name)
+}
+
+func waitForPodReady(cs clientset.Interface, ns, name string) (*corev1.Pod, error) {
+	var ret *corev1.Pod
+	err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 20*time.Second, false, func(context.Context) (bool, error) {
+		var err error
+		ret, err = cs.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		isReady := (ret.Status.Phase == corev1.PodRunning) && (PodIsReady(ret))
+		return isReady, nil
+	})
+	return ret, err
 }
