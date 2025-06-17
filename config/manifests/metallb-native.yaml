@@ -161,7 +161,7 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          BGPAdvertisement allows to advertise the IPs coming
+          BGPAdvertisement allows the advertisement of IPs coming
           from the selected IPAddressPools via BGP, setting the parameters of the
           BGP Advertisement.
         properties:
@@ -275,8 +275,8 @@ spec:
                 format: int32
                 type: integer
               nodeSelectors:
-                description: NodeSelectors allows to limit the nodes to announce as
-                  next hops for the LoadBalancer IP. When empty, all the nodes having  are
+                description: NodeSelectors limit the set of nodes announced as
+                  next hops for the LoadBalancer IP. When empty, all the nodes are
                   announced as next hops.
                 items:
                   description: |-
@@ -557,8 +557,8 @@ spec:
               dualStackAddressFamily:
                 default: false
                 description: |-
-                  To set if we want to enable the neighbor not only for the ipfamily related to its session,
-                  but also the other one. This allows to advertise/receive IPv4 prefixes over IPv6 sessions and vice versa.
+                  Set if we want to enable the neighbor not only for the ipfamily related to its session,
+                  but also the other one. This allows advertise/receive IPv4 prefixes over IPv6 sessions and vice versa.
                 type: boolean
               dynamicASN:
                 description: |-
