@@ -1,0 +1,27 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: controller
+  namespace: metallb-system
+spec:
+  podSelector:
+    matchLabels:
+     app: metallb
+     component: controller
+  egress:
+   - ports:
+       - protocol: TCP
+         port: 6443
+  ingress:
+    - ports:
+      # Uncomment to allow metricshttp
+      # - protocol: TCP
+      #   port: monitoring
+      - protocol: TCP
+        port: metricshttps
+      - protocol: TCP
+        port: webhook-server
+  policyTypes:
+    - Egress
+    - Ingress
