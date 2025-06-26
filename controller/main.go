@@ -28,6 +28,10 @@ import (
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
 
+	"go.universe.tf/metallb/internal/env"
+	bgpcontroller "go.universe.tf/metallb/internal/controller/bgpcontroller"
+
+
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	v1 "k8s.io/api/core/v1"

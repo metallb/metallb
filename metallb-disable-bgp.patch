@@ -1,0 +1,74 @@
+diff --git a/controller/main.go b/controller/main.go
+index e5c5eb6..3e1fcf7 100644
+--- a/controller/main.go
++++ b/controller/main.go
+@@ import section
+ import (
++       "go.universe.tf/metallb/internal/env"
++       bgpcontroller "go.universe.tf/metallb/internal/controller/bgpcontroller"
+ )
+
+@@ main function setup logic
++       if !env.BGPDisabled() {
++               setupLog.Info("BGP enabled, initializing BGP controller")
++               if err := mgr.Add(bgpcontroller.New()); err != nil {
++                       setupLog.Error(err, "unable to create BGP controller")
++                       os.Exit(1)
++               }
++       } else {
++               setupLog.Info("METALLB_DISABLE_BGP is true; skipping BGP controller")
++       }
+
+diff --git a/speaker/main.go b/speaker/main.go
+index 73f08c9..5f260f3 100644
+--- a/speaker/main.go
++++ b/speaker/main.go
+@@ import section
+ import (
++       "go.universe.tf/metallb/internal/env"
++       "go.universe.tf/metallb/internal/bgp"
+ )
+
+@@ speaker main function logic
++       var bgpSpeaker *bgp.Speaker
++       if !env.BGPDisabled() {
++               setupLog.Info("BGP enabled, initializing BGP speaker")
++               bgpSpeaker = bgp.New(config)
++       } else {
++               setupLog.Info("METALLB_DISABLE_BGP is true; skipping BGP speaker")
++               bgpSpeaker = nil
++       }
++       speaker.Run(bgpSpeaker, otherArgs...)
+
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 94e3d88..2c94a50 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ import section
+ import (
++       "go.universe.tf/metallb/internal/env"
+ )
+
+@@ config parsing logic
++       if env.BGPDisabled() {
++               setupLog.Info("Skipping BGP config parsing")
++               cfg.BGPPeers = nil
++               cfg.BGPAdvertisements = nil
++       }
+
+diff --git a/internal/env/env.go b/internal/env/env.go
+new file mode 100644
+index 0000000..f14e8bc
+--- /dev/null
++++ b/internal/env/env.go
+@@
++package env
++
++import (
++       "os"
++       "strings"
++)
++
++func BGPDisabled() bool {
++       return strings.ToLower(os.Getenv("METALLB_DISABLE_BGP")) == "true"
++}

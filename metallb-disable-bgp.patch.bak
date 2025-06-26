@@ -1,0 +1,68 @@
+diff --git a/controller/main.go b/controller/main.go
+index 0123456..abcdef0 100644
+--- a/controller/main.go
++++ b/controller/main.go
+@@ import lines
++   "go.universe.tf/metallb/internal/env"
++   bgpcontroller "go.universe.tf/metallb/internal/controller/bgpcontroller"
+
+@@ func main() or init logic
++   if !env.BGPDisabled() {
++       setupLog.Info("BGP enabled, initializing BGP controller")
++       if err := mgr.Add(bgpcontroller.New()); err != nil {
++           setupLog.Error(err, "unable to create BGP controller")
++           os.Exit(1)
++       }
++   } else {
++       setupLog.Info("METALLB_DISABLE_BGP is true; skipping BGP controller")
++   }
+
+diff --git a/speaker/main.go b/speaker/main.go
+index 789abcd..012efgh 100644
+--- a/speaker/main.go
++++ b/speaker/main.go
+@@ import lines
++   "go.universe.tf/metallb/internal/env"
++   "go.universe.tf/metallb/internal/bgp"
+
+@@ func main()
++   var bgpSpeaker *bgp.Speaker
++   if !env.BGPDisabled() {
++       setupLog.Info("BGP enabled, initializing BGP speaker")
++       bgpSpeaker = bgp.New(config)
++   } else {
++       setupLog.Info("METALLB_DISABLE_BGP is true; skipping BGP speaker")
++       bgpSpeaker = nil
++   }
++   speaker.Run(bgpSpeaker, otherArgs...)
+
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 6543210..fedcba9 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ import lines
++   "go.universe.tf/metallb/internal/env"
+
+@@ config parsing
++   if env.BGPDisabled() {
++       setupLog.Info("Skipping BGP config parsing")
++       cfg.BGPPeers = nil
++       cfg.BGPAdvertisements = nil
++   }
+
+diff --git a/internal/env/env.go b/internal/env/env.go
+new file mode 100644
+--- /dev/null
++++ b/internal/env/env.go
+@@
++package env
++
++import (
++    "os"
++    "strings"
++)
++
++func BGPDisabled() bool {
++    return strings.ToLower(os.Getenv("METALLB_DISABLE_BGP")) == "true"
++}
+
