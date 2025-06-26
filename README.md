@@ -42,3 +42,35 @@ prefer private disclosure, please email to all of the maintainers:
 
 We aim for initial response to vulnerability reports within 48
 hours. The timeline for fixes depends on the complexity of the issue.
+
+# Summary of changes made - chayah
+### 🔧 Feature: Optional BGP Controller via Environment Variable
+
+This update introduces the ability to **disable MetalLB's BGP functionality** at runtime by setting an environment variable. This allows more flexible deployments, especially for users running MetalLB in **Layer 2-only mode**.
+
+#### ✅ Summary of Changes
+
+- **New Feature Flag**
+  - Added support for the `METALLB_DISABLE_BGP=true` environment variable to conditionally disable BGP-related functionality.
+
+- **New Utility Package**
+  - Introduced `internal/env/env.go` with a helper function:
+    ```go
+    func BGPDisabled() bool {
+        return strings.ToLower(os.Getenv("METALLB_DISABLE_BGP")) == "true"
+    }
+    ```
+
+- **Controller Behavior (`controller/main.go`)**
+  - BGP controller is only initialized if `METALLB_DISABLE_BGP` is not set to `true`.
+
+- **Speaker Behavior (`speaker/main.go`)**
+  - BGP speaker is conditionally initialized based on the same environment variable.
+  - Passes `nil` to `speaker.Run()` if BGP is disabled.
+
+- **Config Behavior (`internal/config/config.go`)**
+  - Skips parsing and applying BGP configuration (`BGPPeers` and `BGPAdvertisements`) if BGP is disabled.
+
+---
+
+This feature allows MetalLB to cleanly operate in environments where BGP is not required, by omitting all BGP-related processing and controllers at runtime. 
