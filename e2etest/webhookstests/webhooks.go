@@ -106,6 +106,102 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
 		})
+
+		ginkgo.It("Should validate IPAddressPool against existing BGPAdvertisements", func() {
+			ginkgo.By("Creating BGPAdvertisement first")
+			resources := config.Resources{
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "adv-webhook-test",
+						},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							AggregationLength:   ptr.To(int32(26)),
+							AggregationLengthV6: ptr.To(int32(64)),
+							IPAddressPools:      []string{"pool-webhook-test"},
+						},
+					},
+				},
+			}
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Creating IPAddressPool with incompatible aggregation length")
+			resources.Pools = []metallbv1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pool-webhook-test",
+					},
+					Spec: metallbv1beta1.IPAddressPoolSpec{
+						Addresses: []string{
+							"192.168.1.0/28", // /28 is more specific than /26 aggregation length
+						},
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("incompatible with BGPAdvertisement"))
+
+			ginkgo.By("Creating IPAddressPool with compatible aggregation length")
+			resources.Pools[0].Spec.Addresses = []string{"192.168.1.0/24"} // /24 is compatible with /26 aggregation length
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Testing with label selector")
+			// Clean up first
+			err = ConfigUpdater.Clean()
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create BGPAdvertisement with label selector
+			resources = config.Resources{
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "adv-selector-test",
+						},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							AggregationLength:   ptr.To(int32(26)),
+							AggregationLengthV6: ptr.To(int32(64)),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test-label": "test-value",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Creating IPAddressPool with matching labels but incompatible prefix")
+			resources.Pools = []metallbv1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pool-selector-test",
+						Labels: map[string]string{
+							"test-label": "test-value",
+						},
+					},
+					Spec: metallbv1beta1.IPAddressPoolSpec{
+						Addresses: []string{
+							"10.0.0.0/28", // /28 is more specific than /26 aggregation length
+						},
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("incompatible with BGPAdvertisement"))
+
+			ginkgo.By("Creating IPAddressPool with matching labels and compatible prefix")
+			resources.Pools[0].Spec.Addresses = []string{"10.0.0.0/24"} // /24 is compatible with /26 aggregation length
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 
 	ginkgo.Context("for BGPAdvertisement", func() {
