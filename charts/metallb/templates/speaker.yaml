@@ -216,6 +216,10 @@ spec:
               mountPath: /tmp/frr
             - name: frr-conf
               mountPath: /etc/frr
+          {{- with .Values.speaker.initContainers.cpFrrFiles.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         # Copies the reloader to the shared volume between the speaker and reloader.
         - name: cp-reloader
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
@@ -223,6 +227,10 @@ spec:
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
+          {{- with .Values.speaker.initContainers.cpReloader.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         # Copies the metrics exporter
         - name: cp-metrics
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
@@ -230,6 +238,10 @@ spec:
           volumeMounts:
             - name: metrics
               mountPath: /etc/frr_metrics
+          {{- with .Values.speaker.initContainers.cpMetrics.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       shareProcessNamespace: true
       {{- end }}
       containers:
