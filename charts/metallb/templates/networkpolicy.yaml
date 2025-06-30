@@ -35,11 +35,10 @@ spec:
           {{ else }}
           port: {{ .Values.prometheus.metricsPort }}
           {{- end }}
-        {{- if .Values.controller.webhookMode }}
+        {{- if and .Values.controller.webhookMode (ne .Values.controller.webhookMode "disabled") }}
         - protocol: TCP
           port: webhook-server
         {{- end }}
-
   policyTypes:
     - Egress
     - Ingress
