@@ -2,7 +2,9 @@
 package netpoltests
 
 import (
+	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,24 +55,53 @@ var _ = ginkgo.Describe("Networkpolicies", func() {
 	})
 
 	ginkgo.It("only allowed traffic", func() {
-		ginkgo.By("checking ingress - probe pod to any port on the controller other than webhook should be timeout")
+		ginkgo.By("checking ingress - probe pod to any port on the controller other than webhook,metricshttps should be timeout")
+
+		ingressPorts := map[string]string{
+			"8888": "TIMEOUT", // Add random port to check for being blocked
+		}
+		for _, c := range controller.Spec.Containers {
+			for _, p := range c.Ports {
+				port := strconv.Itoa(int(p.ContainerPort))
+				if p.Name == "monitoring" { // the non-https port is not whitelisted in the network policies
+					ingressPorts[port] = "TIMEOUT"
+					continue
+				}
+				ingressPorts[port] = "" // Agnhost connect return empty on success
+			}
+		}
+
 		controllerIP := controller.Status.PodIP
 		probeExec := executor.ForPod(probe.Namespace, probe.Name, "netpol")
-		out, err := probeExec.Exec("./agnhost", "connect", net.JoinHostPort(controllerIP, "7472"), "--timeout", "5s")
-		Expect(err).To(HaveOccurred())
-		Expect(out).To(ContainSubstring("TIMEOUT"), out)
-		out, err = probeExec.Exec("./agnhost", "connect", net.JoinHostPort(controllerIP, "9443"), "--timeout", "5s")
-		Expect(err).NotTo(HaveOccurred(), out) // Until we manage to allow traffic only from k8s API
+		for port, action := range ingressPorts {
+			out, err := probeExec.Exec("./agnhost", "connect", net.JoinHostPort(controllerIP, port), "--timeout", "5s")
+			if action != "" {
+				Expect(err).To(HaveOccurred())
+				Expect(out).To(ContainSubstring(action), fmt.Sprintf("connect to port %s returned %s not %s", port, out, action))
+				continue
+			}
+			Expect(err).NotTo(HaveOccurred())
+			Expect(out).To(ContainSubstring(""), fmt.Sprintf("connect to port %s returned %s", port, out))
+		}
 
 		ginkgo.By("checking egress - controller pod to any port on the probe other port than API should be timeout")
+		egressPorts := map[string]string{
+			"8888": "TIMEOUT", // Add random port to check for being blocked
+			"6443": "REFUSED", // Until we restrict egress only to k8s service
+		}
+
 		probeIP := probe.Status.PodIP
 		ctrlExec, err := executor.ForPodDebug(cs, controller.Namespace, controller.Name, "controller", agnhostImage)
 		Expect(err).NotTo(HaveOccurred())
-		out, err = ctrlExec.Exec("./agnhost", "connect", net.JoinHostPort(probeIP, "8080"), "--timeout", "5s")
-		Expect(err).To(HaveOccurred())
-		Expect(out).To(ContainSubstring("TIMEOUT")) // If no netpol then REFUSED
-		out, err = ctrlExec.Exec("./agnhost", "connect", net.JoinHostPort(probeIP, "6443"), "--timeout", "5s")
-		Expect(err).To(HaveOccurred())
-		Expect(out).To(ContainSubstring("REFUSED")) // until we restrict only to k8s svc
+
+		for port, action := range egressPorts {
+			out, err := ctrlExec.Exec("./agnhost", "connect", net.JoinHostPort(probeIP, port), "--timeout", "5s")
+			if action != "" {
+				Expect(err).To(HaveOccurred())
+				Expect(out).To(ContainSubstring(action), fmt.Sprintf("connect to port %s returned %s not %s", port, out, action))
+				continue
+			}
+			Expect(err).NotTo(HaveOccurred())
+		}
 	})
 })
