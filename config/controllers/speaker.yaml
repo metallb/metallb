@@ -108,8 +108,8 @@ spec:
       - name: memberlist 
         secret: 
           secretName: memberlist
-          defaultMode: 420
+          defaultMode: 256
       - name: metallb-excludel2
         configMap:
-          defaultMode: 256
+          defaultMode: 416
           name: metallb-excludel2
