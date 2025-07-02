@@ -352,6 +352,14 @@ speaker:
   frrMetrics:
     resources: {}
 
+  initContainers:
+    cpFrrFiles:
+      resources: {}
+    cpReloader:
+      resources: {}
+    cpMetrics:
+      resources: {}
+
   extraContainers: []
 
 crds:

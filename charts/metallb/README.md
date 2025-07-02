@@ -136,6 +136,9 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.image.pullPolicy | string | `nil` |  |
 | speaker.image.repository | string | `"quay.io/metallb/speaker"` |  |
 | speaker.image.tag | string | `nil` |  |
+| speaker.initContainers.cpFrrFiles.resources | object | `{}` |  |
+| speaker.initContainers.cpMetrics.resources | object | `{}` |  |
+| speaker.initContainers.cpReloader.resources | object | `{}` |  |
 | speaker.labels | object | `{}` |  |
 | speaker.livenessProbe.enabled | bool | `true` |  |
 | speaker.livenessProbe.failureThreshold | int | `3` |  |
