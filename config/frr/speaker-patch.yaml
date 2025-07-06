@@ -110,7 +110,7 @@ spec:
               value: /dev/null
           ports:
             - containerPort: 7473
-              name: monitoring
+              name: frrmetrics
           volumeMounts:
             - name: frr-sockets
               mountPath: /var/run/frr
