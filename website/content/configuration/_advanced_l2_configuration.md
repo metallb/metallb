@@ -148,3 +148,44 @@ In other words, if MetalLB chooses hostB to announce the VIP of pool1, the Speak
 {{% notice warning %}}
 The interface selector won't affect how MetalLB is choosing the leader for a given L2 IP. This means that if it elects a leader where the selected interface is not available, the service won't be announced. The cluster administrator is responsible to use the combination of interfaces selector and node selector to avoid the problem.
 {{% /notice %}}
+
+### Excluding interfaces from L2 announcements
+
+In some environments, you may want to exclude certain network interfaces from being used for L2 announcements. This is particularly useful when you have virtual interfaces, container interfaces, or other interfaces that should not participate in load balancer announcements.
+
+You can configure interface exclusion by creating a ConfigMap named `metallb-excludel2` in the `metallb-system` namespace:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metallb-excludel2
+  namespace: metallb-system
+data:
+  excludel2.yaml: |
+    announcedInterfacesToExclude:
+    - ^docker.*
+    - ^cbr.*
+    - ^dummy.*
+    - ^virbr.*
+    - ^lxcbr.*
+    - ^veth.*
+    - ^lo$
+    - ^cali.*
+    - ^tunl.*
+    - ^flannel.*
+    - ^kube-ipvs.*
+    - ^cni.*
+    - ^nodelocaldns.*
+    - ^lxc.*
+```
+
+The `announcedInterfacesToExclude` field contains a list of regular expressions that match interface names to exclude. The default configuration excludes common virtual and container interfaces.
+
+{{% notice note %}}
+This configuration is applied globally to all MetalLB speakers in the cluster. It takes precedence over interface selection in L2Advertisements.
+{{% /notice %}}
+
+{{% notice tip %}}
+You can customize the exclusion list based on your specific environment. For example, if you have custom interface naming patterns, you can add them to the list.
+{{% /notice %}}
