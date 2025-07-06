@@ -2253,7 +2253,7 @@ spec:
         name: frr-metrics
         ports:
         - containerPort: 7473
-          name: monitoring
+          name: frrmetrics
         volumeMounts:
         - mountPath: /var/run/frr
           name: frr-sockets
