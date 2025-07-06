@@ -26,8 +26,10 @@ type ndpResponder struct {
 }
 
 func newNDPResponder(logger log.Logger, ifi *net.Interface, ann announceFunc) (*ndpResponder, error) {
-	// Use link-local address as the source IPv6 address for NDP communications.
-	conn, _, err := ndp.Dial(ifi, ndp.LinkLocal)
+	// Use global unicast address as the source IPv6 address for NDP communications.
+	// This avoids the "cannot assign requested address" error when the global unicast
+	// IPv6 address is not the first address on the interface.
+	conn, _, err := ndp.Dial(ifi, ndp.Global)
 	if err != nil {
 		return nil, fmt.Errorf("creating NDP responder for %q: %s", ifi.Name, err)
 	}
