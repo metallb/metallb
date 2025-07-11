@@ -514,7 +514,59 @@ func TestValidateFRR(t *testing.T) {
 				},
 			},
 			mustFail: true,
-		}, {
+		},
+		{
+			desc: "duplicate bgp address, with nodeSelectors",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"key": "value"},
+								},
+							},
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"key2": "value2"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: false,
+		},
+		{
+			desc: "duplicate bgp address, only one with nodeSelectors",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"key": "value"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
 			desc: "duplicate bgp address, different vrfs",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
