@@ -146,19 +146,22 @@ func DontValidate(c ClusterResources) error {
 // any options that are available only in the native implementation.
 func DiscardNativeOnly(c ClusterResources) error {
 	if len(c.Peers) > 1 {
-		peerAddr := make(map[string]bool)
+		peerAddrHasNodeSelectors := make(map[string]bool) // if a peer has nodeSelectors, we can have multiple peers with the same address
 		routerID := c.Peers[0].Spec.RouterID
 		peer0 := peerIdentifier(c.Peers[0].Spec)
-		peerAddr[peer0] = true
+		peerAddrHasNodeSelectors[peer0] = len(c.Peers[0].Spec.NodeSelectors) > 0
 		for _, p := range c.Peers[1:] {
 			if p.Spec.RouterID != routerID {
 				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
 			}
 			peerID := peerIdentifier(p.Spec)
-			if _, ok := peerAddr[peerID]; ok {
-				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", p.Spec.Address)
+			if hadNodeSelectors, ok := peerAddrHasNodeSelectors[peerID]; ok {
+				// make sure there is at least one nodeSelector for this peer
+				if len(p.Spec.NodeSelectors) == 0 || !hadNodeSelectors {
+					return fmt.Errorf("duplicate peer %s has no nodeSelectors, in FRR mode each duplicate peer must have nodeSelectors to differentiate", p.Spec.Address)
+				}
 			}
-			peerAddr[peerID] = true
+			peerAddrHasNodeSelectors[peerID] = len(p.Spec.NodeSelectors) > 0
 		}
 	}
 	for _, p := range c.Peers {
