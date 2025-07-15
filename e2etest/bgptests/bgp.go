@@ -1647,7 +1647,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					return cfgStr
 				}, 1*time.Minute).Should(
 					And(
-						ContainSubstring("log file /etc/frr/frr.log"),
+						ContainSubstring("log stdout"),
 						WithTransform(substringCount("\n profile fullbfdprofile1"), Equal(1)),
 						ContainSubstring("receive-interval 93"),
 						ContainSubstring("transmit-interval 95"),
