@@ -94,26 +94,43 @@ func (a *Announce) updateInterfaces() {
 		}
 		f, err := os.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
 		if err == nil {
-			flags, _ := strconv.ParseUint(string(f)[:len(string(f))-1], 0, 32)
+			flags, _ := strconv.ParseUint(string(f)[:len(f)-1], 0, 32)
 			// NOARP flag
 			if flags&0x80 != 0 {
 				continue
 			}
 		}
-		if ifi.Flags&net.FlagBroadcast != 0 {
-			keepARP[ifi.Index] = true
-		}
 
+		// Check for IPv4 and IPv6 addresses on this interface
+		hasIPv4 := false
+		hasIPv6 := false
 		for _, a := range addrs {
 			ipaddr, ok := a.(*net.IPNet)
 			if !ok {
 				continue
 			}
-			if ipaddr.IP.To4() != nil || !ipaddr.IP.IsLinkLocalUnicast() {
-				continue
+
+			if ipaddr.IP.To4() != nil && ipaddr.IP.IsGlobalUnicast() {
+				hasIPv4 = true
+				level.Debug(l).Log("event", "found IPv4 address", "interface", ifi.Name, "ip", ipaddr.IP)
 			}
+
+			if ipaddr.IP.To4() == nil && ipaddr.IP.To16() != nil && ipaddr.IP.IsGlobalUnicast() {
+				hasIPv6 = true
+				level.Debug(l).Log("event", "found IPv6 address", "interface", ifi.Name, "ip", ipaddr.IP)
+			}
+		}
+
+		// Enable ARP for interfaces with IPv4 addresses and broadcast capability
+		if hasIPv4 && ifi.Flags&net.FlagBroadcast != 0 {
+			keepARP[ifi.Index] = true
+			level.Debug(l).Log("event", "enabling ARP", "interface", ifi.Name)
+		}
+
+		// Enable NDP for interfaces with IPv6 addresses
+		if hasIPv6 {
 			keepNDP[ifi.Index] = true
-			break
+			level.Debug(l).Log("event", "enabling NDP", "interface", ifi.Name)
 		}
 
 		if keepARP[ifi.Index] && a.arps[ifi.Index] == nil {
