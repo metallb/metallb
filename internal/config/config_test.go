@@ -3633,6 +3633,39 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "peer with DisableMP field",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:     42,
+							ASN:       142,
+							Address:   "1.2.3.4",
+							DisableMP: true,
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: map[string]*Peer{
+					"peer1": {
+						Name:                   "peer1",
+						MyASN:                  42,
+						ASN:                    142,
+						Addr:                   net.ParseIP("1.2.3.4"),
+						NodeSelectors:          []labels.Selector{labels.Everything()},
+						DisableMP:              true,
+						DualStackAddressFamily: false,
+					},
+				},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
 	}
 
 	for _, test := range tests {
