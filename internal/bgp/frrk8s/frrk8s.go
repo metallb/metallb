@@ -271,6 +271,7 @@ func (sm *sessionManager) updateConfig() error {
 				EnableGracefulRestart:  s.GracefulRestart,
 				EBGPMultiHop:           s.EBGPMultiHop,
 				DualStackAddressFamily: s.DualStackAddressFamily,
+				DisableMP:              s.DisableMP,
 				ToAdvertise: frrv1beta1.Advertise{
 					Allowed: frrv1beta1.AllowedOutPrefixes{
 						Prefixes: make([]string, 0),
