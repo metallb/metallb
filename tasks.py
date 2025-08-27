@@ -1296,6 +1296,7 @@ def generate_test_filters(config):
         "junit_report": "export JUnit reports xml to file, default junit-report.xml",
         "host_bgp_mode": "tells whether to run the host container in ebgp or ibgp mode",
         "auto_focus": "Automatically determine test focus/skip based on current dev-env configuration. Default: False",
+        "auto_focus_dry_run": "Run auto-focus detection, display skipped tests, and exit without running tests. Default: False",
     }
 )
 def e2etest(
@@ -1322,11 +1323,16 @@ def e2etest(
     host_bgp_mode="ibgp",
     frr_k8s_namespace="metallb-system",
     auto_focus=False,
+    auto_focus_dry_run=False,
 ):
     """Run E2E tests against development cluster."""
     fetch_kubectl()
     fetch_kind()
     fetch_ginkgo()
+
+    # Enable auto_focus if dry_run is requested
+    if auto_focus_dry_run:
+        auto_focus = True
 
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -1342,7 +1348,11 @@ def e2etest(
         ginkgo_focus = '--focus="' + focus + '"'
 
     if auto_focus:
-        print("🔍 Auto-detecting development environment configuration...")
+        if auto_focus_dry_run:
+            print("🧪 Auto-focus dry-run mode: Detecting environment and displaying skip patterns...")
+        else:
+            print("🔍 Auto-detecting development environment configuration...")
+        
         env_config = detect_dev_env_config(name)
         filters = generate_test_filters(env_config)
 
@@ -1359,6 +1369,11 @@ def e2etest(
                 ginkgo_skip = '--skip="' + skip + '"'
         else:
             print("✅ No tests will be skipped")
+
+        # Exit early if this is a dry-run
+        if auto_focus_dry_run:
+            print("\n🏁 Dry-run complete. Exiting without running tests.")
+            return
 
     if kubeconfig is None:
         validate_kind_version()
