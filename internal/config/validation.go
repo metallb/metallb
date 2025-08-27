@@ -3,6 +3,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -142,23 +143,56 @@ func DontValidate(c ClusterResources) error {
 	return nil
 }
 
+// Helper function to turn a NodeSelector into a string so it can be used in a map.
+func serializeNodeSelector(n []metav1.LabelSelector) (string, error) {
+	// https://pkg.go.dev/encoding/json#Marshal
+	// The map keys are sorted and used as JSON object keys
+
+	// If your matchExpressoins are identical but sorted differently,
+	// the uniqueness test will fail
+
+	b, err := json.Marshal(n)
+	if err != nil {
+		err = fmt.Errorf("NodeSelector %v can not be serialized", n)
+	}
+	return (string)(b), err
+}
+
 // DiscardNativeOnly returns an error if the current configFile contains
 // any options that are available only in the native implementation.
 func DiscardNativeOnly(c ClusterResources) error {
 	if len(c.Peers) > 1 {
-		peerAddr := make(map[string]bool)
+		uniquePeer := make(map[string](map[string]bool))
 		routerID := c.Peers[0].Spec.RouterID
+		nodeSelectors, _ := serializeNodeSelector(c.Peers[0].Spec.NodeSelectors)
+
 		peer0 := peerIdentifier(c.Peers[0].Spec)
-		peerAddr[peer0] = true
+		uniquePeer[peer0] = map[string]bool{nodeSelectors: true}
+
 		for _, p := range c.Peers[1:] {
 			if p.Spec.RouterID != routerID {
 				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
 			}
 			peerID := peerIdentifier(p.Spec)
-			if _, ok := peerAddr[peerID]; ok {
-				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", p.Spec.Address)
+			nodeSelectors, err := serializeNodeSelector(p.Spec.NodeSelectors)
+			if err != nil {
+				return err
 			}
-			peerAddr[peerID] = true
+
+			if _, exists := uniquePeer[peerID]; !exists {
+				c := len(p.Spec.NodeSelectors)
+				if c == 0 {
+					uniquePeer[peerID] = make(map[string]bool)
+					uniquePeer[peerID][nodeSelectors] = true
+					continue
+				}
+				uniquePeer[peerID] = map[string]bool{nodeSelectors: true}
+			} else if uniquePeer[peerID][nodeSelectors] {
+				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers per node", p.Spec.Address)
+			} else if uniquePeer[peerID]["null"] {
+				return fmt.Errorf("peer %s nodeselector collides with peer without nodeselector, FRR mode doesn't support duplicate BGPPeers per node", p.Spec.Address)
+			}
+			uniquePeer[peerID][nodeSelectors] = true
 		}
 	}
 	for _, p := range c.Peers {

@@ -601,6 +601,107 @@ func TestValidateFRR(t *testing.T) {
 			},
 			mustFail: true,
 		},
+		{
+			desc: "duplicate bgp address, same vrf, different node selector",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"topology.kubernetes.io/zone": "us-east-1",
+									},
+								},
+							},
+						},
+					}, {
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"topology.kubernetes.io/zone": "africa-east-1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: false,
+		},
+		{
+			desc: "duplicate bgp address, same vrf, same node selector",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"topology.kubernetes.io/zone": "us-east-1",
+									},
+								},
+							},
+						},
+					}, {
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"topology.kubernetes.io/zone": "us-east-1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "duplicate bgp address, node selector overlap",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"topology.kubernetes.io/zone": "us-east-1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
 	}
 
 	for _, test := range tests {
