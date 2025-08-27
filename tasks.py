@@ -1224,9 +1224,10 @@ def detect_dev_env_config(cluster_name="kind"):
         bgppeer_result = run(f"{kubectl_path} get bgppeer -n metallb-system", hide=True, warn=True)
         l2adv_result = run(f"{kubectl_path} get l2advertisement -n metallb-system", hide=True, warn=True)
 
-        if bgppeer_result.ok and "No resources found" not in bgppeer_result.stdout:
+        # Check if stdout contains actual resource data (more than just headers)
+        if bgppeer_result.ok and bgppeer_result.stdout.strip() and len(bgppeer_result.stdout.strip().split('\n')) > 1:
             config['protocol'] = 'bgp'
-        elif l2adv_result.ok and "No resources found" not in l2adv_result.stdout:
+        elif l2adv_result.ok and l2adv_result.stdout.strip() and len(l2adv_result.stdout.strip().split('\n')) > 1:
             config['protocol'] = 'layer2'
 
     except Exception as e:
