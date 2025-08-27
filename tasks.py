@@ -1184,6 +1184,95 @@ def helmdocs(ctx, env="container"):
         raise Exit(message="Unsupported helm-docs environment: {}".format(env))
 
 
+def detect_dev_env_config(cluster_name="kind"):
+    """Detect the configuration of the current dev environment."""
+    config = {
+        'bgp_type': 'unknown',
+        'ip_family': 'unknown',
+        'with_prometheus': False,
+        'protocol': 'unknown'
+    }
+
+    try:
+        # Check what's deployed in metallb-system namespace
+        result = run(f"{kubectl_path} get deployment -n metallb-system -o yaml", hide=True, warn=True)
+
+        if result.ok:
+            # Parse deployment to detect BGP type
+            if "frr-k8s" in result.stdout:
+                config['bgp_type'] = 'frr-k8s'
+            elif "frr" in result.stdout:
+                config['bgp_type'] = 'frr'
+            else:
+                config['bgp_type'] = 'native'
+
+        # Check for prometheus namespace
+        prom_result = run(f"{kubectl_path} get namespace monitoring", hide=True, warn=True)
+        config['with_prometheus'] = prom_result.ok
+
+        # Detect IP family from service CIDRs
+        cidr_result = run(f"{kubectl_path} get ipaddresspool -n metallb-system -o yaml", hide=True, warn=True)
+        if cidr_result.ok:
+            if "fc00:" in cidr_result.stdout and "192.168" in cidr_result.stdout:
+                config['ip_family'] = 'dual'
+            elif "fc00:" in cidr_result.stdout:
+                config['ip_family'] = 'ipv6'
+            else:
+                config['ip_family'] = 'ipv4'
+
+        # Detect protocol (BGP vs Layer2)
+        bgppeer_result = run(f"{kubectl_path} get bgppeer -n metallb-system", hide=True, warn=True)
+        l2adv_result = run(f"{kubectl_path} get l2advertisement -n metallb-system", hide=True, warn=True)
+
+        if bgppeer_result.ok and "No resources found" not in bgppeer_result.stdout:
+            config['protocol'] = 'bgp'
+        elif l2adv_result.ok and "No resources found" not in l2adv_result.stdout:
+            config['protocol'] = 'layer2'
+
+    except Exception as e:
+        print(f"Warning: Could not auto-detect environment config: {e}")
+
+    return config
+
+
+def generate_test_filters(config):
+    """Generate ginkgo focus/skip patterns based on environment config."""
+    skip_patterns = []
+
+    # BGP type filtering
+    if config['bgp_type'] == 'native':
+        skip_patterns.extend(['FRR', 'FRR-MODE', 'FRRK8S-MODE', 'BFD', 'VRF'])
+    elif config['bgp_type'] == 'frr':
+        skip_patterns.append('FRRK8S-MODE')
+    elif config['bgp_type'] in ['frr-k8s', 'frr-k8s-external']:
+        skip_patterns.append('FRR-MODE')
+
+    # IP family filtering
+    if config['ip_family'] == 'ipv4':
+        skip_patterns.extend(['IPV6', 'DUALSTACK'])
+    elif config['ip_family'] == 'ipv6':
+        skip_patterns.extend(['IPV4', 'DUALSTACK'])
+        if config['bgp_type'] == 'native':
+            skip_patterns.append('BGP')  # Native BGP doesn't support IPv6
+    elif config['ip_family'] == 'dual':
+        skip_patterns.append('IPV6')  # Skip IPv6-only tests in dual stack
+
+    # Protocol filtering
+    if config['protocol'] == 'layer2':
+        skip_patterns.append('BGP')
+    elif config['protocol'] == 'bgp':
+        skip_patterns.append('L2')
+
+    # Prometheus filtering
+    if not config['with_prometheus']:
+        skip_patterns.append('metrics')
+
+    return {
+        'skip': '|'.join(skip_patterns) if skip_patterns else '',
+        'focus': ''  # Could add focus logic later
+    }
+
+
 @task(
     help={
         "name": "name of the kind cluster to test (only kind uses).",
@@ -1206,6 +1295,7 @@ def helmdocs(ctx, env="container"):
         "ginkgo_params": "additional ginkgo params to run the e2e tests with",
         "junit_report": "export JUnit reports xml to file, default junit-report.xml",
         "host_bgp_mode": "tells whether to run the host container in ebgp or ibgp mode",
+        "auto_focus": "Automatically determine test focus/skip based on current dev-env configuration. Default: False",
     }
 )
 def e2etest(
@@ -1231,6 +1321,7 @@ def e2etest(
     junit_report="junit-report.xml",
     host_bgp_mode="ibgp",
     frr_k8s_namespace="metallb-system",
+    auto_focus=False,
 ):
     """Run E2E tests against development cluster."""
     fetch_kubectl()
@@ -1249,6 +1340,25 @@ def e2etest(
     ginkgo_focus = ""
     if focus:
         ginkgo_focus = '--focus="' + focus + '"'
+
+    if auto_focus:
+        print("🔍 Auto-detecting development environment configuration...")
+        env_config = detect_dev_env_config(name)
+        filters = generate_test_filters(env_config)
+
+        print(f"📊 Detected configuration:")
+        print(f"  - BGP Type: {env_config['bgp_type']}")
+        print(f"  - IP Family: {env_config['ip_family']}")
+        print(f"  - Protocol: {env_config['protocol']}")
+        print(f"  - Prometheus: {env_config['with_prometheus']}")
+
+        if filters['skip']:
+            print(f"⏭️  Auto-skip patterns: {filters['skip']}")
+            if not skip:  # Don't override manually provided skip
+                skip = filters['skip']
+                ginkgo_skip = '--skip="' + skip + '"'
+        else:
+            print("✅ No tests will be skipped")
 
     if kubeconfig is None:
         validate_kind_version()
