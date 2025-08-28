@@ -1778,40 +1778,52 @@ def detect_dev_env_config(cluster_name="kind"):
     return config
 
 
+def bgp_type_skip_patterns(bgp_type):
+    """Return skip patterns based on BGP type."""
+    if bgp_type == 'native':
+        return ['FRR', 'FRR-MODE', 'FRRK8S-MODE', 'BFD', 'VRF']
+    elif bgp_type == 'frr':
+        return ['FRRK8S-MODE']
+    elif bgp_type in ['frr-k8s', 'frr-k8s-external']:
+        return ['FRR-MODE']
+    return []
+
+def ip_family_skip_patterns(ip_family, bgp_type):
+    """Return skip patterns based on IP family and BGP type."""
+    if ip_family == 'ipv4':
+        return ['IPV6', 'DUALSTACK']
+    elif ip_family == 'ipv6':
+        skip_patterns = ['IPV4', 'DUALSTACK']
+        if bgp_type == 'native':
+            # Native BGP doesn't support IPv6
+            skip_patterns.append('BGP')
+        return skip_patterns
+    elif ip_family == 'dual':
+        # Skip IPv6-only tests in dual stack (ipv4 and ipv6)
+        return ['IPV6']
+    return []
+
+def protocol_skip_patterns(protocol):
+    """Return skip patterns based on protocol."""
+    if protocol == 'layer2':
+        return ['BGP']
+    elif protocol == 'bgp':
+        return ['L2']
+    return []
+
+def prometheus_skip_patterns(with_prometheus):
+    """Return skip patterns based on Prometheus presence."""
+    if not with_prometheus:
+        return ['metrics']
+    return []
+
 def generate_test_filters(config):
     """Generate ginkgo focus/skip patterns based on environment config."""
     skip_patterns = []
-
-    # BGP type filtering
-    if config['bgp_type'] == 'native':
-        skip_patterns.extend(['FRR', 'FRR-MODE', 'FRRK8S-MODE', 'BFD', 'VRF'])
-    elif config['bgp_type'] == 'frr':
-        skip_patterns.append('FRRK8S-MODE')
-    elif config['bgp_type'] in ['frr-k8s', 'frr-k8s-external']:
-        skip_patterns.append('FRR-MODE')
-
-    # IP family filtering
-    if config['ip_family'] == 'ipv4':
-        skip_patterns.extend(['IPV6', 'DUALSTACK'])
-    elif config['ip_family'] == 'ipv6':
-        skip_patterns.extend(['IPV4', 'DUALSTACK'])
-        if config['bgp_type'] == 'native':
-            # Native BGP doesn't support IPv6
-            skip_patterns.append('BGP')
-    elif config['ip_family'] == 'dual':
-        # Skip IPv6-only tests in dual stack (ipv4 and ipv6)
-        skip_patterns.append('IPV6')
-
-    # Protocol filtering
-    if config['protocol'] == 'layer2':
-        skip_patterns.append('BGP')
-    elif config['protocol'] == 'bgp':
-        skip_patterns.append('L2')
-
-    # Prometheus filtering
-    if not config['with_prometheus']:
-        skip_patterns.append('metrics')
-
+    skip_patterns.extend(bgp_type_skip_patterns(config.get('bgp_type')))
+    skip_patterns.extend(ip_family_skip_patterns(config.get('ip_family'), config.get('bgp_type')))
+    skip_patterns.extend(protocol_skip_patterns(config.get('protocol')))
+    skip_patterns.extend(prometheus_skip_patterns(config.get('with_prometheus')))
     return {
         'skip': '|'.join(skip_patterns) if skip_patterns else '',
         'focus': ''  # Could add focus logic later
