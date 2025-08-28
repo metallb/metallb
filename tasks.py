@@ -1257,7 +1257,7 @@ def e2etest(
         ginkgo_focus = '--focus="' + focus + '"'
 
     if auto_focus:
-        
+
         env_config = detect_dev_env_config(name)
         filters = generate_test_filters(env_config)
 
@@ -1265,9 +1265,8 @@ def e2etest(
 
         if filters['skip']:
             print(f"⏭️  Auto-skip patterns: {filters['skip']}")
-            if not skip:  # Don't override manually provided skip
-                skip = filters['skip']
-                ginkgo_skip = '--skip="' + skip + '"'
+            # Override skip with auto-detected patterns
+            ginkgo_skip = '--skip="' + filters['skip'] + '"'
         else:
             print("✅ No tests will be skipped")
 
