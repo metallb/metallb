@@ -1194,20 +1194,23 @@ def detect_dev_env_config(cluster_name="kind"):
     }
 
     try:
-        # namespace to use for the rest of the detection
+        # Use this namespace to detect the environment
         namespace = "metallb-system"
 
-        # Check what's deployed in the namespace
-        result = run(f"{kubectl_path} get deployment -n {namespace} -o yaml", hide=True, warn=True)
+        # Extract METALLB_BGP_TYPE from controller deployment
+        bgp_type_result = run(
+            f"{kubectl_path} get deployment controller -n {namespace} "
+            f"-o jsonpath='{{.spec.template.spec.containers[0].env[?(@.name==\"METALLB_BGP_TYPE\")].value}}'",
+            hide=True, warn=True
+        )
 
-        if result.ok:
-            # Parse deployment to detect BGP type
-            if "frr-k8s" in result.stdout:
-                config['bgp_type'] = 'frr-k8s'
-            elif "frr" in result.stdout:
-                config['bgp_type'] = 'frr'
-            else:
-                config['bgp_type'] = 'native'
+        # Detect BGP type from controller deployment
+        if bgp_type_result.ok:
+            value = bgp_type_result.stdout.strip()
+            # 'native' if not set (follows the Go code behaviour)
+            config['bgp_type'] = value if value else 'native'
+        else:
+            raise Exception(f"Cannot detect BGP type from controller deployment in {namespace} namespace")
 
         # Check for prometheus namespace
         prom_result = run(f"{kubectl_path} get namespace monitoring", hide=True, warn=True)
@@ -1217,7 +1220,19 @@ def detect_dev_env_config(cluster_name="kind"):
         cidr_result = run(f"{kubectl_path} get ipaddresspool -n {namespace} -o yaml", hide=True, warn=True)
         if cidr_result.ok:
             has_ipv4 = bool(re.search(r'\d+\.\d+\.\d+\.\d+', cidr_result.stdout))
-            has_ipv6 = 'fc00:' in cidr_result.stdout or '::' in cidr_result.stdout
+
+            # Generic IPv6 detection using the proper simplified pattern
+            ipv6_pattern = r'''
+                (?:
+                    [0-9a-fA-F]{0,4}:         # Hex digits followed by colon
+                ){2,7}                        # At least 2 groups (minimum valid IPv6)
+                [0-9a-fA-F]{0,4}              # Final group
+                (?:/\d{1,3})?                 # Optional CIDR prefix
+                |
+                ::(?:[0-9a-fA-F]{0,4}:?)*     # Compressed format starting with ::
+                (?:/\d{1,3})?                 # Optional CIDR prefix
+            '''
+            has_ipv6 = bool(re.search(ipv6_pattern, cidr_result.stdout, re.VERBOSE))
 
             if has_ipv4 and has_ipv6:
                 config['ip_family'] = 'dual'
@@ -1229,7 +1244,7 @@ def detect_dev_env_config(cluster_name="kind"):
                 raise Exception("Cannot detect IP family from ipaddresspool resource")
         else:
             raise Exception(f"Cannot detect IP family from ipaddresspool resource in {namespace} namespace")
-                
+
         # Detect protocol (BGP vs Layer2)
         bgppeer_result = run(f"{kubectl_path} get bgppeer -n {namespace}", hide=True, warn=True)
         l2adv_result = run(f"{kubectl_path} get l2advertisement -n {namespace}", hide=True, warn=True)
@@ -1241,7 +1256,7 @@ def detect_dev_env_config(cluster_name="kind"):
             config['protocol'] = 'layer2'
         else:
             raise Exception(f"Cannot detect protocol from bgppeer or l2advertisement resources in {namespace} namespace")
-        
+
     except Exception as e:
         raise Exit(message=f"Error: Could not auto-detect environment config: {e}")
 
