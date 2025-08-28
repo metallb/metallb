@@ -1261,7 +1261,10 @@ def e2etest(
         env_config = detect_dev_env_config(name)
         filters = generate_test_filters(env_config)
 
-        print(f"\n📊 Auto-detected environment: BGP Type: {env_config['bgp_type']}, IP Family: {env_config['ip_family']}, Protocol: {env_config['protocol']}, Prometheus: {env_config['with_prometheus']}")
+        print(f"\n📊 Auto-detected environment: BGP Type: {env_config['bgp_type']}, "
+              f"IP Family: {env_config['ip_family']}, "
+              f"Protocol: {env_config['protocol']}, "
+              f"Prometheus: {env_config['with_prometheus']}")
 
         if filters['skip']:
             print(f"⏭️  Auto-skip patterns: {filters['skip']}")
