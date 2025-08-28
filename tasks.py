@@ -1194,7 +1194,7 @@ def detect_dev_env_config(cluster_name="kind"):
     }
 
     try:
-        # Use this namespace to detect the environment
+        # Use this namespace to detect the development environment
         namespace = "metallb-system"
 
         # Detect BGP type from controller deployment (METALLB_BGP_TYPE environment variable)
@@ -1225,7 +1225,7 @@ def detect_dev_env_config(cluster_name="kind"):
             addresses = addresses_result.stdout.strip().split()
             if not addresses:
                 raise Exception("Cannot detect IP family from ipaddresspool resource: no addresses found ")
-            
+
             ipv6_pattern = r'''
                 (?:
                     [0-9a-fA-F]{0,4}:         # Hex digits followed by colon
@@ -1236,7 +1236,7 @@ def detect_dev_env_config(cluster_name="kind"):
                 ::(?:[0-9a-fA-F]{0,4}:?)*     # Compressed format starting with ::
                 (?:/\d{1,3})?                 # Optional CIDR prefix
             '''
-            
+
             has_ipv4 = any(re.search(r'\d+\.\d+\.\d+\.\d+', address) for address in addresses)
             has_ipv6 = any(re.search(ipv6_pattern, address, re.VERBOSE) for address in addresses)
 
@@ -1252,13 +1252,22 @@ def detect_dev_env_config(cluster_name="kind"):
             raise Exception(f"Cannot detect IP family from ipaddresspool resource in {namespace} namespace: command failed")
 
         # Detect protocol (BGP vs Layer2)
-        bgppeer_result = run(f"{kubectl_path} get bgppeer -n {namespace}", hide=True, warn=True)
-        l2adv_result = run(f"{kubectl_path} get l2advertisement -n {namespace}", hide=True, warn=True)
+        bgppeer_result = run(
+            f"{kubectl_path} get bgppeer -n {namespace} "
+            f"-o jsonpath='{{.items[*].metadata.name}}'",
+            hide=True,
+            warn=True
+        )
+        l2adv_result = run(
+            f"{kubectl_path} get l2advertisement -n {namespace} "
+            f"-o jsonpath='{{.items[*].metadata.name}}'",
+            hide=True,
+            warn=True
+        )
 
-        # Check if stdout contains actual resource data (more than just headers)
-        if bgppeer_result.ok and bgppeer_result.stdout.strip() and len(bgppeer_result.stdout.strip().split('\n')) > 1:
+        if bgppeer_result.ok and bgppeer_result.stdout.strip():
             config['protocol'] = 'bgp'
-        elif l2adv_result.ok and l2adv_result.stdout.strip() and len(l2adv_result.stdout.strip().split('\n')) > 1:
+        elif l2adv_result.ok and l2adv_result.stdout.strip():
             config['protocol'] = 'layer2'
         else:
             raise Exception(f"Cannot detect protocol from bgppeer or l2advertisement resources in {namespace} namespace")
