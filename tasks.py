@@ -1194,8 +1194,11 @@ def detect_dev_env_config(cluster_name="kind"):
     }
 
     try:
-        # Check what's deployed in metallb-system namespace
-        result = run(f"{kubectl_path} get deployment -n metallb-system -o yaml", hide=True, warn=True)
+        # namespace to use for the rest of the detection
+        namespace = "metallb-system"
+
+        # Check what's deployed in the namespace
+        result = run(f"{kubectl_path} get deployment -n {namespace} -o yaml", hide=True, warn=True)
 
         if result.ok:
             # Parse deployment to detect BGP type
@@ -1210,28 +1213,37 @@ def detect_dev_env_config(cluster_name="kind"):
         prom_result = run(f"{kubectl_path} get namespace monitoring", hide=True, warn=True)
         config['with_prometheus'] = prom_result.ok
 
-        # Detect IP family from service CIDRs
-        cidr_result = run(f"{kubectl_path} get ipaddresspool -n metallb-system -o yaml", hide=True, warn=True)
+        # Detect IP family from ipaddresspool resource (dual, ipv4, ipv6)
+        cidr_result = run(f"{kubectl_path} get ipaddresspool -n {namespace} -o yaml", hide=True, warn=True)
         if cidr_result.ok:
-            if "fc00:" in cidr_result.stdout and "192.168" in cidr_result.stdout:
-                config['ip_family'] = 'dual'
-            elif "fc00:" in cidr_result.stdout:
-                config['ip_family'] = 'ipv6'
-            else:
-                config['ip_family'] = 'ipv4'
+            has_ipv4 = bool(re.search(r'\d+\.\d+\.\d+\.\d+', cidr_result.stdout))
+            has_ipv6 = 'fc00:' in cidr_result.stdout or '::' in cidr_result.stdout
 
+            if has_ipv4 and has_ipv6:
+                config['ip_family'] = 'dual'
+            elif has_ipv6:
+                config['ip_family'] = 'ipv6'
+            elif has_ipv4:
+                config['ip_family'] = 'ipv4'
+            else:
+                raise Exception("Cannot detect IP family from ipaddresspool resource")
+        else:
+            raise Exception(f"Cannot detect IP family from ipaddresspool resource in {namespace} namespace")
+                
         # Detect protocol (BGP vs Layer2)
-        bgppeer_result = run(f"{kubectl_path} get bgppeer -n metallb-system", hide=True, warn=True)
-        l2adv_result = run(f"{kubectl_path} get l2advertisement -n metallb-system", hide=True, warn=True)
+        bgppeer_result = run(f"{kubectl_path} get bgppeer -n {namespace}", hide=True, warn=True)
+        l2adv_result = run(f"{kubectl_path} get l2advertisement -n {namespace}", hide=True, warn=True)
 
         # Check if stdout contains actual resource data (more than just headers)
         if bgppeer_result.ok and bgppeer_result.stdout.strip() and len(bgppeer_result.stdout.strip().split('\n')) > 1:
             config['protocol'] = 'bgp'
         elif l2adv_result.ok and l2adv_result.stdout.strip() and len(l2adv_result.stdout.strip().split('\n')) > 1:
             config['protocol'] = 'layer2'
-
+        else:
+            raise Exception(f"Cannot detect protocol from bgppeer or l2advertisement resources in {namespace} namespace")
+        
     except Exception as e:
-        print(f"Warning: Could not auto-detect environment config: {e}")
+        raise Exit(message=f"Error: Could not auto-detect environment config: {e}")
 
     return config
 
@@ -1349,19 +1361,11 @@ def e2etest(
         ginkgo_focus = '--focus="' + focus + '"'
 
     if auto_focus:
-        if auto_focus_dry_run:
-            print("🧪 Auto-focus dry-run mode: Detecting environment and displaying skip patterns...")
-        else:
-            print("🔍 Auto-detecting development environment configuration...")
         
         env_config = detect_dev_env_config(name)
         filters = generate_test_filters(env_config)
 
-        print(f"📊 Detected configuration:")
-        print(f"  - BGP Type: {env_config['bgp_type']}")
-        print(f"  - IP Family: {env_config['ip_family']}")
-        print(f"  - Protocol: {env_config['protocol']}")
-        print(f"  - Prometheus: {env_config['with_prometheus']}")
+        print(f"\n📊 Auto-detected environment: BGP Type: {env_config['bgp_type']}, IP Family: {env_config['ip_family']}, Protocol: {env_config['protocol']}, Prometheus: {env_config['with_prometheus']}")
 
         if filters['skip']:
             print(f"⏭️  Auto-skip patterns: {filters['skip']}")
