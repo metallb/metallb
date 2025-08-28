@@ -1197,31 +1197,35 @@ def detect_dev_env_config(cluster_name="kind"):
         # Use this namespace to detect the environment
         namespace = "metallb-system"
 
-        # Extract METALLB_BGP_TYPE from controller deployment
+        # Detect BGP type from controller deployment (METALLB_BGP_TYPE environment variable)
         bgp_type_result = run(
             f"{kubectl_path} get deployment controller -n {namespace} "
             f"-o jsonpath='{{.spec.template.spec.containers[0].env[?(@.name==\"METALLB_BGP_TYPE\")].value}}'",
             hide=True, warn=True
         )
 
-        # Detect BGP type from controller deployment
         if bgp_type_result.ok:
             value = bgp_type_result.stdout.strip()
             # 'native' if not set (follows the Go code behaviour)
             config['bgp_type'] = value if value else 'native'
         else:
-            raise Exception(f"Cannot detect BGP type from controller deployment in {namespace} namespace")
+            raise Exception(f"Cannot detect BGP type from controller deployment in {namespace} namespace: command failed")
 
-        # Check for prometheus namespace
+        # Detect prometheus namespace
         prom_result = run(f"{kubectl_path} get namespace monitoring", hide=True, warn=True)
         config['with_prometheus'] = prom_result.ok
 
         # Detect IP family from ipaddresspool resource (dual, ipv4, ipv6)
-        cidr_result = run(f"{kubectl_path} get ipaddresspool -n {namespace} -o yaml", hide=True, warn=True)
-        if cidr_result.ok:
-            has_ipv4 = bool(re.search(r'\d+\.\d+\.\d+\.\d+', cidr_result.stdout))
-
-            # Generic IPv6 detection using the proper simplified pattern
+        addresses_result = run(
+            f"{kubectl_path} get ipaddresspool -n {namespace} "
+            f"-o jsonpath='{{.items[*].spec.addresses[*]}}'",
+            hide=True, warn=True
+        )
+        if addresses_result.ok:
+            addresses = addresses_result.stdout.strip().split()
+            if not addresses:
+                raise Exception("Cannot detect IP family from ipaddresspool resource: no addresses found ")
+            
             ipv6_pattern = r'''
                 (?:
                     [0-9a-fA-F]{0,4}:         # Hex digits followed by colon
@@ -1232,7 +1236,9 @@ def detect_dev_env_config(cluster_name="kind"):
                 ::(?:[0-9a-fA-F]{0,4}:?)*     # Compressed format starting with ::
                 (?:/\d{1,3})?                 # Optional CIDR prefix
             '''
-            has_ipv6 = bool(re.search(ipv6_pattern, cidr_result.stdout, re.VERBOSE))
+            
+            has_ipv4 = any(re.search(r'\d+\.\d+\.\d+\.\d+', address) for address in addresses)
+            has_ipv6 = any(re.search(ipv6_pattern, address, re.VERBOSE) for address in addresses)
 
             if has_ipv4 and has_ipv6:
                 config['ip_family'] = 'dual'
@@ -1241,9 +1247,9 @@ def detect_dev_env_config(cluster_name="kind"):
             elif has_ipv4:
                 config['ip_family'] = 'ipv4'
             else:
-                raise Exception("Cannot detect IP family from ipaddresspool resource")
+                raise Exception("Cannot detect IP family from ipaddresspool resource: unmatched ip family addresses")
         else:
-            raise Exception(f"Cannot detect IP family from ipaddresspool resource in {namespace} namespace")
+            raise Exception(f"Cannot detect IP family from ipaddresspool resource in {namespace} namespace: command failed")
 
         # Detect protocol (BGP vs Layer2)
         bgppeer_result = run(f"{kubectl_path} get bgppeer -n {namespace}", hide=True, warn=True)
@@ -1281,9 +1287,11 @@ def generate_test_filters(config):
     elif config['ip_family'] == 'ipv6':
         skip_patterns.extend(['IPV4', 'DUALSTACK'])
         if config['bgp_type'] == 'native':
-            skip_patterns.append('BGP')  # Native BGP doesn't support IPv6
+            # Native BGP doesn't support IPv6
+            skip_patterns.append('BGP') 
     elif config['ip_family'] == 'dual':
-        skip_patterns.append('IPV6')  # Skip IPv6-only tests in dual stack
+        # Skip IPv6-only tests in dual stack (ipv4 and ipv6)
+        skip_patterns.append('IPV6')  
 
     # Protocol filtering
     if config['protocol'] == 'layer2':
