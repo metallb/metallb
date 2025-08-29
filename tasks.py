@@ -1266,9 +1266,11 @@ def e2etest(
               f"Protocol: {env_config['protocol']}, "
               f"Prometheus: {env_config['with_prometheus']}")
 
-        if filters['skip']:
+        if skip:
+            print(f"🔧 User-provided skip patterns override auto-detection: {skip}")
+        elif filters['skip']:
             print(f"⏭️  Auto-skip patterns: {filters['skip']}")
-            # Override skip with auto-detected patterns
+            # Use auto-detected patterns only if user didn't provide skip
             ginkgo_skip = '--skip="' + filters['skip'] + '"'
         else:
             print("✅ No tests will be skipped")
