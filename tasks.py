@@ -1204,7 +1204,7 @@ def helmdocs(ctx, env="container"):
         "ginkgo_params": "additional ginkgo params to run the e2e tests with",
         "junit_report": "export JUnit reports xml to file, default junit-report.xml",
         "host_bgp_mode": "tells whether to run the host container in ebgp or ibgp mode",
-        "auto_focus": "Automatically determine test focus/skip based on current dev-env configuration. Default: False",
+        "auto_focus_disable": "Disable automatic test focus/skip detection based on dev-env configuration. Default: False",
         "auto_focus_dry_run": "Run auto-focus detection, display skipped tests, and exit without running tests. Default: False",
     }
 )
@@ -1231,7 +1231,7 @@ def e2etest(
     junit_report="junit-report.xml",
     host_bgp_mode="ibgp",
     frr_k8s_namespace="metallb-system",
-    auto_focus=False,
+    auto_focus_disable=False,
     auto_focus_dry_run=False,
 ):
     """Run E2E tests against development cluster."""
@@ -1239,7 +1239,10 @@ def e2etest(
     fetch_kind()
     fetch_ginkgo()
 
-    # Enable auto_focus if dry_run is requested
+    # Auto-focus is enabled by default unless explicitly disabled
+    auto_focus = not auto_focus_disable
+
+    # Enable auto_focus if dry_run is requested (overrides disable flag)
     if auto_focus_dry_run:
         auto_focus = True
 
