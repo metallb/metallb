@@ -1759,20 +1759,14 @@ def detect_protocol(namespace="metallb-system"):
 
 def detect_dev_env_config(cluster_name="kind"):
     """Detect the configuration of the current dev environment."""
-    config = {
-        'bgp_type': 'unknown',
-        'ip_family': 'unknown',
-        'with_prometheus': False,
-        'protocol': 'unknown'
-    }
 
     try:
-        namespace = "metallb-system"
-
-        config['bgp_type'] = detect_bgp_type(namespace)
-        config['with_prometheus'] = detect_prometheus()
-        config['ip_family'] = detect_ip_family(namespace)
-        config['protocol'] = detect_protocol(namespace)
+        config = {
+            'bgp_type': detect_bgp_type(),
+            'ip_family': detect_ip_family(),
+            'with_prometheus': detect_prometheus(),
+            'protocol': detect_protocol()
+        }
 
     except Exception as e:
         raise Exit(message=f"Error: Could not auto-detect environment config: {e}")
