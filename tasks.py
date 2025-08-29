@@ -1352,6 +1352,13 @@ def e2etest(
 
     if external_frr_image != "":
         external_frr_image = "--frr-image=" + (external_frr_image)
+
+    if bgp_mode == "":
+        try:
+            bgp_mode = detect_bgp_type()
+        except Exception as e:
+            raise Exit(message=f"Error detecting BGP mode: {e}")
+
     testrun = run(
         "cd `git rev-parse --show-toplevel`/e2etest &&"
         "KUBECONFIG={} {} {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={} -with-vrf={} {} --host-bgp-mode={} --kubectl={} --frr-k8s-namespace={}".format(
