@@ -13,30 +13,70 @@ with other types of bgp backend, you specify that with `--bgp-type` parameter. F
 inv dev-env --bgp-type native
 ```
 
-Running the E2E tests against the development cluster requires mandatory field `bgp-mode`, which needs
-to match the backend bgp the dev-env was created with.
+## Automatic Test Selection (Auto-Focus)
 
+**New feature**: E2E tests now automatically detect your development environment configuration and skip irrelevant tests by default. This means you no longer need to manually specify `--bgp-mode` or remember complex skip patterns for most scenarios.
+
+### Default Behavior
+
+Simply run the tests and let auto-focus handle the rest:
+
+```bash
+# Automatically detects environment and runs relevant tests
+inv e2etest
 ```
-inv e2etest --bgp-mode frr
+
+Auto-focus will:
+- Detect BGP type (native, frr, frr-k8s, frr-k8s-external)
+- Detect IP family (ipv4, ipv6, dual)
+- Detect protocol (BGP vs Layer2)
+- Detect Prometheus availability
+- Skip tests that don't match your configuration
+
+### Manual Control
+
+When you need full control over test selection:
+
+```bash
+# Disable auto-focus for complete manual control
+inv e2etest --auto-focus-disable --bgp-mode frr --focus BGP
+
+# Your skip patterns override auto-detection
+inv e2etest --skip "MyCustomPattern|AnotherPattern"
 ```
+
+### Testing Auto-Focus
+
+See what tests would be skipped without running them:
+
+```bash
+# Dry-run to see detected configuration and skip patterns
+inv e2etest --auto-focus-dry-run
+```
+
+## Legacy Manual Selection
+
+The following examples still work but are often unnecessary with auto-focus enabled:
 
 Run only BGP test suite:
 
 ```
-inv e2etest --bgp-mode frr --focus BGP
+inv e2etest --focus BGP
 ```
 
 Run only L2 test suite:
 
 ```
-inv e2etest --bgp-mode frr --focus L2
+inv e2etest --focus L2
 ```
 
 Run with additional ginkgo parameters for example:
 
 ```
-inv e2etest --bgp-mode frr --ginkgo-params="--until-it-fails -v"
+inv e2etest --ginkgo-params="--until-it-fails -v"
 ```
+
+**Note**: When using `--skip`, auto-focus detection still runs to show environment details, but your custom skip patterns will be used instead of the auto-detected ones. The system will clearly indicate when user patterns override auto-detection.
 
 The test suite will run the appropriate tests against the cluster.
 Be sure to cleanup any previously created development clusters using `inv dev-env-cleanup`.
