@@ -85,6 +85,11 @@ type BGPPeerSpec struct {
 
 	// EBGP peer is multi-hops away
 	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty"`
+	
+	// TestWorkflowField - Test field to trigger documentation workflow
+	// This demonstrates the doc-check workflow detecting new API fields
+	// +optional
+	TestWorkflowField string `json:"testWorkflowField,omitempty"`
 	// Add future BGP configuration here
 }
 
