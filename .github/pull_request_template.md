@@ -28,6 +28,20 @@
 
 **Special notes for your reviewer**:
 
+**Documentation Checklist** *(for feature PRs)*:
+<!--  
+If this PR adds new user-facing features, please ensure documentation is updated:
+- API changes should be reflected in generated docs (run `inv generateapidocs`)
+- New configuration options should be documented in website/content/configuration/
+- New features should have usage examples in website/content/usage/ or configsamples/
+- Breaking changes should be noted in release notes
+-->
+
+- [ ] API documentation updated (if applicable)
+- [ ] Configuration documentation updated (if applicable) 
+- [ ] Usage examples provided (if applicable)
+- [ ] No user-facing changes / documentation not needed
+
 **Release note**:
 <!--  Write your release note:
 1. Enter your extended release note in the below block. If the PR requires additional action from users switching to the new release, include the string "action required".
