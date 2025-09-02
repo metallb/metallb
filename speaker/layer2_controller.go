@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"maps"
 	"net"
@@ -30,21 +31,30 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	"go.universe.tf/metallb/internal/layer2"
 )
 
 type layer2Controller struct {
-	announcer       *layer2.Announce
-	myNode          string
-	ignoreExcludeLB bool
-	sList           SpeakerList
-	onStatusChange  func(types.NamespacedName)
+	announcer            *layer2.Announce
+	myNode               string
+	ignoreExcludeLB      bool
+	sList                SpeakerList
+	onStatusChange       func(types.NamespacedName)
+	enableLeaderElection bool
+	leaseManager         *k8s.Layer2LeaseManager
+	activeLeases         map[string]context.CancelFunc
 }
 
 func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 	return nil
+}
+
+// SetLeaseManager sets the lease manager for this controller.
+func (c *layer2Controller) SetLeaseManager(leaseManager *k8s.Layer2LeaseManager) {
+	c.leaseManager = leaseManager
 }
 
 // nodesWithEndpoint returns all nodes that have at least one fully ready
@@ -105,6 +115,27 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 
 	// Using the first IP should work for both single and dual stack.
 	ipString := toAnnounce[0].String()
+
+	// If leader election is enabled, try to acquire a lease for this IP
+	if c.enableLeaderElection && c.leaseManager != nil {
+		ctx := context.Background()
+		acquired, err := c.leaseManager.TryAcquireLease(ctx, ipString)
+		if err != nil {
+			level.Warn(l).Log("event", "shouldannounce", "protocol", "l2", "service", name, "ip", ipString, "msg", "failed to acquire lease", "error", err)
+			return "notOwner"
+		}
+
+		if !acquired {
+			level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "service", name, "ip", ipString, "msg", "lease not acquired, another speaker holds it")
+			return "notOwner"
+		}
+
+		// Start lease renewal for this IP
+		c.startLeaseRenewal(l, name, ipString)
+		level.Info(l).Log("event", "shouldannounce", "protocol", "l2", "service", name, "ip", ipString, "msg", "lease acquired, will announce")
+		return ""
+	}
+
 	// Sort the slice by the hash of node + load balancer ips. This
 	// produces an ordering of ready nodes that is unique to all the services
 	// with the same ip.
@@ -122,6 +153,31 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 
 	// Either not eligible, or lost the election entirely.
 	return "notOwner"
+}
+
+// startLeaseRenewal starts a background lease renewal for the given service and IP.
+func (c *layer2Controller) startLeaseRenewal(l log.Logger, serviceName, ip string) {
+	// Cancel existing renewal if any
+	if cancel, exists := c.activeLeases[serviceName]; exists {
+		cancel()
+	}
+
+	// Create new context for this lease renewal
+	ctx, cancel := context.WithCancel(context.Background())
+	c.activeLeases[serviceName] = cancel
+
+	// Start lease renewal in background
+	go func() {
+		defer func() {
+			delete(c.activeLeases, serviceName)
+		}()
+
+		c.leaseManager.StartLeaseRenewal(ctx, ip)
+
+		// Wait for context cancellation
+		<-ctx.Done()
+		level.Debug(l).Log("event", "startLeaseRenewal", "service", serviceName, "ip", ip, "msg", "lease renewal stopped")
+	}()
 }
 
 func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, client service, svc *v1.Service) error {

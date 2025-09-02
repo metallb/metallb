@@ -39,6 +39,10 @@ type L2AdvertisementSpec struct {
 	// If the field is not set, we advertise from all the interfaces on the host.
 	// +optional
 	Interfaces []string `json:"interfaces,omitempty"`
+	// EnableL2Lease enables Kubernetes Lease coordination to prevent split-brain announcements.
+	// When enabled, only the current Lease holder will announce the IP, ensuring only one active announcer per IP.
+	// +optional
+	EnableL2Lease bool `json:"enableL2Lease,omitempty"`
 }
 
 // L2AdvertisementStatus defines the observed state of L2Advertisement.

@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -74,21 +75,25 @@ func main() {
 	prometheus.MustRegister(announcing)
 
 	var (
-		namespace         = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
-		host              = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
-		mlBindAddr        = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
-		mlBindPort        = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
-		mlLabels          = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
-		mlSecretKeyPath   = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
-		mlWANConfig       = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
-		myNode            = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
-		myPod             = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
-		port              = flag.Int("port", 7472, "HTTP listening port")
-		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
-		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
-		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
-		frrK8sNamespace   = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
+		namespace            = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
+		host                 = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
+		mlBindAddr           = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlBindPort           = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
+		mlLabels             = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
+		mlSecretKeyPath      = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
+		mlWANConfig          = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
+		myNode               = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		myPod                = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
+		port                 = flag.Int("port", 7472, "HTTP listening port")
+		logLevel             = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
+		enablePprof          = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+		loadBalancerClass    = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		ignoreLBExclude      = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
+		frrK8sNamespace      = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
+		enableL2Lease        = flag.Bool("enable-l2-lease", false, "enable Kubernetes Lease coordination for Layer2 announcements to prevent split-brain")
+		l2LeaseDuration      = flag.Duration("l2-lease-duration", 15*time.Second, "duration of Layer2 lease in seconds")
+		l2LeaseRenewDeadline = flag.Duration("l2-lease-renew-deadline", 10*time.Second, "renew deadline for Layer2 lease in seconds")
+		l2LeaseRetryPeriod   = flag.Duration("l2-lease-retry-period", 2*time.Second, "retry period for Layer2 lease in seconds")
 	)
 	flag.Parse()
 
@@ -173,6 +178,10 @@ func main() {
 		bgpType:                bgpImplementation(bgpType),
 		InterfaceExcludeRegexp: interfacesToExclude,
 		IgnoreExcludeLB:        *ignoreLBExclude,
+		EnableL2Lease:          *enableL2Lease,
+		L2LeaseDuration:        *l2LeaseDuration,
+		L2LeaseRenewDeadline:   *l2LeaseRenewDeadline,
+		L2LeaseRetryPeriod:     *l2LeaseRetryPeriod,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
 			l2StatusChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
 		},
@@ -236,6 +245,17 @@ func main() {
 	ctrl.client = client
 	ctrl.protocolHandlers[config.BGP].SetEventCallback(client.BGPEventCallback)
 
+	// Set up lease manager for Layer2 if enabled
+	if *enableL2Lease {
+		if l2Handler, ok := ctrl.protocolHandlers[config.Layer2]; ok {
+			if l2Controller, ok := l2Handler.(*layer2Controller); ok {
+				leaseManager := k8s.NewLayer2LeaseManager(client.KubernetesClient(), *namespace, "metallb-l2-lease", *myPod, logger)
+				leaseManager.SetLeaseTimings(*l2LeaseDuration, *l2LeaseRenewDeadline, *l2LeaseRetryPeriod)
+				l2Controller.SetLeaseManager(leaseManager)
+			}
+		}
+	}
+
 	sList.Start(client)
 	defer sList.Stop()
 
@@ -282,6 +302,10 @@ type controllerConfig struct {
 	IgnoreExcludeLB              bool
 	Layer2StatusChange           func(types.NamespacedName)
 	BGPAdsChangedCallback        func(string)
+	EnableL2Lease                bool
+	L2LeaseDuration              time.Duration
+	L2LeaseRenewDeadline         time.Duration
+	L2LeaseRetryPeriod           time.Duration
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
@@ -317,13 +341,19 @@ func newController(cfg controllerConfig) (*controller, error) {
 		if err != nil {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}
-		handlers[config.Layer2] = &layer2Controller{
-			announcer:       a,
-			myNode:          cfg.MyNode,
-			sList:           cfg.SList,
-			ignoreExcludeLB: cfg.IgnoreExcludeLB,
-			onStatusChange:  cfg.Layer2StatusChange,
+
+		l2Controller := &layer2Controller{
+			announcer:            a,
+			myNode:               cfg.MyNode,
+			sList:                cfg.SList,
+			ignoreExcludeLB:      cfg.IgnoreExcludeLB,
+			onStatusChange:       cfg.Layer2StatusChange,
+			enableLeaderElection: cfg.EnableL2Lease,
 		}
+
+		// Note: The lease manager will be set later when we have access to the Kubernetes client
+
+		handlers[config.Layer2] = l2Controller
 		protocols = append(protocols, config.Layer2)
 	}
 
