@@ -125,7 +125,7 @@ func TestNewLayer2LeaseManager(t *testing.T) {
 	logger := log.NewNopLogger()
 	client := newMockK8sClient()
 	
-	lm := NewLayer2LeaseManager(client, "test-namespace", "test-lease", "test-identity", logger)
+	lm := NewLayer2LeaseManager(client, "test-namespace", "metallb-layer2", "test-node", logger)
 	
 	if lm.client != client {
 		t.Error("client not set correctly")
@@ -133,10 +133,10 @@ func TestNewLayer2LeaseManager(t *testing.T) {
 	if lm.namespace != "test-namespace" {
 		t.Error("namespace not set correctly")
 	}
-	if lm.leaseName != "test-lease" {
+	if lm.leaseName != "metallb-layer2" {
 		t.Error("leaseName not set correctly")
 	}
-	if lm.identity != "test-identity" {
+	if lm.identity != "test-node" {
 		t.Error("identity not set correctly")
 	}
 	if lm.logger != logger {
@@ -178,7 +178,7 @@ func TestSetLeaseTimings(t *testing.T) {
 func TestTryAcquireLease_NewLease(t *testing.T) {
 	logger := log.NewNopLogger()
 	client := newMockK8sClient()
-	lm := NewLayer2LeaseManager(client, "test-namespace", "test-lease", "test-identity", logger)
+	lm := NewLayer2LeaseManager(client, "test-namespace", "metallb-layer2", "test-node", logger)
 	
 	ctx := context.Background()
 	ip := "192.168.1.1"
@@ -193,7 +193,7 @@ func TestTryAcquireLease_NewLease(t *testing.T) {
 	}
 	
 	// Verify lease was created
-	leaseKey := fmt.Sprintf("%s/%s-%s", "test-namespace", "test-lease", ip)
+	leaseKey := fmt.Sprintf("%s/metallb-layer2-%s", "test-namespace", ip)
 	if _, exists := client.leases[leaseKey]; !exists {
 		t.Error("lease was not created")
 	}
@@ -202,7 +202,7 @@ func TestTryAcquireLease_NewLease(t *testing.T) {
 func TestTryAcquireLease_IPv6Address(t *testing.T) {
 	logger := log.NewNopLogger()
 	client := newMockK8sClient()
-	lm := NewLayer2LeaseManager(client, "test-namespace", "test-lease", "test-identity", logger)
+	lm := NewLayer2LeaseManager(client, "test-namespace", "metallb-layer2", "test-node", logger)
 	
 	ctx := context.Background()
 	ip := "2001:db8::1"
@@ -216,8 +216,8 @@ func TestTryAcquireLease_IPv6Address(t *testing.T) {
 		t.Error("expected lease to be acquired for IPv6 address")
 	}
 	
-	// Verify lease was created with correct name
-	leaseKey := fmt.Sprintf("%s/%s-%s", "test-namespace", "test-lease", ip)
+	// Verify lease was created
+	leaseKey := fmt.Sprintf("%s/metallb-layer2-%s", "test-namespace", ip)
 	if _, exists := client.leases[leaseKey]; !exists {
 		t.Error("IPv6 lease was not created")
 	}
@@ -226,7 +226,7 @@ func TestTryAcquireLease_IPv6Address(t *testing.T) {
 func TestTryAcquireLease_ExistingLease(t *testing.T) {
 	logger := log.NewNopLogger()
 	client := newMockK8sClient()
-	lm := NewLayer2LeaseManager(client, "test-namespace", "test-lease", "test-identity", logger)
+	lm := NewLayer2LeaseManager(client, "test-namespace", "metallb-layer2", "test-node", logger)
 	
 	ctx := context.Background()
 	ip := "192.168.1.1"
@@ -253,13 +253,13 @@ func TestTryAcquireLease_ExistingLease(t *testing.T) {
 func TestTryAcquireLease_ClientError(t *testing.T) {
 	logger := log.NewNopLogger()
 	client := newMockK8sClient()
-	lm := NewLayer2LeaseManager(client, "test-namespace", "test-lease", "test-identity", logger)
+	lm := NewLayer2LeaseManager(client, "test-namespace", "metallb-layer2", "test-node", logger)
 	
 	ctx := context.Background()
 	ip := "192.168.1.1"
 	
 	// Set up an error for the lease creation
-	leaseKey := fmt.Sprintf("%s/%s-%s", "test-namespace", "test-lease", ip)
+	leaseKey := fmt.Sprintf("%s/metallb-layer2-%s", "test-namespace", ip)
 	client.errors[leaseKey] = fmt.Errorf("simulated client error")
 	
 	acquired, err := lm.TryAcquireLease(ctx, ip)
@@ -275,22 +275,22 @@ func TestTryAcquireLease_ClientError(t *testing.T) {
 func TestTryAcquireLease_LeaseHeldByOther(t *testing.T) {
 	logger := log.NewNopLogger()
 	client := newMockK8sClient()
-	lm := NewLayer2LeaseManager(client, "test-namespace", "test-lease", "test-identity", logger)
+	lm := NewLayer2LeaseManager(client, "test-namespace", "metallb-layer2", "test-node", logger)
 	
 	ctx := context.Background()
 	ip := "192.168.1.1"
 	
-	// Create a lease held by a different identity
-	leaseName := fmt.Sprintf("%s-%s", "test-lease", ip)
+	// Create a lease held by a different node
+	leaseName := fmt.Sprintf("metallb-layer2-%s", ip)
 	leaseDurationSeconds := int32(15)
-	otherIdentity := "other-identity"
+	otherNode := "other-node"
 	lease := &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      leaseName,
 			Namespace: "test-namespace",
 		},
 		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity:       &otherIdentity,
+			HolderIdentity:       &otherNode,
 			LeaseDurationSeconds: &leaseDurationSeconds,
 			RenewTime:            &metav1.MicroTime{Time: time.Now()},
 		},
@@ -306,14 +306,14 @@ func TestTryAcquireLease_LeaseHeldByOther(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if acquired {
-		t.Error("expected lease acquisition to fail when held by another identity")
+		t.Error("expected lease acquisition to fail when held by another node")
 	}
 }
 
 func TestRenewLease_Success(t *testing.T) {
 	logger := log.NewNopLogger()
 	client := newMockK8sClient()
-	lm := NewLayer2LeaseManager(client, "test-namespace", "test-lease", "test-identity", logger)
+	lm := NewLayer2LeaseManager(client, "test-namespace", "metallb-layer2", "test-node", logger)
 	
 	ctx := context.Background()
 	ip := "192.168.1.1"
@@ -334,7 +334,7 @@ func TestRenewLease_Success(t *testing.T) {
 func TestRenewLease_NoExistingLease(t *testing.T) {
 	logger := log.NewNopLogger()
 	client := newMockK8sClient()
-	lm := NewLayer2LeaseManager(client, "test-namespace", "test-lease", "test-identity", logger)
+	lm := NewLayer2LeaseManager(client, "test-namespace", "metallb-layer2", "test-node", logger)
 	
 	ctx := context.Background()
 	ip := "192.168.1.1"
@@ -349,7 +349,7 @@ func TestRenewLease_NoExistingLease(t *testing.T) {
 func TestReleaseLease_Success(t *testing.T) {
 	logger := log.NewNopLogger()
 	client := newMockK8sClient()
-	lm := NewLayer2LeaseManager(client, "test-namespace", "test-lease", "test-identity", logger)
+	lm := NewLayer2LeaseManager(client, "test-namespace", "metallb-layer2", "test-node", logger)
 	
 	ctx := context.Background()
 	ip := "192.168.1.1"
@@ -367,7 +367,7 @@ func TestReleaseLease_Success(t *testing.T) {
 	}
 	
 	// Verify lease was deleted
-	leaseKey := fmt.Sprintf("%s/%s-%s", "test-namespace", "test-lease", ip)
+	leaseKey := fmt.Sprintf("%s/metallb-layer2-%s", "test-namespace", ip)
 	if _, exists := client.leases[leaseKey]; exists {
 		t.Error("lease should have been deleted")
 	}

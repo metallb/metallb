@@ -204,6 +204,14 @@ func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
 	if !c.announcer.AnnounceName(name) {
 		return nil
 	}
+	
+	// Cancel any active lease renewal for this service
+	if cancel, exists := c.activeLeases[name]; exists {
+		cancel()
+		delete(c.activeLeases, name)
+		level.Debug(l).Log("op", "DeleteBalancer", "protocol", "layer2", "service", name, "msg", "cancelled lease renewal")
+	}
+	
 	c.announcer.DeleteBalancer(name)
 
 	svcNamespace, svcName, err := cache.SplitMetaNamespaceKey(name)

@@ -249,7 +249,8 @@ func main() {
 	if *enableL2Lease {
 		if l2Handler, ok := ctrl.protocolHandlers[config.Layer2]; ok {
 			if l2Controller, ok := l2Handler.(*layer2Controller); ok {
-				leaseManager := k8s.NewLayer2LeaseManager(client.KubernetesClient(), *namespace, "metallb-l2-lease", *myPod, logger)
+				// Use node name as lease identity for better resilience across pod restarts
+				leaseManager := k8s.NewLayer2LeaseManager(client.KubernetesClient(), *namespace, "metallb-layer2", *myNode, logger)
 				leaseManager.SetLeaseTimings(*l2LeaseDuration, *l2LeaseRenewDeadline, *l2LeaseRetryPeriod)
 				l2Controller.SetLeaseManager(leaseManager)
 			}

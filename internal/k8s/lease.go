@@ -57,7 +57,7 @@ func (lm *Layer2LeaseManager) SetLeaseTimings(leaseDuration, renewDeadline, retr
 // TryAcquireLease attempts to acquire a lease for the given IP address
 // Returns true if the lease was acquired, false otherwise.
 func (lm *Layer2LeaseManager) TryAcquireLease(ctx context.Context, ip string) (bool, error) {
-	leaseName := fmt.Sprintf("%s-%s", lm.leaseName, ip)
+	leaseName := fmt.Sprintf("metallb-layer2-%s", ip)
 
 	// Check if lease already exists and who holds it
 	lease, err := lm.client.CoordinationV1().Leases(lm.namespace).Get(ctx, leaseName, metav1.GetOptions{})
@@ -125,7 +125,7 @@ func (lm *Layer2LeaseManager) TryAcquireLease(ctx context.Context, ip string) (b
 
 // RenewLease renews the lease for the given IP address.
 func (lm *Layer2LeaseManager) RenewLease(ctx context.Context, ip string) error {
-	leaseName := fmt.Sprintf("%s-%s", lm.leaseName, ip)
+	leaseName := fmt.Sprintf("metallb-layer2-%s", ip)
 
 	lease, err := lm.client.CoordinationV1().Leases(lm.namespace).Get(ctx, leaseName, metav1.GetOptions{})
 	if err != nil {
@@ -147,7 +147,7 @@ func (lm *Layer2LeaseManager) RenewLease(ctx context.Context, ip string) error {
 
 // ReleaseLease releases the lease for the given IP address.
 func (lm *Layer2LeaseManager) ReleaseLease(ctx context.Context, ip string) error {
-	leaseName := fmt.Sprintf("%s-%s", lm.leaseName, ip)
+	leaseName := fmt.Sprintf("metallb-layer2-%s", ip)
 
 	lease, err := lm.client.CoordinationV1().Leases(lm.namespace).Get(ctx, leaseName, metav1.GetOptions{})
 	if err != nil {
