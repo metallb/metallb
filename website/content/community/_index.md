@@ -77,10 +77,10 @@ currently have, relative to the top-level directory:
   Kubernetes apiserver to get and modify service information. It
   allows most of the rest of the MetalLB code to be ignorant of the
   Kubernetes client library, other than the objects (Service,
-  ConfigMap...) that they manipulate.
-- `internal/config` parses and validates the MetalLB configmap.
+  CRs...) that they manipulate.
+- `internal/config` parses and validates the MetalLB Custom Resources (e.g., IPAddressPool, L2Advertisement)
 - `internal/allocator` is the IP address manager. Given pools from the
-  MetalLB configmap, it can allocate addresses on demand.
+  IPAddressPool Custom Resource, it can allocate addresses on demand.
 - `internal/bgp/native` is a _very_ stripped down implementation of BGP. It
   speaks just enough of the protocol to keep peering sessions up, and
   to push routes to the peer.
