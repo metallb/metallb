@@ -13,29 +13,77 @@ with other types of bgp backend, you specify that with `--bgp-type` parameter. F
 inv dev-env --bgp-type native
 ```
 
-Running the E2E tests against the development cluster requires mandatory field `bgp-mode`, which needs
-to match the backend bgp the dev-env was created with.
+# E2E Tests auto detection
 
+**Auto-detection is enabled by default** to make testing easier for newcomers.
+
+## Default Behavior: Auto-Detection with Required Protocol
+
+Auto-detection **always requires** the `--protocol` parameter because kind clusters are typically unconfigured:
+
+```bash
+# Auto-detect environment and run tests automatically
+inv e2etest --protocol bgp      # For BGP testing
+inv e2etest --protocol layer2   # For Layer2 testing
 ```
-inv e2etest --bgp-mode frr
+
+This will:
+- Detect your environment configuration (BGP type, IP family, Prometheus presence, etc.)
+- Generate appropriate skip patterns from `test-filters.yaml`
+- **Warn if overriding any manual parameters** (--skip, --bgp-mode)
+- **Automatically run the tests** with the detected configuration
+
+Example output:
 ```
+Auto-detected environment: BGP Type: frr, IP Family: ipv4, Protocol: bgp, Prometheus: True
+Auto-skip patterns: IPV6|DUALSTACK|L2
+
+Running tests with auto-detected configuration...
+[Test execution begins...]
+```
+
+## **Manual Mode**
+To use manual parameters exclusively, disable auto-detection:
+
+```bash
+# Disable auto-detection and run with explicit parameters
+inv e2etest --auto-detect-env=false --skip "IPV6|DUALSTACK" --bgp-mode frr
+```
+
+### **Recommendation**
+- **Use auto-detection** for quick, environment-matched testing
+- **Use manual mode** for specific test scenarios or CI environments
+
+Running the E2E tests against the development cluster can be done in those ways. Examples:
 
 Run only BGP test suite:
 
 ```
-inv e2etest --bgp-mode frr --focus BGP
+# Auto-detection approach
+inv e2etest --protocol bgp --focus BGP
+
+# Manual approach
+inv e2etest --auto-detect-env=false --bgp-mode frr --focus BGP
 ```
 
 Run only L2 test suite:
 
 ```
-inv e2etest --bgp-mode frr --focus L2
+# Auto-detection approach
+inv e2etest --protocol layer2 --focus L2
+
+# Manual approach
+inv e2etest --auto-detect-env=false --bgp-mode frr --focus L2
 ```
 
-Run with additional ginkgo parameters for example:
+Run with additional ginkgo parameters:
 
 ```
-inv e2etest --bgp-mode frr --ginkgo-params="--until-it-fails -v"
+# Auto-detection approach
+inv e2etest --protocol bgp --ginkgo-params="--until-it-fails -v"
+
+# Manual approach
+inv e2etest --auto-detect-env=false --bgp-mode frr --ginkgo-params="--until-it-fails -v"
 ```
 
 The test suite will run the appropriate tests against the cluster.

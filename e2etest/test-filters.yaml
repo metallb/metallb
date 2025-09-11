@@ -1,0 +1,32 @@
+# This file defines which test patterns to skip based on environment configuration
+
+# Skip patterns based on BGP type
+bgp_type:
+  native:
+    skip: ["FRR", "FRR-MODE", "FRRK8S-MODE", "BFD", "VRF", "DUALSTACK"]
+  frr:
+    skip: ["FRRK8S-MODE"]
+  frr-k8s:
+    skip: ["FRR-MODE"]
+  frr-k8s-external:
+    skip: ["FRR-MODE", "metrics"]
+
+# Skip patterns based on IP family
+ip_family:
+  ipv4:
+    skip: ["IPV6", "DUALSTACK"]
+  ipv6:
+    skip: ["IPV4", "DUALSTACK"]
+  dual:
+    skip: ["IPV6"]
+
+# Skip patterns based on protocol
+protocol:
+  layer2:
+    skip: ["BGP"]
+  bgp:
+    skip: ["L2"]
+
+# Skip patterns based on Prometheus presence
+prometheus:
+  skip: ["metrics"]
