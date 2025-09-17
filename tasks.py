@@ -757,7 +757,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
     )
     run(
         "docker run -d --privileged --network kind --rm --ulimit core=-1 --name frr --volume %s:/etc/frr "
-        "quay.io/frrouting/frr:9.1.0" % frr_volume_dir,
+        "quay.io/frrouting/frr:10.4.1" % frr_volume_dir,
         echo=True,
     )
 
