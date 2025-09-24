@@ -1304,6 +1304,7 @@ def helmdocs(ctx, env="container"):
         "junit_report": "export JUnit reports xml to file, default junit-report.xml",
         "host_bgp_mode": "tells whether to run the host container in ebgp or ibgp mode",
         "auto_detect_env": "Detect environment configuration, display recommended test command, and exit without running tests. Default: False",
+        "protocol": "Override protocol detection (bgp, layer2) when using --auto-detect-env. Use when cluster is unconfigured.",
     }
 )
 def e2etest(
@@ -1330,6 +1331,7 @@ def e2etest(
     host_bgp_mode="ibgp",
     frr_k8s_namespace="metallb-system",
     auto_detect_env=False,
+    protocol=None,
 ):
     """Run E2E tests against development cluster."""
     fetch_kubectl()
@@ -1350,7 +1352,7 @@ def e2etest(
         ginkgo_focus = '--focus="' + focus + '"'
 
     if auto_detect_env:
-        env_config = detect_dev_env_config(name)
+        env_config = detect_dev_env_config(name, protocol)
         filters = generate_test_filters(env_config)
 
         print(
@@ -1872,8 +1874,20 @@ def detect_ip_family(namespace="metallb-system"):
         )
 
 
-def detect_protocol(namespace="metallb-system"):
-    """Detect protocol (BGP vs Layer2) from resource presence."""
+def detect_protocol(namespace="metallb-system", protocol_override=None):
+    """Detect protocol (BGP vs Layer2) from resource presence or use override.
+    
+    Args:
+        namespace: Kubernetes namespace to check for resources
+        protocol_override: Optional protocol override (bgp, layer2) for unconfigured clusters
+    """
+    # Handle protocol override first
+    if protocol_override:
+        if protocol_override not in ["bgp", "layer2"]:
+            raise ValueError(f"Invalid protocol override '{protocol_override}'. Supported: bgp, layer2")
+        return protocol_override
+    
+    # Attempt automatic detection
     bgppeer_result = run(
         f"{kubectl_path} get bgppeer -n {namespace} "
         f"-o jsonpath='{{.items[*].metadata.name}}'",
@@ -1893,19 +1907,24 @@ def detect_protocol(namespace="metallb-system"):
         return "layer2"
     else:
         raise Exception(
-            f"Cannot detect protocol from bgppeer or l2advertisement resources in {namespace} namespace"
+            f"Cannot detect protocol,use: inv e2etest --auto-detect-env --protocol=<bgp|layer2>"
         )
 
 
-def detect_dev_env_config(cluster_name="kind"):
-    """Detect the configuration of the current dev environment."""
+def detect_dev_env_config(cluster_name="kind", protocol_override=None):
+    """Detect the configuration of the current dev environment.
+
+    Args:
+        cluster_name: Name of the cluster to detect config for
+        protocol_override: Optional protocol override (bgp, layer2) for unconfigured clusters
+    """
 
     try:
         config = {
             "bgp_type": detect_bgp_type(),
             "ip_family": detect_ip_family(),
             "with_prometheus": detect_prometheus(),
-            "protocol": detect_protocol(),
+            "protocol": detect_protocol(protocol_override=protocol_override),
         }
 
     except Exception as e:
