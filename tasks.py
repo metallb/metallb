@@ -63,7 +63,7 @@ def generate_skip_patterns(bgp_type, ip_family, protocol=None, with_prometheus=N
         with_prometheus: Whether Prometheus is present (bool) - optional
 
     Returns:
-        List of skip pattern strings
+        String of skip patterns separated by '|', or empty string if no patterns
     """
     config = load_test_filters()
     filters = config
@@ -90,27 +90,11 @@ def generate_skip_patterns(bgp_type, ip_family, protocol=None, with_prometheus=N
     if bgp_type == "native" and ip_family == "ipv6":
         skip_patterns.append("BGP")  # Native BGP doesn't support IPv6
 
-    # Remove duplicates and return
-    return list(set(skip_patterns))
+    # Remove duplicates and return as pipe-separated string
+    unique_patterns = list(set(skip_patterns))
+    return "|".join(unique_patterns) if unique_patterns else ""
 
 
-def generate_skip_string(bgp_type, ip_family, protocol=None, with_prometheus=None):
-    """
-    Generate skip patterns as a pipe-separated string.
-
-    Args:
-        bgp_type: BGP type (native, frr, frr-k8s, frr-k8s-external)
-        ip_family: IP family (ipv4, ipv6, dual)
-        protocol: Protocol type (bgp, layer2) - optional
-        with_prometheus: Whether Prometheus is present (bool) - optional
-
-    Returns:
-        String of skip patterns separated by '|', or empty string if no patterns
-    """
-    skip_patterns = generate_skip_patterns(
-        bgp_type, ip_family, protocol, with_prometheus
-    )
-    return "|".join(skip_patterns) if skip_patterns else ""
 
 
 def _check_architectures(architectures):
@@ -1898,7 +1882,7 @@ def generate_test_filters(config):
     with_prometheus = config.get("with_prometheus")
 
     # Generate skip patterns from configuration file
-    skip_string = generate_skip_string(bgp_type, ip_family, protocol, with_prometheus)
+    skip_string = generate_skip_patterns(bgp_type, ip_family, protocol, with_prometheus)
 
     return {
         "skip": skip_string,
@@ -1923,7 +1907,7 @@ def generate_test_skip_patterns(
         with_prometheus = with_prometheus.lower() == "true"
 
     try:
-        skip_string = generate_skip_string(
+        skip_string = generate_skip_patterns(
             bgp_type, ip_family, protocol, with_prometheus
         )
         print(skip_string)
