@@ -52,6 +52,44 @@ def load_test_filters():
         return yaml.safe_load(f)
 
 
+def validate_test_filter_parameters(
+    filters, bgp_type, ip_family, protocol=None, with_prometheus=None
+):
+    """
+    Validate test filter parameters against supported configurations.
+
+    Args:
+        filters: Configuration dictionary loaded from test-filters.yaml
+        bgp_type: BGP type to validate
+        ip_family: IP family to validate
+        protocol: Protocol type to validate (optional)
+        with_prometheus: Prometheus flag to validate (optional)
+
+    Raises:
+        ValueError: If any parameter is invalid
+    """
+    if bgp_type not in filters["bgp_type"]:
+        supported_bgp_types = list(filters["bgp_type"].keys())
+        raise ValueError(
+            f"Unsupported bgp_type '{bgp_type}'. Supported types: {supported_bgp_types}"
+        )
+
+    if ip_family not in filters["ip_family"]:
+        supported_ip_families = list(filters["ip_family"].keys())
+        raise ValueError(
+            f"Unsupported ip_family '{ip_family}'. Supported families: {supported_ip_families}"
+        )
+
+    if protocol is not None and protocol not in filters["protocol"]:
+        supported_protocols = list(filters["protocol"].keys())
+        raise ValueError(
+            f"Unsupported protocol '{protocol}'. Supported protocols: {supported_protocols}"
+        )
+
+    if with_prometheus is False and "prometheus" not in filters:
+        raise ValueError("Prometheus configuration not found in filters")
+
+
 def generate_skip_patterns(bgp_type, ip_family, protocol=None, with_prometheus=None):
     """
     Generate skip patterns based on environment configuration.
@@ -69,22 +107,24 @@ def generate_skip_patterns(bgp_type, ip_family, protocol=None, with_prometheus=N
     filters = config
     skip_patterns = []
 
+    # Validate parameters
+    validate_test_filter_parameters(
+        filters, bgp_type, ip_family, protocol, with_prometheus
+    )
+
     # Add BGP type skip patterns
-    if bgp_type in filters["bgp_type"]:
-        skip_patterns.extend(filters["bgp_type"][bgp_type]["skip"])
+    skip_patterns.extend(filters["bgp_type"][bgp_type]["skip"])
 
     # Add IP family skip patterns
-    if ip_family in filters["ip_family"]:
-        skip_patterns.extend(filters["ip_family"][ip_family]["skip"])
+    skip_patterns.extend(filters["ip_family"][ip_family]["skip"])
 
     # Add protocol skip patterns (if provided)
-    if protocol and protocol in filters["protocol"]:
+    if protocol is not None:
         skip_patterns.extend(filters["protocol"][protocol]["skip"])
 
     # Add Prometheus skip patterns (if Prometheus is not available)
     if with_prometheus is False:
-        if "prometheus" in filters and "skip" in filters["prometheus"]:
-            skip_patterns.extend(filters["prometheus"]["skip"])
+        skip_patterns.extend(filters["prometheus"]["skip"])
 
     # Handle special cases
     if bgp_type == "native" and ip_family == "ipv6":
@@ -93,8 +133,6 @@ def generate_skip_patterns(bgp_type, ip_family, protocol=None, with_prometheus=N
     # Remove duplicates and return as pipe-separated string
     unique_patterns = list(set(skip_patterns))
     return "|".join(unique_patterns) if unique_patterns else ""
-
-
 
 
 def _check_architectures(architectures):
@@ -1774,24 +1812,24 @@ def detect_prometheus():
 
 def detect_ip_family(namespace="metallb-system"):
     """Detect IP family from node podCIDRs (dual, ipv4, ipv6)."""
-    
+
     # Get list of nodes
     nodes_result = run(
         f"{kubectl_path} get nodes -o jsonpath='{{.items[*].metadata.name}}'",
         hide=True,
         warn=True,
     )
-    
+
     if not nodes_result.ok:
         raise Exception("Cannot get nodes: kubectl command failed")
-    
+
     nodes = nodes_result.stdout.strip().split()
     if not nodes:
         raise Exception("No nodes found in cluster")
-    
+
     # Use the first node to detect IP family
     node = nodes[0]
-    
+
     # Get podCIDRs from the node
     cidr_result = run(
         f"{kubectl_path} get nodes {node} -o go-template "
@@ -1799,17 +1837,17 @@ def detect_ip_family(namespace="metallb-system"):
         hide=True,
         warn=True,
     )
-    
+
     if not cidr_result.ok:
         raise Exception(f"Cannot get podCIDRs from node {node}: kubectl command failed")
-    
+
     cidrs = cidr_result.stdout.strip().split()
     if not cidrs:
         raise Exception(f"No podCIDRs found on node {node}")
-    
+
     has_ipv4 = False
     has_ipv6 = False
-    
+
     for cidr in cidrs:
         try:
             # Parse CIDR to determine IP version
@@ -1818,10 +1856,10 @@ def detect_ip_family(namespace="metallb-system"):
                 has_ipv4 = True
             elif network.version == 6:
                 has_ipv6 = True
-                
+
         except ValueError as e:
             raise Exception(f"Invalid CIDR '{cidr}' found on node {node}: {e}")
-    
+
     if has_ipv4 and has_ipv6:
         return "dual"
     elif has_ipv6:
@@ -1829,7 +1867,9 @@ def detect_ip_family(namespace="metallb-system"):
     elif has_ipv4:
         return "ipv4"
     else:
-        raise Exception(f"Cannot detect IP family from node {node}: no valid CIDRs found")
+        raise Exception(
+            f"Cannot detect IP family from node {node}: no valid CIDRs found"
+        )
 
 
 def detect_protocol(namespace="metallb-system"):
