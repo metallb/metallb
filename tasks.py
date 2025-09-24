@@ -66,7 +66,7 @@ def generate_skip_patterns(bgp_type, ip_family, protocol=None, with_prometheus=N
         List of skip pattern strings
     """
     config = load_test_filters()
-    filters = config["test_filters"]
+    filters = config
     skip_patterns = []
 
     # Add BGP type skip patterns

@@ -76,7 +76,6 @@ inv e2etest --help
 **Important Notes:**
 - `--auto-detect-env` is a **discovery tool** - it shows you what to run but doesn't run tests itself
 - The two-step approach ensures you understand what tests will be skipped before running
-```
 
 This matches the actual implementation behavior and guides users through the intended workflow.
 
@@ -109,13 +108,12 @@ The filtering system skips tests based on:
 
 Example configuration snippet from `test-filters.yaml`:
 ```yaml
-test_filters:
-  bgp_type:
-    native:
-      skip: ["FRR", "FRR-MODE", "FRRK8S-MODE", "BFD", "VRF", "DUALSTACK"]
-  ip_family:
-    ipv4:
-      skip: ["IPV6", "DUALSTACK"]
+bgp_type:
+  native:
+    skip: ["FRR", "FRR-MODE", "FRRK8S-MODE", "BFD", "VRF", "DUALSTACK"]
+ip_family:
+  ipv4:
+    skip: ["IPV6", "DUALSTACK"]
 ```
 
 #### CI Integration
