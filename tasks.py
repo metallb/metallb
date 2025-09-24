@@ -86,24 +86,9 @@ def generate_skip_patterns(bgp_type, ip_family, protocol=None, with_prometheus=N
         if "prometheus" in filters and "skip" in filters["prometheus"]:
             skip_patterns.extend(filters["prometheus"]["skip"])
 
-    # Check special cases and apply additional skip patterns
-    for special_case in filters.get("special_cases", []):
-        condition = special_case["condition"]
-
-        # Check if this special case applies by matching all condition fields
-        matches = True
-        for key, value in condition.items():
-            if key == "bgp_type" and bgp_type != value:
-                matches = False
-                break
-            elif key == "ip_family" and ip_family != value:
-                matches = False
-                break
-
-        # If condition matches, add the skip patterns
-        if matches:
-            if "skip" in special_case:
-                skip_patterns.extend(special_case["skip"])
+    # Handle special cases
+    if bgp_type == "native" and ip_family == "ipv6":
+        skip_patterns.append("BGP")  # Native BGP doesn't support IPv6
 
     # Remove duplicates and return
     return list(set(skip_patterns))

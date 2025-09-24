@@ -30,10 +30,3 @@ protocol:
 # Skip patterns based on Prometheus presence
 prometheus:
   skip: ["metrics"]
-
-# Special combination rules
-special_cases:
-  - condition:
-      bgp_type: "native"
-      ip_family: "ipv6"
-    skip: ["BGP"]  # Native BGP doesn't support IPv6
