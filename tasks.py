@@ -1789,58 +1789,55 @@ def detect_prometheus():
 
 
 def detect_ip_family(namespace="metallb-system"):
-    """Detect IP family from ipaddresspool resource (dual, ipv4, ipv6)."""
-    addresses_result = run(
-        f"{kubectl_path} get ipaddresspool -n {namespace} "
-        f"-o jsonpath='{{.items[*].spec.addresses[*]}}'",
+    """Detect IP family from node podCIDRs (dual, ipv4, ipv6)."""
+    
+    # Get list of nodes
+    nodes_result = run(
+        f"{kubectl_path} get nodes -o jsonpath='{{.items[*].metadata.name}}'",
         hide=True,
         warn=True,
     )
-
-    if not addresses_result.ok:
-        raise Exception(
-            f"Cannot detect IP family from ipaddresspool resource in {namespace} namespace: command failed"
-        )
-
-    addresses = addresses_result.stdout.strip().split()
-    if not addresses:
-        raise Exception(
-            "Cannot detect IP family from ipaddresspool resource: no addresses found"
-        )
-
+    
+    if not nodes_result.ok:
+        raise Exception("Cannot get nodes: kubectl command failed")
+    
+    nodes = nodes_result.stdout.strip().split()
+    if not nodes:
+        raise Exception("No nodes found in cluster")
+    
+    # Use the first node to detect IP family
+    node = nodes[0]
+    
+    # Get podCIDRs from the node
+    cidr_result = run(
+        f"{kubectl_path} get nodes {node} -o go-template "
+        f"--template='{{{{range .spec.podCIDRs}}}}{{{{printf \"%s\\n\" .}}}}{{{{end}}}}'",
+        hide=True,
+        warn=True,
+    )
+    
+    if not cidr_result.ok:
+        raise Exception(f"Cannot get podCIDRs from node {node}: kubectl command failed")
+    
+    cidrs = cidr_result.stdout.strip().split()
+    if not cidrs:
+        raise Exception(f"No podCIDRs found on node {node}")
+    
     has_ipv4 = False
     has_ipv6 = False
-
-    for address in addresses:
+    
+    for cidr in cidrs:
         try:
-            # Handle IP ranges (e.g., "172.18.0.9-172.18.0.19")
-            if "-" in address:
-                start_ip, end_ip = address.split("-", 1)
-                start = ipaddress.ip_address(start_ip.strip())
-                end = ipaddress.ip_address(end_ip.strip())
-
-                # Both IPs must be same version and start <= end
-                if start.version != end.version:
-                    raise Exception(f"IP range '{address}' contains mixed IP versions")
-                if start > end:
-                    raise Exception(
-                        f"IP range '{address}' has start IP greater than end IP"
-                    )
-
-                # Use the start ip as a representative address for version checking
-                address = start
-
-            # Handle single IPs or CIDR networks
-            if is_ipv4(address):
+            # Parse CIDR to determine IP version
+            network = ipaddress.ip_network(cidr, strict=False)
+            if network.version == 4:
                 has_ipv4 = True
-            elif is_ipv6(address):
+            elif network.version == 6:
                 has_ipv6 = True
-
+                
         except ValueError as e:
-            raise Exception(
-                f"Invalid IP address or network '{address}' found in ipaddresspool: {e}"
-            )
-
+            raise Exception(f"Invalid CIDR '{cidr}' found on node {node}: {e}")
+    
     if has_ipv4 and has_ipv6:
         return "dual"
     elif has_ipv6:
@@ -1848,9 +1845,7 @@ def detect_ip_family(namespace="metallb-system"):
     elif has_ipv4:
         return "ipv4"
     else:
-        raise Exception(
-            "Cannot detect IP family from ipaddresspool resource: unmatched ip family addresses"
-        )
+        raise Exception(f"Cannot detect IP family from node {node}: no valid CIDRs found")
 
 
 def detect_protocol(namespace="metallb-system"):
