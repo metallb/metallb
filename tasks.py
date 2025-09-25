@@ -1353,7 +1353,12 @@ def e2etest(
 
     if auto_detect_env:
         env_config = detect_dev_env_config(name, protocol)
-        filters = generate_test_filters(env_config)
+        skip_patterns = generate_skip_patterns(
+            env_config["bgp_type"],
+            env_config["ip_family"],
+            env_config["protocol"],
+            env_config["with_prometheus"],
+        )
 
         print(
             f"\n📊 Auto-detected environment: BGP Type: {env_config['bgp_type']}, "
@@ -1362,15 +1367,15 @@ def e2etest(
             f"Prometheus: {env_config['with_prometheus']}"
         )
 
-        if filters["skip"]:
-            print(f"⏭️  Auto-skip patterns: {filters['skip']}")
+        if skip_patterns:
+            print(f"⏭️  Auto-skip patterns: {skip_patterns}")
         else:
             print("✅ No tests will be skipped")
 
         # Show the recommended test execution command
         recommended_cmd = "inv e2etest"
-        if filters["skip"]:
-            recommended_cmd += f" --skip \"{filters['skip']}\""
+        if skip_patterns:
+            recommended_cmd += f' --skip "{skip_patterns}"'
         recommended_cmd += f" --bgp-mode {env_config['bgp_type']}"
 
         print(
@@ -1876,7 +1881,7 @@ def detect_ip_family(namespace="metallb-system"):
 
 def detect_protocol(namespace="metallb-system", protocol_override=None):
     """Detect protocol (BGP vs Layer2) from resource presence or use override.
-    
+
     Args:
         namespace: Kubernetes namespace to check for resources
         protocol_override: Optional protocol override (bgp, layer2) for unconfigured clusters
@@ -1884,9 +1889,11 @@ def detect_protocol(namespace="metallb-system", protocol_override=None):
     # Handle protocol override first
     if protocol_override:
         if protocol_override not in ["bgp", "layer2"]:
-            raise ValueError(f"Invalid protocol override '{protocol_override}'. Supported: bgp, layer2")
+            raise ValueError(
+                f"Invalid protocol override '{protocol_override}'. Supported: bgp, layer2"
+            )
         return protocol_override
-    
+
     # Attempt automatic detection
     bgppeer_result = run(
         f"{kubectl_path} get bgppeer -n {namespace} "
@@ -1933,22 +1940,6 @@ def detect_dev_env_config(cluster_name="kind", protocol_override=None):
     return config
 
 
-def generate_test_filters(config):
-    """Generate ginkgo focus/skip patterns based on environment config."""
-    bgp_type = config.get("bgp_type")
-    ip_family = config.get("ip_family")
-    protocol = config.get("protocol")
-    with_prometheus = config.get("with_prometheus")
-
-    # Generate skip patterns from configuration file
-    skip_string = generate_skip_patterns(bgp_type, ip_family, protocol, with_prometheus)
-
-    return {
-        "skip": skip_string,
-        "focus": "",  # TODO: we might add focus patterns later
-    }
-
-
 @task(
     help={
         "bgp_type": "BGP type (native, frr, frr-k8s, frr-k8s-external)",
@@ -1957,11 +1948,11 @@ def generate_test_filters(config):
         "with_prometheus": "Optional Prometheus (bool)",
     }
 )
-def generate_test_skip_patterns(
+def generate_ci_skip_patterns(
     ctx, bgp_type, ip_family, protocol=None, with_prometheus=None
 ):
-    """Generate test skip patterns for CI use."""
-    # Convert string 'true'/'false' to boolean
+    """Generate skip patterns for CI use."""
+    # Convert string 'true'/'false' to boolean for CLI compatibility
     if with_prometheus is not None:
         with_prometheus = with_prometheus.lower() == "true"
 

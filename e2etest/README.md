@@ -123,7 +123,7 @@ The filtering system is integrated into CI workflows:
 ```yaml
 - name: Run E2E Tests
   run: |
-    SKIP_PATTERNS=$(inv generate-test-skip-patterns "${{ matrix.bgp-type }}" "${{ matrix.ip-family }}")
+    SKIP_PATTERNS=$(inv generate-ci-skip-patterns "${{ matrix.bgp-type }}" "${{ matrix.ip-family }}")
     sudo -E env "PATH=$PATH" inv e2etest --skip "$SKIP_PATTERNS" --bgp-mode ${{ matrix.bgp-type }}
 ```
 

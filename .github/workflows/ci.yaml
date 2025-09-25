@@ -231,7 +231,7 @@ jobs:
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
 
           # Generate skip patterns using invoke task
-          SKIP_PATTERNS=$(inv generate-test-skip-patterns "${{ matrix.bgp-type }}" "${{ matrix.ip-family }}")
+          SKIP_PATTERNS=$(inv generate-ci-skip-patterns "${{ matrix.bgp-type }}" "${{ matrix.ip-family }}")
           SKIP="none"
           if [ -n "$SKIP_PATTERNS" ]; then
             SKIP="$SKIP|$SKIP_PATTERNS"
