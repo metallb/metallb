@@ -1,32 +1,52 @@
 # E2E Tests
 
-This directory contains End-to-End tests for MetalLB.
+To run the MetalLB E2E test suite, you first need to create a development cluster:
 
-## Test Organization
+```
+inv dev-env
+```
 
-The tests are split between:
-- **BGP tests** (`bgptests/`): Tests focused on BGP protocol functionality
-- **Layer2 tests** (`l2tests/`): Tests focused on Layer2 protocol functionality
-- **Network Policy tests** (`netpoltests/`): Tests focused on network policy enforcement
-- **Webhook tests** (`webhookstests/`): Tests focused on validation and mutation webhooks
-- **Common functionality** (`pkg/`): Shared utilities and helper functions
+The above command will create a cluster with backend bgp `frr`. To deploy development cluster
+with other types of bgp backend, you specify that with `--bgp-type` parameter. For example:
 
-## Running Tests
+```
+inv dev-env --bgp-type native
+```
 
-### Prerequisites
+Running the E2E tests against the development cluster requires mandatory field `bgp-mode`, which needs
+to match the backend bgp the dev-env was created with.
 
-1. **Development environment**: Set up a MetalLB development environment:
-   ```bash
-   inv dev-env --bgp-type frr --ip-family ipv4 --protocol bgp
-   ```
+```
+inv e2etest --bgp-mode frr
+```
 
-2. **Required dependencies**: The test suite requires several utilities installed on the host system. These are automatically installed in CI environments.
+Run only BGP test suite:
 
-### Test Execution
+```
+inv e2etest --bgp-mode frr --focus BGP
+```
 
-The recommended approach is a **two-step process**:
+Run only L2 test suite:
 
-#### Step 1: Auto-Detect Environment and Get Recommendations
+```
+inv e2etest --bgp-mode frr --focus L2
+```
+
+Run with additional ginkgo parameters for example:
+
+```
+inv e2etest --bgp-mode frr --ginkgo-params="--until-it-fails -v"
+```
+
+The test suite will run the appropriate tests against the cluster.
+Be sure to cleanup any previously created development clusters using `inv dev-env-cleanup`.
+
+
+# E2E Tests auto detection
+
+The recommended E2E tests execution is a **two-step process**:
+
+## Step 1: Auto-Detect Environment and Get Recommendations
 
 First, use auto-detection to see what configuration is detected and get the recommended test command:
 
@@ -52,7 +72,7 @@ $ inv e2etest --skip "IPV6|DUALSTACK|L2" --bgp-mode frr
 Exiting without running tests.
 ```
 
-#### Step 2: Run Tests with Recommended Parameters
+## Step 2: Run Tests with Recommended Parameters
 
 Copy and run the recommended command from Step 1:
 
@@ -61,198 +81,15 @@ Copy and run the recommended command from Step 1:
 inv e2etest --skip "IPV6|DUALSTACK|L2" --bgp-mode frr
 ```
 
-#### Alternative: Manual Configuration
+# E2E Tests auto detection in CI
 
-If you prefer to skip auto-detection and configure manually:
-
-```bash
-# Direct manual configuration
-inv e2etest --bgp-mode frr --focus "BGP"
-
-# See all available options
-inv e2etest --help
-```
-
-**Important Notes:**
-- `--auto-detect-env` is a **discovery tool** - it shows you what to run but doesn't run tests itself
-- The two-step approach ensures you understand what tests will be skipped before running
-
-This matches the actual implementation behavior and guides users through the intended workflow.
-
-### Test Filtering System
-
-E2E tests use an intelligent filtering system to skip irrelevant tests based on your environment configuration. This system is defined in:
-
-- **`test-filters.yaml`**: Central configuration defining skip patterns for different environments
-- **`tasks.py`**: Contains filtering functions that process the YAML configuration
-
-#### Configuration-Based Skipping
-
-The filtering system skips tests based on:
-
-1. **BGP Type** (`native`, `frr`, `frr-k8s`, `frr-k8s-external`):
-   - Native BGP skips FRR-specific tests
-   - FRR skips FRR-K8s-specific tests
-   - etc.
-
-2. **IP Family** (`ipv4`, `ipv6`, `dual`):
-   - IPv4 environments skip IPv6-only tests
-   - IPv6 environments skip IPv4-only tests
-   - Dual-stack has its own skip patterns
-
-3. **Protocol** (`bgp`, `layer2`):
-   - BGP environments skip Layer2-only tests
-   - Layer2 environments skip BGP-only tests
-
-4. **Prometheus presence**: Tests requiring metrics are skipped when Prometheus is not available
-
-Example configuration snippet from `test-filters.yaml`:
-```yaml
-bgp_type:
-  native:
-    skip: ["FRR", "FRR-MODE", "FRRK8S-MODE", "BFD", "VRF", "DUALSTACK"]
-ip_family:
-  ipv4:
-    skip: ["IPV6", "DUALSTACK"]
-```
-
-#### CI Integration
-
-The filtering system is integrated into CI workflows:
+This auto detection mechanism has been integrated in CI to generate appropriate skip patterns:
 
 ```yaml
 - name: Run E2E Tests
   run: |
     SKIP_PATTERNS=$(inv generate-ci-skip-patterns "${{ matrix.bgp-type }}" "${{ matrix.ip-family }}")
     sudo -E env "PATH=$PATH" inv e2etest --skip "$SKIP_PATTERNS" --bgp-mode ${{ matrix.bgp-type }}
-```
-
-### Components of the Filtering System
-
-1. **`test-filters.yaml`**: Central configuration file defining all skip rules
-2. **`tasks.py`**: Contains filtering functions (`load_test_filters`, `generate_skip_patterns`, `generate_skip_string`)
-
-## Automatic Environment Detection
-
-E2E tests can automatically detect your development environment configuration and provide recommended test commands. This means you no longer need to remember complex skip patterns for most scenarios.
-
-### Auto-Detection Usage
-
-Use auto-detection to see what configuration is detected and get a recommended command:
-
-```bash
-# Automatically detect environment and show recommended command
-inv e2etest --auto-detect-env
-```
-
-Auto-detection will:
-- Detect BGP type (native, frr, frr-k8s, frr-k8s-external)
-- Detect IP family (ipv4, ipv6, dual)
-- Detect protocol (BGP vs Layer2)
-- Detect Prometheus availability
-- Load `test-filters.yaml` and generate appropriate skip patterns
-- Display the recommended test execution command
-- Exit without running tests
-
-### Manual Control
-
-When you need full control over test selection:
-
-```bash
-# Manual configuration with specific parameters
-inv e2etest --bgp-mode frr --focus "BGP"
-
-# Using custom skip patterns (note the required quotes)
-inv e2etest --skip "MyCustomPattern|AnotherPattern"
-```
-
-## Manual Test Selection
-
-Run specific test suites:
-
-```bash
-# Run only BGP test suite
-inv e2etest --focus "BGP"
-
-# Run only L2 test suite
-inv e2etest --focus "L2"
-
-# Run with additional ginkgo parameters
-inv e2etest --ginkgo-params="--until-it-fails -v"
-
-# Skip specific patterns (always use quotes for pipe-separated values)
-inv e2etest --skip "IPV6|FRRK8S-MODE|metrics|BGP"
-```
-
-**Important**: Always quote skip patterns that contain pipe characters (`|`) to prevent shell interpretation issues.
-
-## Maintaining Test Filters
-
-When adding new test patterns or changing environment configurations:
-
-1. **Update `test-filters.yaml`**: Add new skip patterns or modify existing ones
-2. **Test locally**: Use `inv e2etest --auto-detect-env` to verify your changes
-3. **Test in CI**: The filtering system automatically applies to CI matrix runs
-
-### Adding New Skip Patterns
-
-To add skip patterns for a new test category:
-
-1. **Identify the pattern**: Look at test names that should be skipped
-2. **Update `test-filters.yaml`**: Add the pattern to appropriate sections
-3. **Test the change**: Run tests with different configurations to verify
-
-Example of adding a new special case:
-```yaml
-special_cases:
-  - condition:
-      bgp_type: "native"
-      ip_family: "ipv6" 
-    skip: ["BGP"]  # Native BGP doesn't support IPv6
-```
-
-## Test Development Guidelines
-
-When writing new tests:
-
-1. **Use descriptive test names** that clearly indicate what environment they target
-2. **Tag tests appropriately** using patterns that match the filtering system
-3. **Consider multi-environment compatibility** - write tests that work across configurations when possible
-4. **Update `test-filters.yaml`** if adding environment-specific tests
-
-Common test naming patterns:
-- `BGP` prefix for BGP-specific tests
-- `L2` prefix for Layer2-specific tests  
-- `IPV4`, `IPV6`, `DUALSTACK` for IP family specific tests
-- `FRR-MODE`, `FRRK8S-MODE` for implementation-specific tests
-- `metrics` for Prometheus-dependent tests
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Shell parsing errors when using skip patterns**:
-   - **Problem**: `bash: FRRK8S-MODE: command not found`
-   - **Solution**: Always quote skip patterns: `--skip "IPV6|FRRK8S-MODE|metrics"`
-
-2. **Tests failing due to environment mismatch**: 
-   - Check detected configuration: `inv e2etest --auto-detect-env`
-   - Verify your dev-env matches expected configuration
-
-3. **Skip patterns not working**:
-   - Validate `test-filters.yaml` syntax
-   - Check that test names match skip patterns exactly
-
-### Debugging Environment Detection
-
-See what environment configuration is detected:
-
-```bash
-# Show detected configuration and recommended command
-inv e2etest --auto-detect-env
-
-# Run specific configuration manually
-inv e2etest --bgp-mode frr --skip "IPV6|L2"
 ```
 
 ## BGP tests network topology
