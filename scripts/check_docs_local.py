@@ -218,9 +218,7 @@ class DocumentationChecker:
         # API
         if any("CRD" in detail or "API" in detail for detail in feature_details):
             recommendations.extend([
-                "  - Consider updating API documentation in `website/content/apis/`",
-                "  - Consider updating configuration guides in `website/content/configuration/`",
-                "  - Consider adding usage examples in `website/content/usage/` or `configsamples/`"
+                "  - Consider updating API documentation, configuration guides and usage examples on the website"
             ])
 
         # Helm
