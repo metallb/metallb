@@ -17,6 +17,7 @@ description: MetalLB API reference documentation
 - [BFDProfile](#bfdprofile)
 - [BGPAdvertisement](#bgpadvertisement)
 - [Community](#community)
+- [ConfigurationStatus](#configurationstatus)
 - [IPAddressPool](#ipaddresspool)
 - [L2Advertisement](#l2advertisement)
 - [ServiceBGPStatus](#servicebgpstatus)
@@ -158,6 +159,24 @@ _Appears in:_
 
 
 
+#### ConfigurationStatus
+
+
+
+ConfigurationStatus exposes the validation status of the overall MetalLB configuration.
+
+
+
+| Field | Description |
+| --- | --- |
+| `apiVersion` _string_ | `metallb.io/v1beta1`
+| `kind` _string_ | `ConfigurationStatus`
+| `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
+| `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `status` _[MetalLBConfigurationStatus](#metallbconfigurationstatus)_ |  |
+
+
 #### IPAddressPool
 
 
@@ -262,6 +281,20 @@ _Appears in:_
 | `interfaces` _string array_ | A list of interfaces to announce from. The LB IP will be announced only from these interfaces.<br />If the field is not set, we advertise from all the interfaces on the host. |
 
 
+
+
+#### MetalLBConfigurationStatus
+
+
+
+MetalLBConfigurationStatus defines the observed state of ConfigurationStatus.
+
+_Appears in:_
+- [ConfigurationStatus](#configurationstatus)
+
+| Field | Description |
+| --- | --- |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#condition-v1-meta) array_ | Conditions contains the status conditions from each controller.<br />Each condition reports the controller's reconciliation state:<br />  - Status: True (valid) or False (invalid)<br />  - Reason: The SyncState of the reconciler<br />  - Message: Error message during reconcile, if any (empty if no error)<br /><br />Example valid condition:<br />  - type: speaker-<node-name>/frrk8sReconcilerValid<br />    status: "True"<br />    reason: SyncStateSuccess<br />    message: ""<br /><br />Example invalid condition:<br />  - type: speaker-<node-name>/frrk8sReconcilerValid<br />    status: "False"<br />    reason: ConfigError<br />    message: 'failed to create or update frr configuration: admission webhook denied the request: different asns specified for same vrf' |
 
 
 #### MetalLBServiceBGPStatus
