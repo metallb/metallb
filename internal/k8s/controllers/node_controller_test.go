@@ -24,7 +24,11 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	v1beta1 "go.universe.tf/metallb/api/v1beta1"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -47,6 +51,7 @@ func TestNodeController(t *testing.T) {
 		expectReconcileFails    bool
 		initObjects             []client.Object
 		expectForceReloadCalled bool
+		wantCondition           metav1.Condition
 	}{
 		{
 			desc:                    "handler returns SyncStateSuccess",
@@ -54,6 +59,7 @@ func TestNodeController(t *testing.T) {
 			initObjects:             []client.Object{testNode},
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantCondition:           metav1.Condition{Status: metav1.ConditionTrue, Reason: "SyncStateSuccess"},
 		},
 		{
 			desc:                    "handler returns SyncStateError",
@@ -61,6 +67,7 @@ func TestNodeController(t *testing.T) {
 			initObjects:             []client.Object{testNode},
 			expectReconcileFails:    true,
 			expectForceReloadCalled: false,
+			wantCondition:           metav1.Condition{Status: metav1.ConditionFalse, Reason: "ConfigError", Message: "handler failed for node test-controller/testNode: " + errRetry.Error()},
 		},
 		{
 			desc:                    "handler returns SyncStateErrorNoRetry",
@@ -68,6 +75,7 @@ func TestNodeController(t *testing.T) {
 			initObjects:             []client.Object{testNode},
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantCondition:           metav1.Condition{Status: metav1.ConditionFalse, Reason: "SyncStateErrorNoRetry"},
 		},
 		{
 			desc:                    "handler returns SyncStateReprocessAll",
@@ -75,10 +83,19 @@ func TestNodeController(t *testing.T) {
 			initObjects:             []client.Object{testNode},
 			expectReconcileFails:    false,
 			expectForceReloadCalled: true,
+			wantCondition:           metav1.Condition{Status: metav1.ConditionTrue, Reason: "SyncStateReprocessAll"},
 		},
 	}
 	for _, test := range tests {
-		fakeClient, err := newFakeClient(test.initObjects)
+		initObjects := make([]client.Object, len(test.initObjects))
+		copy(initObjects, test.initObjects)
+		initObjects = append(initObjects, &v1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "config-status",
+				Namespace: testNamespace,
+			},
+		})
+		fakeClient, err := newFakeClient(initObjects)
 		if err != nil {
 			t.Fatalf("test %s failed to create fake client: %v", test.desc, err)
 		}
@@ -95,13 +112,13 @@ func TestNodeController(t *testing.T) {
 		mockForceReload := func() { calledForceReload = true }
 
 		r := &NodeReconciler{
-			Client:      fakeClient,
-			Logger:      log.NewNopLogger(),
-			Scheme:      scheme.Scheme,
-			NodeName:    testNodeName,
-			Namespace:   testNamespace,
-			Handler:     mockHandler,
-			ForceReload: mockForceReload,
+			Client:          fakeClient,
+			Logger:          log.NewNopLogger(),
+			Scheme:          scheme.Scheme,
+			NodeName:        testNodeName,
+			ConfigStatusRef: types.NamespacedName{Name: "config-status", Namespace: testNamespace},
+			Handler:         mockHandler,
+			ForceReload:     mockForceReload,
 		}
 		req := reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -120,6 +137,24 @@ func TestNodeController(t *testing.T) {
 
 		if test.expectForceReloadCalled != calledForceReload {
 			t.Errorf("test %s failed: call force reload expected: %v, got: %v", test.desc, test.expectForceReloadCalled, calledForceReload)
+		}
+
+		configStatus := &v1beta1.ConfigurationState{}
+		if err := fakeClient.Get(context.TODO(), types.NamespacedName{Name: "config-status", Namespace: testNamespace}, configStatus); err != nil {
+			t.Errorf("test %s: failed to get ConfigurationState: %v", test.desc, err)
+			continue
+		}
+
+		const conditionType = "speaker-testNode/nodeReconcilerValid"
+		gotCondition := meta.FindStatusCondition(configStatus.Status.Conditions, conditionType)
+		if gotCondition == nil {
+			t.Errorf("test %s: condition %q not found in ConfigurationState", test.desc, conditionType)
+			continue
+		}
+
+		opts := cmpopts.IgnoreFields(metav1.Condition{}, "Type", "LastTransitionTime", "ObservedGeneration")
+		if diff := cmp.Diff(test.wantCondition, *gotCondition, opts); diff != "" {
+			t.Errorf("test %s: condition mismatch (-want +got):\n%s", test.desc, diff)
 		}
 	}
 }

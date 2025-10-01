@@ -21,6 +21,21 @@ const (
 	SyncStateErrorNoRetry
 )
 
+func (s SyncState) String() string {
+	switch s {
+	case SyncStateSuccess:
+		return "SyncStateSuccess"
+	case SyncStateError:
+		return "SyncStateError"
+	case SyncStateReprocessAll:
+		return "SyncStateReprocessAll"
+	case SyncStateErrorNoRetry:
+		return "SyncStateErrorNoRetry"
+	default:
+		return "Unknown"
+	}
+}
+
 type NeedEndPoints int
 
 const (

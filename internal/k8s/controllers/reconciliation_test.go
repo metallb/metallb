@@ -37,6 +37,7 @@ import (
 	"go.universe.tf/metallb/internal/allocator"
 	frrk8s "go.universe.tf/metallb/internal/bgp/frrk8s"
 	"go.universe.tf/metallb/internal/config"
+
 	"go.universe.tf/metallb/internal/layer2"
 )
 
@@ -170,12 +171,12 @@ var _ = BeforeSuite(func() {
 		return SyncStateSuccess
 	}
 	err = (&NodeReconciler{
-		Client:    k8sManager.GetClient(),
-		Scheme:    k8sManager.GetScheme(),
-		Logger:    log.NewNopLogger(),
-		Namespace: testNamespace,
-		Handler:   mockHandler,
-		NodeName:  testNodeName,
+		Client:          k8sManager.GetClient(),
+		Scheme:          k8sManager.GetScheme(),
+		Logger:          log.NewNopLogger(),
+		ConfigStatusRef: types.NamespacedName{Name: "config-status", Namespace: testNamespace},
+		Handler:         mockHandler,
+		NodeName:        testNodeName,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -200,6 +201,7 @@ var _ = BeforeSuite(func() {
 		Logger:          log.NewNopLogger(),
 		NodeName:        testNodeName,
 		FRRK8sNamespace: testNamespace,
+		ConfigStatusRef: types.NamespacedName{Name: ConfigurationStateName, Namespace: testNamespace},
 	}
 	err = frrk8sReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -281,7 +283,6 @@ var _ = AfterSuite(func() {
 
 var _ = Describe("Config controller", func() {
 	BeforeEach(func() {
-
 	})
 	Context("SetupWithManager", func() {
 		It("Should Reconcile correctly", func() {

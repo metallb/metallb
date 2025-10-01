@@ -39,36 +39,39 @@ func (r *reconcilerEnqueuer) Start(ctx context.Context) error {
 	return nil
 }
 
-type ConfigurationStatusReconciler struct {
+type ConfigurationStateReconciler struct {
 	client.Client
 	Logger          log.Logger
 	Scheme          *runtime.Scheme
 	ConfigStatusRef types.NamespacedName
 }
 
-func (r *ConfigurationStatusReconciler) String() string {
-	return "ConfigurationStatusReconciler"
+func (r *ConfigurationStateReconciler) String() string {
+	return "ConfigurationStateReconciler"
 }
 
-func (r *ConfigurationStatusReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ConfigurationStateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", r, "start reconcile", req.String())
 	defer level.Info(r.Logger).Log("controller", r, "end reconcile", req.String())
 
-	var configStatus metallbv1beta1.ConfigurationStatus
+	var configStatus metallbv1beta1.ConfigurationState
 	if err := r.Get(ctx, r.ConfigStatusRef, &configStatus); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 		level.Info(r.Logger).Log("controller", r, "event", fmt.Sprintf("%s not found", r.ConfigStatusRef))
-		configStatus = metallbv1beta1.ConfigurationStatus{
+		configStatus = metallbv1beta1.ConfigurationState{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      r.ConfigStatusRef.Name,
 				Namespace: r.ConfigStatusRef.Namespace,
 			},
+			Spec: metallbv1beta1.ConfigurationStateSpec{
+				Type: "Controller",
+			},
 		}
 		// TODO: Set OwnerReference to controller deployment for automatic cleanup
 		if createErr := r.Create(ctx, &configStatus); createErr != nil {
-			level.Error(r.Logger).Log("controller", r, "error", "failed to create ConfigurationStatus", "name", r.ConfigStatusRef, "error", createErr)
+			level.Error(r.Logger).Log("controller", r, "error", "failed to create ConfigurationState", "name", r.ConfigStatusRef, "error", createErr)
 			return ctrl.Result{}, createErr
 		}
 		level.Info(r.Logger).Log("controller", r, "event", fmt.Sprintf("%s created", r.ConfigStatusRef))
@@ -82,12 +85,12 @@ func (r *ConfigurationStatusReconciler) Reconcile(ctx context.Context, req ctrl.
 	return ctrl.Result{}, nil
 }
 
-func (r *ConfigurationStatusReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ConfigurationStateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	c := make(chan event.GenericEvent)
 
 	if err := mgr.Add(&reconcilerEnqueuer{
 		channel: c,
-		obj: &metallbv1beta1.ConfigurationStatus{
+		obj: &metallbv1beta1.ConfigurationState{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      r.ConfigStatusRef.Name,
 				Namespace: r.ConfigStatusRef.Namespace,
@@ -99,13 +102,13 @@ func (r *ConfigurationStatusReconciler) SetupWithManager(mgr ctrl.Manager) error
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("ConfigurationStatusController").
-		For(&metallbv1beta1.ConfigurationStatus{}).
+		Named("ConfigurationStateController").
+		For(&metallbv1beta1.ConfigurationState{}).
 		WatchesRawSource(source.Channel(c, &handler.EnqueueRequestForObject{})).
 		Complete(r)
 }
 
-// ConditionReporter reports controller conditions to ConfigurationStatus using server-side apply.
+// ConditionReporter reports controller conditions to ConfigurationState using server-side apply.
 // Implementations determine their owner ID ("controller/<name>" or "speaker-<node>/<name>") and
 // map configErr (nil or error) and syncResult (SyncState) to condition Status/Reason/Message fields.
 // The configErr parameter takes precedence: if non-nil, sets Status=False, Reason="ConfigError", Message=error text.
@@ -114,18 +117,18 @@ type ConditionReporter interface {
 	reportCondition(ctx context.Context, configErr error, syncResult SyncState) error
 }
 
-// patchCondition patches a condition to ConfigurationStatus using server-side apply.
+// patchCondition patches a condition to ConfigurationState using server-side apply.
 func patchCondition(ctx context.Context, cl client.Client, configStatusRef types.NamespacedName, owner string, condition metav1.Condition) error {
-	configStatus := &metallbv1beta1.ConfigurationStatus{
+	configStatus := &metallbv1beta1.ConfigurationState{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "metallb.io/v1beta1",
-			Kind:       "ConfigurationStatus",
+			Kind:       "ConfigurationState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configStatusRef.Name,
 			Namespace: configStatusRef.Namespace,
 		},
-		Status: metallbv1beta1.MetalLBConfigurationStatus{
+		Status: metallbv1beta1.ConfigurationStateStatus{
 			Conditions: []metav1.Condition{condition},
 		},
 	}
@@ -140,7 +143,7 @@ func patchCondition(ctx context.Context, cl client.Client, configStatusRef types
 // updateReadyCondition calculates and updates the aggregate Ready condition based on all controller conditions.
 // Ready=True when all conditions are True, Ready=False when any condition is False (Reason shows all failed components),
 // Ready=Unknown when no conditions exist yet.
-func (r *ConfigurationStatusReconciler) updateReadyCondition(ctx context.Context, configStatus *metallbv1beta1.ConfigurationStatus) error {
+func (r *ConfigurationStateReconciler) updateReadyCondition(ctx context.Context, configStatus *metallbv1beta1.ConfigurationState) error {
 	const owner = "configurationStatusReconciler"
 
 	condition := metav1.Condition{

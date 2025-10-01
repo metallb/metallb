@@ -50,17 +50,27 @@ func NewBGPStatusEvent(namespace, name string) event.GenericEvent {
 
 type ServiceBGPStatusReconciler struct {
 	client.Client
-	Logger        log.Logger
-	NodeName      string
-	Namespace     string
-	SpeakerPod    *v1.Pod
-	ReconcileChan <-chan event.GenericEvent
-	PeersFetcher  PeersForService
+	Logger          log.Logger
+	NodeName        string
+	Namespace       string
+	ConfigStatusRef types.NamespacedName
+	SpeakerPod      *v1.Pod
+	ReconcileChan   <-chan event.GenericEvent
+	PeersFetcher    PeersForService
 }
 
 func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ServiceBGPStatus", "start reconcile", req.String())
 	defer level.Info(r.Logger).Log("controller", "ServiceBGPStatus", "end reconcile", req.String())
+
+	var syncResult SyncState
+	var syncError error
+
+	defer func() {
+		if err := r.reportCondition(ctx, syncError, syncResult); err != nil {
+			level.Error(r.Logger).Log("controller", "ServiceBGPStatus", "error", err, "syncError", syncError)
+		}
+	}()
 
 	serviceName, serviceNamespace := req.Name, req.Namespace
 
@@ -69,6 +79,7 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		serviceIndexName: indexFor(serviceNamespace, serviceName, r.NodeName),
 	})
 	if err != nil {
+		syncError = fmt.Errorf("failed to list ServiceBGPStatus for %s: %w", req.String(), err)
 		return ctrl.Result{}, err
 	}
 
@@ -84,7 +95,12 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 		}
 
-		return ctrl.Result{}, utilerrors.NewAggregate(errs)
+		if len(errs) > 0 {
+			syncError = fmt.Errorf("failed to delete ServiceBGPStatus for %s: %w", req.String(), utilerrors.NewAggregate(errs))
+			return ctrl.Result{}, utilerrors.NewAggregate(errs)
+		}
+		syncResult = SyncStateSuccess
+		return ctrl.Result{}, nil
 	}
 
 	deleteRedundantErrs := []error{}
@@ -101,6 +117,7 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if len(deleteRedundantErrs) > 0 {
+		syncError = fmt.Errorf("failed to delete redundant ServiceBGPStatus for %s: %w", req.String(), utilerrors.NewAggregate(deleteRedundantErrs))
 		return ctrl.Result{}, utilerrors.NewAggregate(deleteRedundantErrs)
 	}
 
@@ -123,6 +140,7 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if reflect.DeepEqual(state.Status, desiredStatus) {
+		syncResult = SyncStateSuccess
 		return ctrl.Result{}, nil
 	}
 
@@ -141,6 +159,7 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return nil
 	})
 	if err != nil {
+		syncError = fmt.Errorf("failed to create or patch ServiceBGPStatus for %s: %w", req.String(), err)
 		return ctrl.Result{}, err
 	}
 	if result == controllerutil.OperationResultCreated {
@@ -148,10 +167,12 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// If the object is created, we have to patch it again to ensure the status is created.
 		// This will happen when we reconcile the creation event.
 		level.Debug(r.Logger).Log("controller", "ServiceBGPStatus", "created state", dumpResource(state))
+		syncResult = SyncStateSuccess
 		return ctrl.Result{}, nil
 	}
 
 	level.Debug(r.Logger).Log("controller", "ServiceBGPStatus", "updated state", dumpResource(state))
+	syncResult = SyncStateSuccess
 	return ctrl.Result{}, nil
 }
 
@@ -236,4 +257,31 @@ func (r *ServiceBGPStatusReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func indexFor(svcNs, svcName, node string) string {
 	return fmt.Sprintf("%s/%s-%s", svcNs, svcName, node)
+}
+
+// reportCondition implements ConditionReporter interface.
+func (r *ServiceBGPStatusReconciler) reportCondition(ctx context.Context, configErr error, syncResult SyncState) error {
+	owner := "speaker-" + r.NodeName + "/serviceBGPStatusReconciler"
+
+	condition := metav1.Condition{
+		Type:               owner + "Valid",
+		Status:             metav1.ConditionTrue,
+		Reason:             syncResult.String(),
+		LastTransitionTime: metav1.Now(),
+	}
+
+	if configErr != nil {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "ConfigError"
+		condition.Message = configErr.Error()
+	}
+
+	if syncResult != SyncStateSuccess && syncResult != SyncStateReprocessAll {
+		condition.Status = metav1.ConditionFalse
+	}
+
+	if err := patchCondition(ctx, r.Client, r.ConfigStatusRef, owner, condition); err != nil {
+		return fmt.Errorf("failed to patch condition for %s: %w", owner, err)
+	}
+	return nil
 }

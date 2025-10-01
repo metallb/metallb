@@ -63,7 +63,7 @@ var (
 	setupLog                    = ctrl.Log.WithName("setup")
 	validatingWebhookName       = "metallb-webhook-configuration"
 	bgppeerConvertingWebhookCRD = "bgppeers.metallb.io"
-	ConfigurationStatusName     = "config-status"
+	ConfigurationStateName     = "controller"
 )
 
 func init() {
@@ -120,7 +120,7 @@ type Config struct {
 	LoadBalancerClass         string
 	WebhookWithHTTP2          bool
 	WithFRRK8s                bool
-	EnableConfigurationStatus bool
+	EnableConfigurationState bool
 	FRRK8sNamespace           string
 	Listener
 	Layer2StatusChan    <-chan event.GenericEvent
@@ -149,7 +149,7 @@ func New(cfg *Config) (*Client, error) {
 		&metallbv1beta2.BGPPeer{}:             namespaceSelector,
 		&metallbv1beta1.Community{}:           namespaceSelector,
 		&metallbv1beta1.ServiceBGPStatus{}:    namespaceSelector,
-		&metallbv1beta1.ConfigurationStatus{}: namespaceSelector,
+		&metallbv1beta1.ConfigurationState{}: namespaceSelector,
 		&corev1.Secret{}:                      namespaceSelector,
 		&corev1.ConfigMap{}:                   namespaceSelector,
 	}
@@ -182,7 +182,7 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	configStatusRef := types.NamespacedName{
-		Name:      ConfigurationStatusName,
+		Name:      ConfigurationStateName,
 		Namespace: cfg.Namespace,
 	}
 
@@ -197,14 +197,15 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.ConfigChanged != nil {
 		configReconciler := &controllers.ConfigReconciler{
-			Client:         mgr.GetClient(),
-			Logger:         cfg.Logger,
-			Scheme:         mgr.GetScheme(),
-			Namespace:      cfg.Namespace,
-			ValidateConfig: cfg.ValidateConfig,
-			Handler:        cfg.ConfigHandler,
-			ForceReload:    reload,
-			NodeName:       cfg.NodeName,
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			Namespace:       cfg.Namespace,
+			ConfigStatusRef: configStatusRef,
+			ValidateConfig:  cfg.ValidateConfig,
+			Handler:         cfg.ConfigHandler,
+			ForceReload:     reload,
+			NodeName:        cfg.NodeName,
 		}
 
 		if err = configReconciler.SetupWithManager(mgr); err != nil {
@@ -215,13 +216,14 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.PoolChanged != nil {
 		poolReconciler := &controllers.PoolReconciler{
-			Client:         mgr.GetClient(),
-			Logger:         cfg.Logger,
-			Scheme:         mgr.GetScheme(),
-			Namespace:      cfg.Namespace,
-			ValidateConfig: cfg.ValidateConfig,
-			Handler:        cfg.PoolHandler,
-			ForceReload:    reload,
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			Namespace:       cfg.Namespace,
+			ConfigStatusRef: configStatusRef,
+			ValidateConfig:  cfg.ValidateConfig,
+			Handler:         cfg.PoolHandler,
+			ForceReload:     reload,
 		}
 
 		if err = poolReconciler.SetupWithManager(mgr); err != nil {
@@ -242,13 +244,13 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.NodeChanged != nil {
 		if err = (&controllers.NodeReconciler{
-			Client:      mgr.GetClient(),
-			Logger:      cfg.Logger,
-			Scheme:      mgr.GetScheme(),
-			Handler:     cfg.NodeHandler,
-			NodeName:    cfg.NodeName,
-			Namespace:   cfg.Namespace,
-			ForceReload: reload,
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			Handler:         cfg.NodeHandler,
+			NodeName:        cfg.NodeName,
+			ConfigStatusRef: configStatusRef,
+			ForceReload:     reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "node")
 			return nil, errors.Join(err, errors.New("failed to create node reconciler"))
@@ -262,6 +264,7 @@ func New(cfg *Config) (*Client, error) {
 			Scheme:          mgr.GetScheme(),
 			FRRK8sNamespace: cfg.FRRK8sNamespace,
 			NodeName:        cfg.NodeName,
+			ConfigStatusRef: configStatusRef,
 		}
 		if err := frrk8sController.SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "frrk8s")
@@ -270,8 +273,8 @@ func New(cfg *Config) (*Client, error) {
 		c.BGPEventCallback = frrk8sController.UpdateConfig
 	}
 
-	if cfg.EnableConfigurationStatus {
-		cc := controllers.ConfigurationStatusReconciler{
+	if cfg.EnableConfigurationState {
+		cc := controllers.ConfigurationStateReconciler{
 			Client:          mgr.GetClient(),
 			Logger:          cfg.Logger,
 			Scheme:          mgr.GetScheme(),
@@ -309,6 +312,8 @@ func New(cfg *Config) (*Client, error) {
 			Client:            mgr.GetClient(),
 			Logger:            cfg.Logger,
 			Scheme:            mgr.GetScheme(),
+			ConfigStatusRef:   configStatusRef,
+			NodeName:          cfg.NodeName,
 			Handler:           cfg.ServiceHandler,
 			Endpoints:         cfg.ReadEndpoints,
 			Reload:            reloadChan,
@@ -346,13 +351,14 @@ func New(cfg *Config) (*Client, error) {
 			return nil, err
 		}
 		if err = (&controllers.ServiceBGPStatusReconciler{
-			Client:        mgr.GetClient(),
-			Logger:        cfg.Logger,
-			NodeName:      cfg.NodeName,
-			Namespace:     cfg.Namespace,
-			SpeakerPod:    selfPod.DeepCopy(),
-			ReconcileChan: cfg.BGPStatusChan,
-			PeersFetcher:  cfg.BGPPeersFetcher,
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			NodeName:        cfg.NodeName,
+			Namespace:       cfg.Namespace,
+			ConfigStatusRef: configStatusRef,
+			SpeakerPod:      selfPod.DeepCopy(),
+			ReconcileChan:   cfg.BGPStatusChan,
+			PeersFetcher:    cfg.BGPPeersFetcher,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "layer2Status")
 		}

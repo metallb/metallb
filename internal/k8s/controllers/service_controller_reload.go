@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/go-kit/log/level"
@@ -63,9 +64,19 @@ func (r *ServiceReconciler) reprocessAll(ctx context.Context, req ctrl.Request) 
 	level.Info(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "start reconcile", req.String())
 	defer level.Info(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "end reconcile", req.String())
 
+	var syncResult SyncState
+	var syncError error
+
+	defer func() {
+		if err := r.reportCondition(ctx, syncError, syncResult); err != nil {
+			level.Error(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "error", err, "syncError", syncError)
+		}
+	}()
+
 	var services v1.ServiceList
 	if err := r.List(ctx, &services); err != nil {
 		level.Error(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "message", "failed to list the services", "error", err)
+		syncError = fmt.Errorf("failed to list services during reprocessAll: %w", err)
 		return ctrl.Result{}, err
 	}
 
@@ -90,6 +101,7 @@ func (r *ServiceReconciler) reprocessAll(ctx context.Context, req ctrl.Request) 
 			eps, err = epSlicesForService(ctx, r, serviceName)
 			if err != nil {
 				level.Error(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "message", "failed to get endpoints", "service", serviceName.String(), "error", err)
+				syncError = fmt.Errorf("failed to get endpoints for service %s during reprocessAll: %w", serviceName.String(), err)
 				return ctrl.Result{}, err
 			}
 		}
@@ -100,20 +112,27 @@ func (r *ServiceReconciler) reprocessAll(ctx context.Context, req ctrl.Request) 
 		switch res {
 		case SyncStateError:
 			level.Error(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "name", serviceName, "service", dumpResource(service), "endpoints", dumpResource(eps), "event", "failed to handle service, retry")
+			syncResult = SyncStateError
 			retry = true
 		case SyncStateReprocessAll:
+			syncResult = SyncStateReprocessAll
 			retry = true
 		case SyncStateErrorNoRetry:
 			level.Error(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "name", serviceName, "service", dumpResource(service), "endpoints", dumpResource(eps), "event", "failed to handle service, no retry")
+			syncResult = SyncStateErrorNoRetry
 		}
 	}
 	if retry {
 		// in case we want to retry, we return an error to trigger the exponential backoff mechanism so that
 		// this controller won't loop at full speed
 		level.Info(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "event", "force service reload")
+		syncError = fmt.Errorf("reprocessAll retry needed: %w", errRetry)
 		return ctrl.Result{}, errRetry
 	}
 	r.initialLoadPerformed = true
+	if syncResult == 0 {
+		syncResult = SyncStateSuccess
+	}
 
 	return ctrl.Result{}, nil
 }

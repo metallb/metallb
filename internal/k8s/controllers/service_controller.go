@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -29,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	discovery "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,7 +44,8 @@ type ServiceReconciler struct {
 	client.Client
 	Logger            log.Logger
 	Scheme            *runtime.Scheme
-	Namespace         string
+	ConfigStatusRef   types.NamespacedName
+	NodeName          string
 	Handler           func(log.Logger, string, *v1.Service, []discovery.EndpointSlice) SyncState
 	Endpoints         bool
 	LoadBalancerClass string
@@ -63,23 +66,36 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ServiceReconciler", "start reconcile", req.String())
 	defer level.Info(r.Logger).Log("controller", "ServiceReconciler", "end reconcile", req.String())
+
+	var syncResult SyncState
+	var syncError error
+
+	defer func() {
+		if err := r.reportCondition(ctx, syncError, syncResult); err != nil {
+			level.Error(r.Logger).Log("controller", "ServiceReconciler", "error", err, "syncError", syncError)
+		}
+	}()
+
 	updates.Inc()
 
 	var service *v1.Service
 
 	if !r.initialLoadPerformed {
 		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "message", "filtered service, still waiting for the initial load to be performed")
+		syncResult = SyncStateSuccess
 		return ctrl.Result{}, nil
 	}
 
 	service, err := r.serviceFor(ctx, req.NamespacedName)
 	if err != nil {
 		level.Error(r.Logger).Log("controller", "ServiceReconciler", "message", "failed to get service", "service", req.NamespacedName, "error", err)
+		syncError = fmt.Errorf("failed to get service %s: %w", req.NamespacedName, err)
 		return ctrl.Result{}, err
 	}
 
 	if filterByLoadBalancerClass(service, r.LoadBalancerClass) {
 		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "filtered service", req.NamespacedName)
+		syncResult = SyncStateSuccess
 		return ctrl.Result{}, nil
 	}
 
@@ -88,6 +104,7 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 		epSlices, err = epSlicesForService(ctx, r, req.NamespacedName)
 		if err != nil {
 			level.Error(r.Logger).Log("controller", "ServiceReconciler", "message", "failed to get endpoints", "service", req.NamespacedName, "error", err)
+			syncError = fmt.Errorf("failed to get endpoints for service %s: %w", req.NamespacedName, err)
 			return ctrl.Result{}, err
 		}
 	}
@@ -97,11 +114,12 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "processing deletion on service", req.String())
 	}
 
-	res := r.Handler(r.Logger, req.String(), service, epSlices)
-	switch res {
+	syncResult = r.Handler(r.Logger, req.String(), service, epSlices)
+	switch syncResult {
 	case SyncStateError:
 		updateErrors.Inc()
 		level.Info(r.Logger).Log("controller", "ServiceReconciler", "name", req.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
+		syncError = fmt.Errorf("handler failed for service %s: %w", req.String(), errRetry)
 		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "ServiceReconciler", "event", "force service reload")
@@ -173,4 +191,33 @@ func filterByLoadBalancerClass(service *v1.Service, loadBalancerClass string) bo
 		return true
 	}
 	return false
+}
+
+func (r *ServiceReconciler) reportCondition(ctx context.Context, configErr error, syncResult SyncState) error {
+	owner := "controller/serviceReconciler"
+	if r.NodeName != "" {
+		owner = "speaker-" + r.NodeName + "/serviceReconciler"
+	}
+
+	condition := metav1.Condition{
+		Type:               owner + "Valid",
+		Status:             metav1.ConditionTrue,
+		Reason:             syncResult.String(),
+		LastTransitionTime: metav1.Now(),
+	}
+
+	if configErr != nil {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "ConfigError"
+		condition.Message = configErr.Error()
+	}
+
+	if syncResult != SyncStateSuccess && syncResult != SyncStateReprocessAll {
+		condition.Status = metav1.ConditionFalse
+	}
+
+	if err := patchCondition(ctx, r.Client, r.ConfigStatusRef, owner, condition); err != nil {
+		return fmt.Errorf("failed to patch condition for %s: %w", owner, err)
+	}
+	return nil
 }

@@ -18,30 +18,30 @@ import (
 )
 
 const (
-	ConfigurationStatusNamespace = "metallb-system"
-	ConfigurationStatusName      = "config-status"
+	ConfigurationStateNamespace = "metallb-system"
+	ConfigurationStateName      = "config-status"
 )
 
 var testObjectMeta = metav1.ObjectMeta{
-	Name:      ConfigurationStatusName,
-	Namespace: ConfigurationStatusNamespace,
+	Name:      ConfigurationStateName,
+	Namespace: ConfigurationStateNamespace,
 }
 
-func TestConfigurationStatus(t *testing.T) {
+func TestConfigurationState(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := metallbv1beta1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add scheme: %v", err)
 	}
 
 	testCases := map[string]struct {
-		existingStatus *metallbv1beta1.ConfigurationStatus
-		wantStatus     *metallbv1beta1.ConfigurationStatus
+		existingStatus *metallbv1beta1.ConfigurationState
+		wantStatus     *metallbv1beta1.ConfigurationState
 	}{
 		"reconciler creates resource when it does not exist": {
 			existingStatus: nil,
-			wantStatus: &metallbv1beta1.ConfigurationStatus{
+			wantStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:    "Ready",
@@ -54,15 +54,15 @@ func TestConfigurationStatus(t *testing.T) {
 			},
 		},
 		"reconciler sets Ready to Unknown when no component conditions exist": {
-			existingStatus: &metallbv1beta1.ConfigurationStatus{
+			existingStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{},
 				},
 			},
-			wantStatus: &metallbv1beta1.ConfigurationStatus{
+			wantStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:    "Ready",
@@ -75,9 +75,9 @@ func TestConfigurationStatus(t *testing.T) {
 			},
 		},
 		"reconciler sets Ready to Unknown when only Ready condition exists": {
-			existingStatus: &metallbv1beta1.ConfigurationStatus{
+			existingStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "Ready",
@@ -87,9 +87,9 @@ func TestConfigurationStatus(t *testing.T) {
 					},
 				},
 			},
-			wantStatus: &metallbv1beta1.ConfigurationStatus{
+			wantStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:    "Ready",
@@ -104,9 +104,9 @@ func TestConfigurationStatus(t *testing.T) {
 
 		// Ready condition aggregation tests
 		"reconciler sets Ready to True when all component conditions are True": {
-			existingStatus: &metallbv1beta1.ConfigurationStatus{
+			existingStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "controller/poolReconcilerValid",
@@ -121,9 +121,9 @@ func TestConfigurationStatus(t *testing.T) {
 					},
 				},
 			},
-			wantStatus: &metallbv1beta1.ConfigurationStatus{
+			wantStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "controller/poolReconcilerValid",
@@ -145,9 +145,9 @@ func TestConfigurationStatus(t *testing.T) {
 			},
 		},
 		"reconciler sets Ready to False when one component condition is False": {
-			existingStatus: &metallbv1beta1.ConfigurationStatus{
+			existingStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:    "controller/poolReconcilerValid",
@@ -163,9 +163,9 @@ func TestConfigurationStatus(t *testing.T) {
 					},
 				},
 			},
-			wantStatus: &metallbv1beta1.ConfigurationStatus{
+			wantStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:    "controller/poolReconcilerValid",
@@ -189,9 +189,9 @@ func TestConfigurationStatus(t *testing.T) {
 			},
 		},
 		"reconciler sets Ready to False when multiple component conditions are False": {
-			existingStatus: &metallbv1beta1.ConfigurationStatus{
+			existingStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:    "controller/poolReconcilerValid",
@@ -208,9 +208,9 @@ func TestConfigurationStatus(t *testing.T) {
 					},
 				},
 			},
-			wantStatus: &metallbv1beta1.ConfigurationStatus{
+			wantStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:    "controller/poolReconcilerValid",
@@ -235,9 +235,9 @@ func TestConfigurationStatus(t *testing.T) {
 			},
 		},
 		"reconciler sets Ready to True from component conditions only": {
-			existingStatus: &metallbv1beta1.ConfigurationStatus{
+			existingStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "Ready",
@@ -252,9 +252,9 @@ func TestConfigurationStatus(t *testing.T) {
 					},
 				},
 			},
-			wantStatus: &metallbv1beta1.ConfigurationStatus{
+			wantStatus: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: testObjectMeta,
-				Status: metallbv1beta1.MetalLBConfigurationStatus{
+				Status: metallbv1beta1.MetalLBConfigurationState{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "Ready",
@@ -284,11 +284,11 @@ func TestConfigurationStatus(t *testing.T) {
 				t.Fatalf("Failed to create fake client: %v", err)
 			}
 
-			reconciler := &ConfigurationStatusReconciler{
+			reconciler := &ConfigurationStateReconciler{
 				Client:          fakeClient,
 				Logger:          log.NewNopLogger(),
 				Scheme:          scheme,
-				ConfigStatusRef: types.NamespacedName{Name: ConfigurationStatusName, Namespace: ConfigurationStatusNamespace},
+				ConfigStatusRef: types.NamespacedName{Name: ConfigurationStateName, Namespace: ConfigurationStateNamespace},
 			}
 
 			if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
@@ -298,11 +298,11 @@ func TestConfigurationStatus(t *testing.T) {
 				return
 			}
 
-			var gotStatus metallbv1beta1.ConfigurationStatus
+			var gotStatus metallbv1beta1.ConfigurationState
 			if err := fakeClient.Get(context.Background(), types.NamespacedName{
-				Name: ConfigurationStatusName, Namespace: ConfigurationStatusNamespace,
+				Name: ConfigurationStateName, Namespace: ConfigurationStateNamespace,
 			}, &gotStatus); err != nil {
-				t.Errorf("Failed to get ConfigurationStatus: %v", err)
+				t.Errorf("Failed to get ConfigurationState: %v", err)
 				return
 			}
 

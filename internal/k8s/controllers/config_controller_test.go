@@ -26,7 +26,9 @@ import (
 	v1beta1 "go.universe.tf/metallb/api/v1beta1"
 	v1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -40,6 +42,7 @@ func TestConfigController(t *testing.T) {
 		validResources          bool
 		expectReconcileFails    bool
 		expectForceReloadCalled bool
+		wantCondition           metav1.Condition
 	}{
 		{
 			desc:                    "handler returns SyncStateSuccess, valid resources",
@@ -47,6 +50,7 @@ func TestConfigController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantCondition:           metav1.Condition{Status: metav1.ConditionTrue, Reason: "SyncStateSuccess"},
 		},
 		{
 			desc:                    "handler returns SyncStateError, valid resources",
@@ -54,6 +58,7 @@ func TestConfigController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    true,
 			expectForceReloadCalled: false,
+			wantCondition:           metav1.Condition{Status: metav1.ConditionFalse, Reason: "ConfigError", Message: "handler failed to apply configuration: " + errRetry.Error()},
 		},
 		{
 			desc:                    "handler returns SyncStateErrorNoRetry, valid resources",
@@ -61,6 +66,7 @@ func TestConfigController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantCondition:           metav1.Condition{Status: metav1.ConditionFalse, Reason: "ConfigError", Message: "handler returned SyncStateErrorNoRetry"},
 		},
 		{
 			desc:                    "handler returns SyncStateReprocessAll, valid resources",
@@ -68,6 +74,7 @@ func TestConfigController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: true,
+			wantCondition:           metav1.Condition{Status: metav1.ConditionTrue, Reason: "SyncStateReprocessAll"},
 		},
 		{
 			desc:                    "handler returns SyncStateSuccess, invalid resources",
@@ -75,6 +82,7 @@ func TestConfigController(t *testing.T) {
 			validResources:          false,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantCondition:           metav1.Condition{Status: metav1.ConditionFalse, Reason: "ConfigError", Message: "failed to parse configuration: parsing peer peer1 missing local ASN"},
 		},
 	}
 	for _, test := range tests {
@@ -86,6 +94,12 @@ func TestConfigController(t *testing.T) {
 		}
 
 		initObjects := objectsFromResources(resources)
+		initObjects = append(initObjects, &v1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "config-status",
+				Namespace: testNamespace,
+			},
+		})
 		fakeClient, err := newFakeClient(initObjects)
 		if err != nil {
 			t.Fatalf("test %s failed to create fake client: %v", test.desc, err)
@@ -109,13 +123,15 @@ func TestConfigController(t *testing.T) {
 		mockForceReload := func() { calledForceReload = true }
 
 		r := &ConfigReconciler{
-			Client:         fakeClient,
-			Logger:         log.NewNopLogger(),
-			Scheme:         scheme.Scheme,
-			Namespace:      testNamespace,
-			ValidateConfig: config.DontValidate,
-			Handler:        mockHandler,
-			ForceReload:    mockForceReload,
+			Client:          fakeClient,
+			Logger:          log.NewNopLogger(),
+			Scheme:          scheme.Scheme,
+			Namespace:       testNamespace,
+			ConfigStatusRef: types.NamespacedName{Name: "config-status", Namespace: testNamespace},
+			NodeName:        "worker1",
+			ValidateConfig:  config.DontValidate,
+			Handler:         mockHandler,
+			ForceReload:     mockForceReload,
 		}
 		req := reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -132,6 +148,24 @@ func TestConfigController(t *testing.T) {
 
 		if test.expectForceReloadCalled != calledForceReload {
 			t.Errorf("%s: call force reload expected: %v, got: %v", test.desc, test.expectForceReloadCalled, calledForceReload)
+		}
+
+		configStatus := &v1beta1.ConfigurationState{}
+		if err := fakeClient.Get(context.TODO(), types.NamespacedName{Name: "config-status", Namespace: testNamespace}, configStatus); err != nil {
+			t.Errorf("test %s: failed to get ConfigurationState: %v", test.desc, err)
+			continue
+		}
+
+		const conditionType = "speaker-worker1/configReconcilerValid"
+		gotCondition := meta.FindStatusCondition(configStatus.Status.Conditions, conditionType)
+		if gotCondition == nil {
+			t.Errorf("test %s: condition %q not found in ConfigurationState", test.desc, conditionType)
+			continue
+		}
+
+		opts := cmpopts.IgnoreFields(metav1.Condition{}, "Type", "LastTransitionTime", "ObservedGeneration")
+		if diff := cmp.Diff(test.wantCondition, *gotCondition, opts); diff != "" {
+			t.Errorf("test %s: condition mismatch (-want +got):\n%s", test.desc, diff)
 		}
 	}
 }
@@ -150,13 +184,14 @@ func TestSecretShouldntTrigger(t *testing.T) {
 	}
 
 	r := &ConfigReconciler{
-		Client:         fakeClient,
-		Logger:         log.NewNopLogger(),
-		Scheme:         scheme.Scheme,
-		Namespace:      testNamespace,
-		ValidateConfig: config.DontValidate,
-		Handler:        mockHandler,
-		ForceReload:    func() {},
+		Client:          fakeClient,
+		Logger:          log.NewNopLogger(),
+		Scheme:          scheme.Scheme,
+		Namespace:       testNamespace,
+		ConfigStatusRef: types.NamespacedName{Name: "config-status", Namespace: testNamespace},
+		ValidateConfig:  config.DontValidate,
+		Handler:         mockHandler,
+		ForceReload:     func() {},
 	}
 	req := reconcile.Request{
 		NamespacedName: types.NamespacedName{

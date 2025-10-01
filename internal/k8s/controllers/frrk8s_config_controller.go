@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -68,6 +70,7 @@ type FRRK8sReconciler struct {
 	Scheme               *runtime.Scheme
 	NodeName             string
 	FRRK8sNamespace      string
+	ConfigStatusRef      types.NamespacedName
 	reconcileChan        chan event.GenericEvent
 	configChangedChan    chan struct{}
 	desiredConfiguration *frrv1beta1.FRRConfiguration
@@ -77,24 +80,44 @@ type FRRK8sReconciler struct {
 func (r *FRRK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "FRRK8sReconciler", "start reconcile", req.String())
 	defer level.Info(r.Logger).Log("controller", "FRRK8sReconciler", "end reconcile", req.String())
+
+	var syncResult SyncState
+	var syncError error
+
+	defer func() {
+		if err := r.reportCondition(ctx, syncError, syncResult); err != nil {
+			level.Error(r.Logger).Log("controller", "FRRK8sReconciler", "error", err, "syncError", syncError)
+		}
+	}()
+
 	updates.Inc()
 
 	r.Lock()
 	defer r.Unlock()
 	if r.desiredConfiguration == nil {
 		config := &frrv1beta1.FRRConfiguration{ObjectMeta: metav1.ObjectMeta{Name: frrk8s.ConfigName(r.NodeName), Namespace: r.FRRK8sNamespace}}
-		err := r.Delete(ctx, config)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		if err := r.Delete(ctx, config); err != nil {
+			err = client.IgnoreNotFound(err)
+			if err != nil {
+				syncResult = SyncStateError
+				syncError = fmt.Errorf("failed to delete frr configuration: %w", err)
+				return ctrl.Result{}, err
+			}
+		}
+		syncResult = SyncStateSuccess
+		return ctrl.Result{}, nil
 	}
 
 	current := frrv1beta1.FRRConfiguration{}
-	err := r.Get(ctx, client.ObjectKey{Name: r.desiredConfiguration.Name, Namespace: r.desiredConfiguration.Namespace}, &current)
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err := r.Get(ctx, client.ObjectKey{Name: r.desiredConfiguration.Name, Namespace: r.desiredConfiguration.Namespace}, &current); err != nil && !apierrors.IsNotFound(err) {
+		syncResult = SyncStateError
+		syncError = fmt.Errorf("failed to get frr configuration: %w", err)
 		return ctrl.Result{}, err
 	}
 
 	if reflect.DeepEqual(current.Spec, r.desiredConfiguration.Spec) {
 		level.Debug(r.Logger).Log("controller", "FRRK8sReconciler", "event", "not reconciling because of no change")
+		syncResult = SyncStateSuccess
 		return ctrl.Result{}, nil
 	}
 
@@ -103,12 +126,13 @@ func (r *FRRK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			Name:      r.desiredConfiguration.Name,
 			Namespace: r.desiredConfiguration.Namespace},
 	}
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, toApply, func() error {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, toApply, func() error {
 		r.desiredConfiguration.Spec.DeepCopyInto(&toApply.Spec)
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		level.Info(r.Logger).Log("controller", "FRRConfiguration", "event", "failed to create frr8s configuration")
+		syncResult = SyncStateError
+		syncError = fmt.Errorf("failed to create or update frr configuration: %w", err)
 		return ctrl.Result{}, err
 	}
 
@@ -120,6 +144,7 @@ func (r *FRRK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		level.Debug(r.Logger).Log("controller", "FRRK8sReconciler", "event", "applied new configuration", "config", toDump)
 	}
 
+	syncResult = SyncStateSuccess
 	return ctrl.Result{}, nil
 }
 
@@ -159,6 +184,36 @@ func (r *FRRK8sReconciler) UpdateConfig(config interface{}) {
 	}
 	r.desiredConfiguration = desired.DeepCopy()
 	r.configChangedChan <- struct{}{}
+}
+
+// reportCondition implements ConditionReporter interface.
+func (r *FRRK8sReconciler) reportCondition(ctx context.Context, configErr error, syncResult SyncState) error {
+	owner := "frrk8sReconciler"
+	if r.NodeName != "" {
+		owner = fmt.Sprintf("speaker-%s/frrk8sReconciler", r.NodeName)
+	}
+
+	condition := metav1.Condition{
+		Type:               owner + "Valid",
+		Status:             metav1.ConditionTrue,
+		Reason:             syncResult.String(),
+		LastTransitionTime: metav1.Now(),
+	}
+
+	if configErr != nil {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "ConfigError"
+		condition.Message = configErr.Error()
+	}
+
+	if syncResult != SyncStateSuccess && syncResult != SyncStateReprocessAll {
+		condition.Status = metav1.ConditionFalse
+	}
+
+	if err := patchCondition(ctx, r.Client, r.ConfigStatusRef, owner, condition); err != nil {
+		return fmt.Errorf("failed to patch condition for %s: %w", owner, err)
+	}
+	return nil
 }
 
 func debouncer(
