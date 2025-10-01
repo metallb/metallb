@@ -60,6 +60,7 @@ func InitReporter(kubeconfig, path string, namespaces ...string) *k8sreporter.Ku
 		{Cr: &metallbv1beta1.BGPAdvertisementList{}},
 		{Cr: &metallbv1beta1.BFDProfileList{}},
 		{Cr: &metallbv1beta1.CommunityList{}},
+		{Cr: &metallbv1beta1.ConfigurationStatusList{}},
 		{Cr: &corev1.ServiceList{}},
 		{Cr: &frrk8sv1beta1.FRRConfigurationList{}},
 		{Cr: &frrk8sv1beta1.FRRNodeStateList{}},

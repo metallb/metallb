@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"go.universe.tf/e2etest/bgptests"
+	"go.universe.tf/e2etest/configurationstatustests"
 	"go.universe.tf/e2etest/l2tests"
 	_ "go.universe.tf/e2etest/netpoltests"
 	testsconfig "go.universe.tf/e2etest/pkg/config"
@@ -188,11 +189,13 @@ var _ = ginkgo.BeforeSuite(func() {
 	reporter := k8s.InitReporter(kubeconfig, reportPath, metallb.Namespace, frrK8sNamespace)
 
 	bgptests.ConfigUpdater = updater
+	configurationstatustests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
 	webhookstests.ConfigUpdater = updater
 	webhookstests.ConfigUpdaterOtherNS = updaterOtherNS
 	bgptests.Reporter = reporter
 	bgptests.ReportPath = reportPath
+	configurationstatustests.Reporter = reporter
 	l2tests.Reporter = reporter
 	webhookstests.Reporter = reporter
 	bgptests.PrometheusNamespace = prometheusNamespace

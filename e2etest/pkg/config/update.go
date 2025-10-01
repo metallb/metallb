@@ -30,6 +30,7 @@ type Resources struct {
 
 type Updater interface {
 	Update(r Resources) error
+	Remove(r Resources) error
 	Clean() error
 	Client() client.Client
 	Namespace() string
@@ -159,6 +160,59 @@ func (o beta1Updater) Update(r Resources) error {
 	return nil
 }
 
+func (o beta1Updater) Remove(r Resources) error {
+	for _, pool := range r.Pools {
+		pool.SetNamespace(o.namespace)
+		if err := o.cli.Delete(context.Background(), &pool); err != nil {
+			return err
+		}
+	}
+
+	for _, secret := range r.PasswordSecrets {
+		secret.SetNamespace(o.namespace)
+		if err := o.cli.Delete(context.Background(), &secret); err != nil {
+			return err
+		}
+	}
+
+	for _, peer := range r.Peers {
+		peer.SetNamespace(o.namespace)
+		if err := o.cli.Delete(context.Background(), &peer); err != nil {
+			return err
+		}
+	}
+
+	for _, bfdProfile := range r.BFDProfiles {
+		bfdProfile.SetNamespace(o.namespace)
+		if err := o.cli.Delete(context.Background(), &bfdProfile); err != nil {
+			return err
+		}
+	}
+
+	for _, bgpAdv := range r.BGPAdvs {
+		bgpAdv.SetNamespace(o.namespace)
+		if err := o.cli.Delete(context.Background(), &bgpAdv); err != nil {
+			return err
+		}
+	}
+
+	for _, l2Adv := range r.L2Advs {
+		l2Adv.SetNamespace(o.namespace)
+		if err := o.cli.Delete(context.Background(), &l2Adv); err != nil {
+			return err
+		}
+	}
+
+	for _, community := range r.Communities {
+		community.SetNamespace(o.namespace)
+		if err := o.cli.Delete(context.Background(), &community); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (o beta1Updater) Clean() error {
 	err := o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.IPAddressPool{}, client.InNamespace(o.namespace))
 	if err != nil {
@@ -181,6 +235,10 @@ func (o beta1Updater) Clean() error {
 		return err
 	}
 	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.Community{}, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.ConfigurationState{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
