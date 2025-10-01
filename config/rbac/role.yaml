@@ -73,6 +73,7 @@ rules:
       - ipaddresspools.metallb.io
       - l2advertisements.metallb.io
       - communities.metallb.io
+      - configurationstatuses.metallb.io
     verbs:
       - create
       - delete
@@ -136,6 +137,14 @@ rules:
       - podsecuritypolicies
     verbs:
       - use
+  - apiGroups:
+      - metallb.io
+    resources:
+      - configurationstatuses
+      - configurationstatuses/status
+    verbs:
+      - get
+      - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -222,6 +231,14 @@ rules:
       - "servicebgpstatuses/status"
     verbs:
       - "*"
+  - apiGroups:
+      - metallb.io
+    resources:
+      - configurationstatuses
+      - configurationstatuses/status
+    verbs:
+      - get
+      - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -311,6 +328,25 @@ rules:
       - get
       - list
       - watch
+  - apiGroups:
+      - metallb.io
+    resources:
+      - configurationstatuses
+    verbs:
+      - create
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - metallb.io
+    resources:
+      - configurationstatuses/status
+    verbs:
+      - get
+      - patch
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -17,6 +17,7 @@ description: MetalLB API reference documentation
 - [BFDProfile](#bfdprofile)
 - [BGPAdvertisement](#bgpadvertisement)
 - [Community](#community)
+- [ConfigurationState](#configurationstate)
 - [IPAddressPool](#ipaddresspool)
 - [L2Advertisement](#l2advertisement)
 - [ServiceBGPStatus](#servicebgpstatus)
@@ -156,6 +157,57 @@ _Appears in:_
 | `communities` _[CommunityAlias](#communityalias) array_ |  |
 
 
+
+
+#### ConfigurationState
+
+
+
+ConfigurationState exposes the validation status of MetalLB components.
+One instance is created by the controller, and one instance per speaker pod.
+
+
+
+| Field | Description |
+| --- | --- |
+| `apiVersion` _string_ | `metallb.io/v1beta1`
+| `kind` _string_ | `ConfigurationState`
+| `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
+| `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `spec` _[ConfigurationStateSpec](#configurationstatespec)_ |  |
+| `status` _[ConfigurationStateStatus](#configurationstatestatus)_ |  |
+
+
+#### ConfigurationStateSpec
+
+
+
+ConfigurationStateSpec defines the desired state of ConfigurationState.
+
+_Appears in:_
+- [ConfigurationState](#configurationstate)
+
+| Field | Description |
+| --- | --- |
+| `type` _string_ | Type identifies whether this is a controller or speaker instance. |
+| `nodeName` _string_ | NodeName is set when Type is "Speaker" to identify which node this speaker is running on. |
+
+
+#### ConfigurationStateStatus
+
+
+
+ConfigurationStateStatus defines the observed state of ConfigurationState.
+
+_Appears in:_
+- [ConfigurationState](#configurationstate)
+
+| Field | Description |
+| --- | --- |
+| `validConfig` _boolean_ | ValidConfig indicates whether the configuration is valid.<br />True when all reconcilers report success, False otherwise. |
+| `lastError` _string_ | LastError contains the error message from the last reconciliation failure.<br />Empty when ValidConfig is true. |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#condition-v1-meta) array_ | Conditions contains the status conditions from the reconcilers running in this component.<br />Each condition reports a reconciler's state:<br />  - Status: True (valid) or False (invalid)<br />  - Reason: The SyncState of the reconciler<br />  - Message: Error message during reconcile, if any (empty if no error)<br /><br />Controller example (valid condition):<br />  - type: poolReconcilerValid<br />    status: "True"<br />    reason: SyncStateSuccess<br />    message: ""<br /><br />Controller example (invalid condition):<br />  - type: poolReconcilerValid<br />    status: "False"<br />    reason: ConfigError<br />    message: 'failed to parse configuration: CIDR overlaps'<br /><br />Speaker example (valid condition):<br />  - type: configReconcilerValid<br />    status: "True"<br />    reason: SyncStateSuccess<br />    message: "" |
 
 
 #### IPAddressPool
