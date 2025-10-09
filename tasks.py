@@ -7,6 +7,7 @@ import tempfile
 import time
 from functools import cache
 from typing import Optional
+from pathlib import Path
 
 import semver
 import yaml
@@ -36,6 +37,102 @@ yq_path = os.path.join(build_path, "bin", "yq")
 kubectl_version = "v1.31.0"
 kind_version = "v0.24.0"
 yq_version = "v4.45.1"
+
+
+def load_test_filters():
+    """Load test filter configuration from YAML file."""
+    # Find the config file relative to this module
+    script_dir = Path(__file__).parent
+    config_path = script_dir / "e2etest" / "test-filters.yaml"
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+
+    with open(config_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def validate_test_filter_parameters(
+    filters, bgp_type, ip_family, protocol=None, with_prometheus=None
+):
+    """
+    Validate test filter parameters against supported configurations.
+
+    Args:
+        filters: Configuration dictionary loaded from test-filters.yaml
+        bgp_type: BGP type to validate
+        ip_family: IP family to validate
+        protocol: Protocol type to validate (optional)
+        with_prometheus: Prometheus flag to validate (optional)
+
+    Raises:
+        ValueError: If any parameter is invalid
+    """
+    if bgp_type not in filters["bgp_type"]:
+        supported_bgp_types = list(filters["bgp_type"].keys())
+        raise ValueError(
+            f"Unsupported bgp_type '{bgp_type}'. Supported types: {supported_bgp_types}"
+        )
+
+    if ip_family not in filters["ip_family"]:
+        supported_ip_families = list(filters["ip_family"].keys())
+        raise ValueError(
+            f"Unsupported ip_family '{ip_family}'. Supported families: {supported_ip_families}"
+        )
+
+    if protocol is not None and protocol not in filters["protocol"]:
+        supported_protocols = list(filters["protocol"].keys())
+        raise ValueError(
+            f"Unsupported protocol '{protocol}'. Supported protocols: {supported_protocols}"
+        )
+
+    if with_prometheus is False and "prometheus" not in filters:
+        raise ValueError("Prometheus configuration not found in filters")
+
+
+def generate_skip_patterns(bgp_type, ip_family, protocol=None, with_prometheus=None):
+    """
+    Generate skip patterns based on environment configuration.
+
+    Args:
+        bgp_type: BGP type (native, frr, frr-k8s, frr-k8s-external)
+        ip_family: IP family (ipv4, ipv6, dual)
+        protocol: Protocol type (bgp, layer2) - optional
+        with_prometheus: Whether Prometheus is present (bool) - optional
+
+    Returns:
+        String of skip patterns separated by '|', or empty string if no patterns
+    """
+    config = load_test_filters()
+    filters = config
+    skip_patterns = []
+
+    # Validate parameters
+    validate_test_filter_parameters(
+        filters, bgp_type, ip_family, protocol, with_prometheus
+    )
+
+    # Add BGP type skip patterns
+    skip_patterns.extend(filters["bgp_type"][bgp_type]["skip"])
+
+    # Add IP family skip patterns
+    skip_patterns.extend(filters["ip_family"][ip_family]["skip"])
+
+    # Add protocol skip patterns (if provided)
+    if protocol is not None:
+        skip_patterns.extend(filters["protocol"][protocol]["skip"])
+
+    # Add Prometheus skip patterns (if Prometheus is not available)
+    if with_prometheus is False:
+        skip_patterns.extend(filters["prometheus"]["skip"])
+
+    # Handle special cases
+    if bgp_type == "native" and ip_family == "ipv6":
+        skip_patterns.append("BGP")  # Native BGP doesn't support IPv6
+
+    # Remove duplicates and return as pipe-separated string
+    unique_patterns = list(set(skip_patterns))
+    return "|".join(unique_patterns) if unique_patterns else ""
 
 
 def _check_architectures(architectures):
@@ -1201,11 +1298,13 @@ def helmdocs(ctx, env="container"):
         "local_nics": "a list of bridges related node's interfaces separated by comma, default is kind",
         "external_containers": "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)",
         "with_vrf": "tells if we want to run the tests against containers reacheable via linux VRFs",
-        "bgp_mode": "tells what bgp mode the cluster is using. valid values are native, frr, frr-k8s.",
+        "bgp_mode": "Required bgp mode the cluster is using. valid values are native, frr, frr-k8s.",
         "external_frr_image": "overrides the image used for the external frr containers used in tests",
         "ginkgo_params": "additional ginkgo params to run the e2e tests with",
         "junit_report": "export JUnit reports xml to file, default junit-report.xml",
         "host_bgp_mode": "tells whether to run the host container in ebgp or ibgp mode",
+        "auto_detect_env": "Detect environment configuration, display recommended test command, and exit without running tests. Default: False",
+        "protocol": "Override protocol detection (bgp, layer2) when using --auto-detect-env. Use when cluster is unconfigured.",
     }
 )
 def e2etest(
@@ -1231,6 +1330,8 @@ def e2etest(
     junit_report="junit-report.xml",
     host_bgp_mode="ibgp",
     frr_k8s_namespace="metallb-system",
+    auto_detect_env=False,
+    protocol=None,
 ):
     """Run E2E tests against development cluster."""
     fetch_kubectl()
@@ -1249,6 +1350,46 @@ def e2etest(
     ginkgo_focus = ""
     if focus:
         ginkgo_focus = '--focus="' + focus + '"'
+
+    if auto_detect_env:
+        env_config = detect_dev_env_config(name, protocol)
+        skip_patterns = generate_skip_patterns(
+            env_config["bgp_type"],
+            env_config["ip_family"],
+            env_config["protocol"],
+            env_config["with_prometheus"],
+        )
+
+        print(
+            f"\n📊 Auto-detected environment: BGP Type: {env_config['bgp_type']}, "
+            f"IP Family: {env_config['ip_family']}, "
+            f"Protocol: {env_config['protocol']}, "
+            f"Prometheus: {env_config['with_prometheus']}"
+        )
+
+        if skip_patterns:
+            print(f"⏭️  Auto-skip patterns: {skip_patterns}")
+        else:
+            print("✅ No tests will be skipped")
+
+        # Show the recommended test execution command
+        recommended_cmd = "inv e2etest"
+        if skip_patterns:
+            recommended_cmd += f' --skip "{skip_patterns}"'
+        recommended_cmd += f" --bgp-mode {env_config['bgp_type']}"
+
+        print(
+            f"\nThe recommended test execution command is:\n"
+            f"$ {recommended_cmd}\n\n"
+            f"Exiting without running tests."
+        )
+
+        return
+
+    if bgp_mode == "":
+        raise Exit(
+            message="Error: --bgp_mode parameter is required. Valid values are: native, frr, frr-k8s"
+        )
 
     if kubeconfig is None:
         validate_kind_version()
@@ -1319,6 +1460,7 @@ def e2etest(
 
     if external_frr_image != "":
         external_frr_image = "--frr-image=" + (external_frr_image)
+
     testrun = run(
         "cd `git rev-parse --show-toplevel`/e2etest &&"
         "KUBECONFIG={} {} {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={} -with-vrf={} {} --host-bgp-mode={} --kubectl={} --frr-k8s-namespace={}".format(
@@ -1643,3 +1785,182 @@ def get_command_version(get_version_command: str, version_prefix: str) -> Option
 def is_ipv4(addr):
     ip = ipaddress.ip_network(addr)
     return ip.version == 4
+
+
+def is_ipv6(addr):
+    ip = ipaddress.ip_network(addr)
+    return ip.version == 6
+
+
+def detect_bgp_type(namespace="metallb-system"):
+    """Detect BGP type from controller deployment."""
+    bgp_type_result = run(
+        f"{kubectl_path} get deployment controller -n {namespace} "
+        f"-o jsonpath='{{.spec.template.spec.containers[0].env[?(@.name==\"METALLB_BGP_TYPE\")].value}}'",
+        hide=True,
+        warn=True,
+    )
+
+    if bgp_type_result.ok:
+        value = bgp_type_result.stdout.strip()
+        # 'native' if not set (follows the Go code behaviour)
+        return value if value else "native"
+    else:
+        raise Exception(
+            f"Cannot detect BGP type from controller deployment in {namespace} namespace: command failed"
+        )
+
+
+def detect_prometheus():
+    """Detect if Prometheus is available by checking monitoring namespace."""
+    prom_result = run(f"{kubectl_path} get namespace monitoring", hide=True, warn=True)
+    return prom_result.ok
+
+
+def detect_ip_family(namespace="metallb-system"):
+    """Detect IP family from node podCIDRs (dual, ipv4, ipv6)."""
+
+    # Get list of nodes
+    nodes_result = run(
+        f"{kubectl_path} get nodes -o jsonpath='{{.items[*].metadata.name}}'",
+        hide=True,
+        warn=True,
+    )
+
+    if not nodes_result.ok:
+        raise Exception("Cannot get nodes: kubectl command failed")
+
+    nodes = nodes_result.stdout.strip().split()
+    if not nodes:
+        raise Exception("No nodes found in cluster")
+
+    # Use the first node to detect IP family
+    node = nodes[0]
+
+    # Get podCIDRs from the node
+    cidr_result = run(
+        f"{kubectl_path} get nodes {node} -o go-template "
+        f"--template='{{{{range .spec.podCIDRs}}}}{{{{printf \"%s\\n\" .}}}}{{{{end}}}}'",
+        hide=True,
+        warn=True,
+    )
+
+    if not cidr_result.ok:
+        raise Exception(f"Cannot get podCIDRs from node {node}: kubectl command failed")
+
+    cidrs = cidr_result.stdout.strip().split()
+    if not cidrs:
+        raise Exception(f"No podCIDRs found on node {node}")
+
+    has_ipv4 = False
+    has_ipv6 = False
+
+    for cidr in cidrs:
+        try:
+            # Parse CIDR to determine IP version
+            network = ipaddress.ip_network(cidr, strict=False)
+            if network.version == 4:
+                has_ipv4 = True
+            elif network.version == 6:
+                has_ipv6 = True
+
+        except ValueError as e:
+            raise Exception(f"Invalid CIDR '{cidr}' found on node {node}: {e}")
+
+    if has_ipv4 and has_ipv6:
+        return "dual"
+    elif has_ipv6:
+        return "ipv6"
+    elif has_ipv4:
+        return "ipv4"
+    else:
+        raise Exception(
+            f"Cannot detect IP family from node {node}: no valid CIDRs found"
+        )
+
+
+def detect_protocol(namespace="metallb-system", protocol_override=None):
+    """Detect protocol (BGP vs Layer2) from resource presence or use override.
+
+    Args:
+        namespace: Kubernetes namespace to check for resources
+        protocol_override: Optional protocol override (bgp, layer2) for unconfigured clusters
+    """
+    # Handle protocol override first
+    if protocol_override:
+        if protocol_override not in ["bgp", "layer2"]:
+            raise ValueError(
+                f"Invalid protocol override '{protocol_override}'. Supported: bgp, layer2"
+            )
+        return protocol_override
+
+    # Attempt automatic detection
+    bgppeer_result = run(
+        f"{kubectl_path} get bgppeer -n {namespace} "
+        f"-o jsonpath='{{.items[*].metadata.name}}'",
+        hide=True,
+        warn=True,
+    )
+    l2adv_result = run(
+        f"{kubectl_path} get l2advertisement -n {namespace} "
+        f"-o jsonpath='{{.items[*].metadata.name}}'",
+        hide=True,
+        warn=True,
+    )
+
+    if bgppeer_result.ok and bgppeer_result.stdout.strip():
+        return "bgp"
+    elif l2adv_result.ok and l2adv_result.stdout.strip():
+        return "layer2"
+    else:
+        raise Exception(
+            f"Cannot detect protocol,use: inv e2etest --auto-detect-env --protocol=<bgp|layer2>"
+        )
+
+
+def detect_dev_env_config(cluster_name="kind", protocol_override=None):
+    """Detect the configuration of the current dev environment.
+
+    Args:
+        cluster_name: Name of the cluster to detect config for
+        protocol_override: Optional protocol override (bgp, layer2) for unconfigured clusters
+    """
+
+    try:
+        config = {
+            "bgp_type": detect_bgp_type(),
+            "ip_family": detect_ip_family(),
+            "with_prometheus": detect_prometheus(),
+            "protocol": detect_protocol(protocol_override=protocol_override),
+        }
+
+    except Exception as e:
+        raise Exit(message=f"Error: Could not auto-detect environment config: {e}")
+
+    return config
+
+
+@task(
+    help={
+        "bgp_type": "BGP type (native, frr, frr-k8s, frr-k8s-external)",
+        "ip_family": "IP family (ipv4, ipv6, dual)",
+        "protocol": "Optional protocol type (bgp, layer2)",
+        "with_prometheus": "Optional Prometheus (bool)",
+    }
+)
+def generate_ci_skip_patterns(
+    ctx, bgp_type, ip_family, protocol=None, with_prometheus=None
+):
+    """Generate skip patterns for CI use."""
+    # Convert string 'true'/'false' to boolean for CLI compatibility
+    if with_prometheus is not None:
+        with_prometheus = with_prometheus.lower() == "true"
+
+    try:
+        skip_string = generate_skip_patterns(
+            bgp_type, ip_family, protocol, with_prometheus
+        )
+        print(skip_string)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)

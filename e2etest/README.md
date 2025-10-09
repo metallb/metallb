@@ -42,6 +42,56 @@ The test suite will run the appropriate tests against the cluster.
 Be sure to cleanup any previously created development clusters using `inv dev-env-cleanup`.
 
 
+# E2E Tests auto detection
+
+The recommended E2E tests execution is a **two-step process**:
+
+## Step 1: Auto-Detect Environment and Get Recommendations
+
+First, use auto-detection to see what configuration is detected and get the recommended test command:
+
+```bash
+# Auto-detect environment and show recommended command (does NOT run tests)
+inv e2etest --auto-detect-env
+```
+
+This will:
+- Detect your environment configuration (BGP type, IP family, protocol, etc.)
+- Generate appropriate skip patterns from `test-filters.yaml`
+- Display the recommended test execution command
+- **Exit without running any tests**
+
+Example output:
+```
+📊 Auto-detected environment: BGP Type: frr, IP Family: ipv4, Protocol: bgp, Prometheus: True
+⏭️  Auto-skip patterns: IPV6|DUALSTACK|L2
+
+The recommended test execution command is:
+$ inv e2etest --skip "IPV6|DUALSTACK|L2" --bgp-mode frr
+
+Exiting without running tests.
+```
+
+## Step 2: Run Tests with Recommended Parameters
+
+Copy and run the recommended command from Step 1:
+
+```bash
+# Run the recommended command (this actually runs the tests)
+inv e2etest --skip "IPV6|DUALSTACK|L2" --bgp-mode frr
+```
+
+# E2E Tests auto detection in CI
+
+This auto detection mechanism has been integrated in CI to generate appropriate skip patterns:
+
+```yaml
+- name: Run E2E Tests
+  run: |
+    SKIP_PATTERNS=$(inv generate-ci-skip-patterns "${{ matrix.bgp-type }}" "${{ matrix.ip-family }}")
+    sudo -E env "PATH=$PATH" inv e2etest --skip "$SKIP_PATTERNS" --bgp-mode ${{ matrix.bgp-type }}
+```
+
 ## BGP tests network topology
 
 In order to test the multiple scenarios required for BGP, three different containers are required.

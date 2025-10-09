@@ -229,18 +229,19 @@ jobs:
           HELM_FLAGS=""
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
+
+          # Generate skip patterns using invoke task
+          SKIP_PATTERNS=$(inv generate-ci-skip-patterns "${{ matrix.bgp-type }}" "${{ matrix.ip-family }}")
           SKIP="none"
+          if [ -n "$SKIP_PATTERNS" ]; then
+            SKIP="$SKIP|$SKIP_PATTERNS"
+          fi
+
           WITH_VRF="--with-vrf"
           FOCUS=""
           FRRK8S_NAMESPACE=""
-          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|FRR-MODE|FRRK8S-MODE|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
-          if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
-          if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
-          if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP|IPV4|DUALSTACK"; fi
-          if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP|BGP"; fi
-          if [ "${{ matrix.bgp-type }}" == "frr" ]; then SKIP="$SKIP|FRRK8S-MODE"; fi
-          if [ "${{ matrix.bgp-type }}" == "frr-k8s" ]; then SKIP="$SKIP|FRR-MODE"; fi
-          if [ "${{ matrix.bgp-type }}" == "frr-k8s-external" ]; then SKIP="$SKIP|FRR-MODE|metrics"; FRRK8NAMESPACE="--frr-k8s-namespace=frr-k8s-system"; fi
+          if [ "${{ matrix.bgp-type }}" == "native" ]; then WITH_VRF=""; fi
+          if [ "${{ matrix.bgp-type }}" == "frr-k8s-external" ]; then FRRK8NAMESPACE="--frr-k8s-namespace=frr-k8s-system"; fi
 
           echo "Skipping $SKIP"
           echo "With VRF $WITH_VRF"
