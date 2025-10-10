@@ -54,6 +54,8 @@ peer is established or not, for each node.
 As a cluster administrator, I want to know if the configuration applied
 is valid or not, and why it failed.
 
+//TODO: can define what is exactly configuration, is the MetalLB CRs?
+
 ## Design Details
 
 ### Making the solution scalable
@@ -107,6 +109,26 @@ status:
 
 Given that the configuration is composed by multiple CRs, there are few cases
 where a given configuration is invalid because of a single CR (i.e. invalid IP formatting).
+
+//TODO
+Can we expand the few cases? the invalid IP formatting is not a case because
+webhook will block from being stored in the API
+Speaker FRRConfig can fail due to merge on the frr-k8s, this is valid use case.
+AFAIU "Case" is when there error in the logs but user api apply commands passed.
+
+```
+ k api-resources --api-group=metallb.io -o name
+bfdprofiles.metallb.io
+bgpadvertisements.metallb.io
+bgppeers.metallb.io
+communities.metallb.io
+ipaddresspools.metallb.io
+l2advertisements.metallb.io
+```
+
+Can we define the e2e usecase:
+When I apply `resouces{X,Y,Z}`, `apply succeeds`, ConfigStatus
+I can only have the frrk8sconfig apply to return error.
 
 The majority of the scenarios involve multiple CRs which are not compatible together.
 For this reason, we think a global `ConfigurationStatus` indicator is better and
