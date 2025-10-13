@@ -208,8 +208,9 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 // implying that the set of running BGP sessions may need tweaking.
 func (c *bgpController) syncPeers(l log.Logger) error {
 	var (
-		errs          int
-		needUpdateAds bool
+		errs           int
+		needUpdateAds  bool
+		duplicatePeers = make(map[string]bool) // address/interface -> true if already seen
 	)
 	for _, p := range c.peers {
 		// First, determine if the peering should be active for this
@@ -233,9 +234,21 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.id, "msg", "failed to shut down BGP session")
 			}
 			p.session = nil
+
+			// Remove from the list of deduplicate peers.
+			delete(duplicatePeers, p.id)
 		} else if p.session == nil && shouldRun {
 			// Session doesn't exist, but should be running. Create
 			// it.
+
+			// Check for duplicate peers based on address or interface.
+			if _, ok := duplicatePeers[p.id]; ok {
+				level.Error(l).Log("op", "syncPeers", "peer", p.id, "msg", "duplicate peer found in config, please ensure each peer has a unique address or interface per node via nodeSelectors")
+				errs++
+				continue
+			}
+			duplicatePeers[p.id] = true
+
 			level.Info(l).Log("event", "peerAdded", "peer", p.id, "msg", "peer configured, starting BGP session")
 			var routerID net.IP
 			if p.cfg.RouterID != nil {
@@ -278,6 +291,10 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 				p.session = s
 				needUpdateAds = true
 			}
+		} else {
+			// Session is running and should be, nothing to do.
+			// Add it to the list of deduplicate peers.
+			duplicatePeers[p.id] = true
 		}
 	}
 	if needUpdateAds {
