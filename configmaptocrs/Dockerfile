@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.2
 
-FROM --platform=$BUILDPLATFORM docker.io/golang:1.24.4 AS builder
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.25.3 AS builder
 WORKDIR $GOPATH/go.universe.tf/metallb
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
