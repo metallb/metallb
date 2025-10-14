@@ -1643,3 +1643,103 @@ def get_command_version(get_version_command: str, version_prefix: str) -> Option
 def is_ipv4(addr):
     ip = ipaddress.ip_network(addr)
     return ip.version == 4
+
+
+@task(
+    help={
+        "version": "version of frr-k8s to bump to (e.g., 0.0.21).",
+    }
+)
+def bumpfrrk8s(ctx, version):
+    """Bump the frr-k8s version across the codebase."""
+    # Validate version format
+    try:
+        semver.parse_version_info(version)
+    except ValueError:
+        raise Exit(message="Invalid version format: {}".format(version))
+
+    # Get current version from Chart.yaml
+    current_version = None
+    with open("charts/metallb/Chart.yaml", "r") as f:
+        in_frr_k8s_block = False
+        for line in f:
+            if "- name: frr-k8s" in line:
+                in_frr_k8s_block = True
+            elif in_frr_k8s_block and "version:" in line:
+                match = re.search(r"version:\s+(\d+\.\d+\.\d+)", line)
+                if match:
+                    current_version = match.group(1)
+                    break
+
+    if not current_version:
+        raise Exit(message="Could not determine current frr-k8s version")
+
+    print("Bumping frr-k8s from v{} to v{}".format(current_version, version))
+
+    # Update tasks.py - the URL in dev_env function
+    run(
+        r"sed -i 's#metallb/frr-k8s/v{}/config/all-in-one/frr-k8s.yaml#metallb/frr-k8s/v{}/config/all-in-one/frr-k8s.yaml#g' tasks.py".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Update go.mod files
+    run(
+        r"sed -i 's/github.com\/metallb\/frr-k8s v{}/github.com\/metallb\/frr-k8s v{}/g' go.mod".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+    run(
+        r"sed -i 's/github.com\/metallb\/frr-k8s v{}/github.com\/metallb\/frr-k8s v{}/g' e2etest/go.mod".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Update kustomization.yaml files
+    run(
+        r"sed -i 's#frr-k8s/config/default/?timeout=120&ref=v{}#frr-k8s/config/default/?timeout=120\&ref=v{}#g' config/frr-k8s/kustomization.yaml".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+    run(
+        r"sed -i 's#frr-k8s/config/prometheus/?timeout=120&ref=v{}#frr-k8s/config/prometheus/?timeout=120\&ref=v{}#g' config/prometheus-frr-k8s/kustomization.yaml".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Update helm Chart.yaml
+    run(
+        r"sed -i '/- name: frr-k8s$/,/^$/{{ /^  version:/s/{}/{}/; }}' charts/metallb/Chart.yaml".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Update helm README.md
+    run(
+        r"sed -i 's/| https:\/\/metallb.github.io\/frr-k8s | frr-k8s | {} |/| https:\/\/metallb.github.io\/frr-k8s | frr-k8s | {} |/g' charts/metallb/README.md".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Run go mod tidy to update go.sum files
+    print("Running go mod tidy...")
+    run("go mod tidy", echo=True)
+    run("cd e2etest && go mod tidy", echo=True)
+
+    # Update helm dependencies
+    print("Updating helm dependencies...")
+    run("helm dependency update charts/metallb", echo=True)
+
+    # Regenerate manifests
+    print("Regenerating manifests...")
+    generatemanifests(ctx)
+
+    print("")
+    print("Successfully bumped frr-k8s to v{}".format(version))
