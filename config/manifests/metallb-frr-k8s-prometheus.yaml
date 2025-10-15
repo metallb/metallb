@@ -3015,6 +3015,7 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: true
       nodeSelector:
         kubernetes.io/os: linux
       securityContext:
@@ -3549,6 +3550,7 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: true
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
