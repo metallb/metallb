@@ -2,7 +2,6 @@
 apiVersion: metallb.io/v1beta1
 kind: BFDProfile
 metadata:
-  creationTimestamp: null
   name: bfdprofile1
   namespace: metallb-system
 spec:
@@ -18,7 +17,6 @@ status: {}
 apiVersion: metallb.io/v1beta1
 kind: BFDProfile
 metadata:
-  creationTimestamp: null
   name: bfdprofile2
   namespace: metallb-system
 spec:
