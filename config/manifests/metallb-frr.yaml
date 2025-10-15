@@ -2037,12 +2037,14 @@ spec:
           periodSeconds: 5
         name: frr
         securityContext:
+          allowPrivilegeEscalation: false
           capabilities:
             add:
             - NET_ADMIN
             - NET_RAW
             - SYS_ADMIN
             - NET_BIND_SERVICE
+          readOnlyRootFilesystem: true
         startupProbe:
           failureThreshold: 30
           httpGet:
@@ -2058,6 +2060,9 @@ spec:
         - /etc/frr_reloader/frr-reloader.sh
         image: quay.io/frrouting/frr:10.4.1
         name: reloader
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
         volumeMounts:
         - mountPath: /var/run/frr
           name: frr-sockets
@@ -2065,6 +2070,8 @@ spec:
           name: frr-conf
         - mountPath: /etc/frr_reloader
           name: reloader
+        - mountPath: /var/log/frr
+          name: frr-log
       - args:
         - --metrics-port=7473
         command:
@@ -2077,6 +2084,9 @@ spec:
         ports:
         - containerPort: 7473
           name: frrmetrics
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
         volumeMounts:
         - mountPath: /var/run/frr
           name: frr-sockets
@@ -2217,6 +2227,12 @@ spec:
         name: reloader
       - emptyDir: {}
         name: metrics
+      - emptyDir: {}
+        name: frr-tmp
+      - emptyDir: {}
+        name: frr-lib
+      - emptyDir: {}
+        name: frr-log
       - name: memberlist
         secret:
           defaultMode: 420

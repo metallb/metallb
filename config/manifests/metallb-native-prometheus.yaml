@@ -1950,6 +1950,7 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: true
       - args:
         - --port=7472
         - --log-level=info
@@ -2060,6 +2061,7 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: true
       - args:
         - --port=7472
         - --log-level=info
