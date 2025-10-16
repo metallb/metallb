@@ -1482,7 +1482,7 @@ def _align_helm_crds(source, output):
 @task
 def generateapidocs(ctx):
     """Generates the docs for the CRDs"""
-    run("go install github.com/elastic/crd-ref-docs@v0.0.12")
+    run("go install github.com/elastic/crd-ref-docs@v0.2.0")
     run(
         "crd-ref-docs --source-path=./api --config=website/generatecrddoc/crdgen.yaml --templates-dir=website/generatecrddoc/template --renderer markdown --output-path=/tmp/generated_apidoc.md"
     )
