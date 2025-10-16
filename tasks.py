@@ -880,8 +880,11 @@ def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     run('rm -f "%s"/config.yaml' % dev_env_dir)
 
     # cleanup extra bridge
-    run("docker network rm {bridge_name}".format(bridge_name=extra_network), warn=True)
-    run("docker network rm vrf-net", warn=True)
+    run(
+        "docker network rm -f {bridge_name}".format(bridge_name=extra_network),
+        warn=True,
+    )
+    run("docker network rm -f vrf-net", warn=True)
 
 
 @task(
