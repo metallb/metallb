@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -29,8 +30,6 @@ import (
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	"errors"
-
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	frrv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
@@ -39,6 +38,7 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -63,6 +63,7 @@ var (
 	setupLog                    = ctrl.Log.WithName("setup")
 	validatingWebhookName       = "metallb-webhook-configuration"
 	bgppeerConvertingWebhookCRD = "bgppeers.metallb.io"
+	ConfigurationStatusName     = "config-status"
 )
 
 func init() {
@@ -98,27 +99,29 @@ type Client struct {
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
 type Config struct {
-	ProcessName         string
-	NodeName            string
-	PodName             string
-	MetricsHost         string
-	MetricsPort         int
-	EnablePprof         bool
-	ReadEndpoints       bool
-	Logger              log.Logger
-	Namespace           string
-	ValidateConfig      config.Validate
-	EnableWebhook       bool
-	WebHookMinVersion   uint16
-	WebHookCipherSuites []uint16
-	DisableCertRotation bool
-	WebhookSecretName   string
-	CertDir             string
-	CertServiceName     string
-	LoadBalancerClass   string
-	WebhookWithHTTP2    bool
-	WithFRRK8s          bool
-	FRRK8sNamespace     string
+	ProcessName               string
+	NodeName                  string
+	PodName                   string
+	MetricsHost               string
+	MetricsPort               int
+	EnablePprof               bool
+	ReadEndpoints             bool
+	Logger                    log.Logger
+	Namespace                 string
+	ConfigStatusRef           types.NamespacedName
+	ValidateConfig            config.Validate
+	EnableWebhook             bool
+	WebHookMinVersion         uint16
+	WebHookCipherSuites       []uint16
+	DisableCertRotation       bool
+	WebhookSecretName         string
+	CertDir                   string
+	CertServiceName           string
+	LoadBalancerClass         string
+	WebhookWithHTTP2          bool
+	WithFRRK8s                bool
+	EnableConfigurationStatus bool
+	FRRK8sNamespace           string
 	Listener
 	Layer2StatusChan    <-chan event.GenericEvent
 	Layer2StatusFetcher controllers.L2StatusFetcher
@@ -138,16 +141,17 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	objectsPerNamespace := map[client.Object]cache.ByObject{
-		&metallbv1beta1.BFDProfile{}:       namespaceSelector,
-		&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
-		&metallbv1beta1.BGPPeer{}:          namespaceSelector,
-		&metallbv1beta1.IPAddressPool{}:    namespaceSelector,
-		&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
-		&metallbv1beta2.BGPPeer{}:          namespaceSelector,
-		&metallbv1beta1.Community{}:        namespaceSelector,
-		&metallbv1beta1.ServiceBGPStatus{}: namespaceSelector,
-		&corev1.Secret{}:                   namespaceSelector,
-		&corev1.ConfigMap{}:                namespaceSelector,
+		&metallbv1beta1.BFDProfile{}:          namespaceSelector,
+		&metallbv1beta1.BGPAdvertisement{}:    namespaceSelector,
+		&metallbv1beta1.BGPPeer{}:             namespaceSelector,
+		&metallbv1beta1.IPAddressPool{}:       namespaceSelector,
+		&metallbv1beta1.L2Advertisement{}:     namespaceSelector,
+		&metallbv1beta2.BGPPeer{}:             namespaceSelector,
+		&metallbv1beta1.Community{}:           namespaceSelector,
+		&metallbv1beta1.ServiceBGPStatus{}:    namespaceSelector,
+		&metallbv1beta1.ConfigurationStatus{}: namespaceSelector,
+		&corev1.Secret{}:                      namespaceSelector,
+		&corev1.ConfigMap{}:                   namespaceSelector,
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -177,6 +181,11 @@ func New(cfg *Config) (*Client, error) {
 		reloadChan <- controllers.NewReloadEvent()
 	}
 
+	configStatusRef := types.NamespacedName{
+		Name:      ConfigurationStatusName,
+		Namespace: cfg.Namespace,
+	}
+
 	c := &Client{
 		logger:         cfg.Logger,
 		client:         clientset,
@@ -187,30 +196,37 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	if cfg.ConfigChanged != nil {
-		if err = (&controllers.ConfigReconciler{
-			Client:         mgr.GetClient(),
-			Logger:         cfg.Logger,
-			Scheme:         mgr.GetScheme(),
-			Namespace:      cfg.Namespace,
-			ValidateConfig: cfg.ValidateConfig,
-			Handler:        cfg.ConfigHandler,
-			ForceReload:    reload,
-		}).SetupWithManager(mgr); err != nil {
+		configReconciler := &controllers.ConfigReconciler{
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			Namespace:       cfg.Namespace,
+			ConfigStatusRef: configStatusRef,
+			ValidateConfig:  cfg.ValidateConfig,
+			Handler:         cfg.ConfigHandler,
+			ForceReload:     reload,
+			NodeName:        cfg.NodeName,
+		}
+
+		if err = configReconciler.SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
 			return nil, errors.Join(err, errors.New("unable to create controller for config"))
 		}
 	}
 
 	if cfg.PoolChanged != nil {
-		if err = (&controllers.PoolReconciler{
-			Client:         mgr.GetClient(),
-			Logger:         cfg.Logger,
-			Scheme:         mgr.GetScheme(),
-			Namespace:      cfg.Namespace,
-			ValidateConfig: cfg.ValidateConfig,
-			Handler:        cfg.PoolHandler,
-			ForceReload:    reload,
-		}).SetupWithManager(mgr); err != nil {
+		poolReconciler := &controllers.PoolReconciler{
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			Namespace:       cfg.Namespace,
+			ConfigStatusRef: configStatusRef,
+			ValidateConfig:  cfg.ValidateConfig,
+			Handler:         cfg.PoolHandler,
+			ForceReload:     reload,
+		}
+
+		if err = poolReconciler.SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
 			return nil, errors.Join(err, errors.New("failed to create config reconciler"))
 		}
@@ -228,12 +244,13 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.NodeChanged != nil {
 		if err = (&controllers.NodeReconciler{
-			Client:      mgr.GetClient(),
-			Logger:      cfg.Logger,
-			Scheme:      mgr.GetScheme(),
-			Handler:     cfg.NodeHandler,
-			NodeName:    cfg.NodeName,
-			ForceReload: reload,
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			Handler:         cfg.NodeHandler,
+			NodeName:        cfg.NodeName,
+			ConfigStatusRef: configStatusRef,
+			ForceReload:     reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "node")
 			return nil, errors.Join(err, errors.New("failed to create node reconciler"))
@@ -247,6 +264,7 @@ func New(cfg *Config) (*Client, error) {
 			Scheme:          mgr.GetScheme(),
 			FRRK8sNamespace: cfg.FRRK8sNamespace,
 			NodeName:        cfg.NodeName,
+			ConfigStatusRef: configStatusRef,
 		}
 		if err := frrk8sController.SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "frrk8s")
@@ -255,6 +273,18 @@ func New(cfg *Config) (*Client, error) {
 		c.BGPEventCallback = frrk8sController.UpdateConfig
 	}
 
+	if cfg.EnableConfigurationStatus {
+		cc := controllers.ConfigurationStatusReconciler{
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			ConfigStatusRef: configStatusRef,
+		}
+		if err := cc.SetupWithManager(mgr); err != nil {
+			level.Error(c.logger).Log("error", err, "unable to create controller", "configurationstatus")
+			return nil, errors.Join(err, errors.New("failed to create configuration status reconciler"))
+		}
+	}
 	if cfg.ReadEndpoints {
 		// Set a field indexer so we can retrieve all the endpoints for a given service.
 		if err := mgr.GetFieldIndexer().IndexField(context.Background(), &discovery.EndpointSlice{}, epslices.SlicesServiceIndexName, func(rawObj client.Object) []string {
@@ -282,6 +312,8 @@ func New(cfg *Config) (*Client, error) {
 			Client:            mgr.GetClient(),
 			Logger:            cfg.Logger,
 			Scheme:            mgr.GetScheme(),
+			ConfigStatusRef:   configStatusRef,
+			NodeName:          cfg.NodeName,
 			Handler:           cfg.ServiceHandler,
 			Endpoints:         cfg.ReadEndpoints,
 			Reload:            reloadChan,
@@ -319,13 +351,14 @@ func New(cfg *Config) (*Client, error) {
 			return nil, err
 		}
 		if err = (&controllers.ServiceBGPStatusReconciler{
-			Client:        mgr.GetClient(),
-			Logger:        cfg.Logger,
-			NodeName:      cfg.NodeName,
-			Namespace:     cfg.Namespace,
-			SpeakerPod:    selfPod.DeepCopy(),
-			ReconcileChan: cfg.BGPStatusChan,
-			PeersFetcher:  cfg.BGPPeersFetcher,
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			NodeName:        cfg.NodeName,
+			Namespace:       cfg.Namespace,
+			ConfigStatusRef: configStatusRef,
+			SpeakerPod:      selfPod.DeepCopy(),
+			ReconcileChan:   cfg.BGPStatusChan,
+			PeersFetcher:    cfg.BGPPeersFetcher,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "layer2Status")
 		}
