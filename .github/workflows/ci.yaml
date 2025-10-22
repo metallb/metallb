@@ -299,11 +299,20 @@ jobs:
 
       - name: Create multi-node K8s Kind Cluster
         run: |
-          cd ${GITHUB_WORKSPACE}/metallboperator
-          ./hack/kind-multi-node-cluster-without-registry.sh
+          which kind
+          kind version
+          cat <<EOF | kind create cluster --config -
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+          - role: worker
+          - role: worker
+          EOF
           kind load docker-image quay.io/metallb/speaker:dev-amd64
           kind load docker-image quay.io/metallb/controller:dev-amd64
-          export KUBECONFIG=${HOME}/.kube/config
+          kind get clusters
+          kubectl version
 
       - name: Deploy Metal LB Operator
         run: |
