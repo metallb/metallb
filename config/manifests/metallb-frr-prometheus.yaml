@@ -11,7 +11,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bfdprofiles.metallb.io
 spec:
   group: metallb.io
@@ -132,7 +132,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bgpadvertisements.metallb.io
 spec:
   group: metallb.io
@@ -349,7 +349,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bgppeers.metallb.io
 spec:
   conversion:
@@ -724,7 +724,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: communities.metallb.io
 spec:
   group: metallb.io
@@ -789,7 +789,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: ipaddresspools.metallb.io
 spec:
   group: metallb.io
@@ -1027,7 +1027,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: l2advertisements.metallb.io
 spec:
   group: metallb.io
@@ -1214,7 +1214,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: servicebgpstatuses.metallb.io
 spec:
   group: metallb.io
@@ -1300,7 +1300,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: servicel2statuses.metallb.io
 spec:
   group: metallb.io
@@ -1937,7 +1937,7 @@ metadata:
 apiVersion: v1
 data:
   excludel2.yaml: |
-    announcedInterfacesToExclude: ["^docker.*", "^cbr.*", "^dummy.*", "^virbr.*", "^lxcbr.*", "^veth.*", "^lo$", "^cali.*", "^tunl.*", "^flannel.*", "^kube-ipvs.*", "^cni.*", "^nodelocaldns.*"]
+    announcedInterfacesToExclude: ["^docker.*", "^cbr.*", "^dummy.*", "^virbr.*", "^lxcbr.*", "^veth.*", "^lo$", "^cali.*", "^tunl.*", "^flannel.*", "^kube-ipvs.*", "^cni.*", "^nodelocaldns.*", "^lxc.*"]
 kind: ConfigMap
 metadata:
   name: metallb-excludel2
@@ -2205,7 +2205,7 @@ spec:
         env:
         - name: TINI_SUBREAPER
           value: "true"
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -2233,7 +2233,7 @@ spec:
           name: frr-conf
       - command:
         - /etc/frr_reloader/frr-reloader.sh
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: reloader
         volumeMounts:
         - mountPath: /var/run/frr
@@ -2249,7 +2249,7 @@ spec:
         env:
         - name: VTYSH_HISTFILE
           value: /dev/null
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: frr-metrics
         ports:
         - containerPort: 7473
@@ -2342,7 +2342,7 @@ spec:
         - /bin/sh
         - -c
         - cp -rLf /tmp/frr/* /etc/frr/
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: cp-frr-files
         securityContext:
           runAsGroup: 101

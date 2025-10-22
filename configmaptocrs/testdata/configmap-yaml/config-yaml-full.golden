@@ -2,7 +2,6 @@
 apiVersion: metallb.io/v1beta2
 kind: BGPPeer
 metadata:
-  creationTimestamp: null
   name: peer1
   namespace: metallb-system
 spec:
@@ -31,7 +30,6 @@ status: {}
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-  creationTimestamp: null
   name: my-ip-space
   namespace: metallb-system
 spec:
@@ -49,7 +47,6 @@ status:
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-  creationTimestamp: null
   name: my-l2-space
   namespace: metallb-system
 spec:
@@ -66,7 +63,6 @@ status:
 apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
-  creationTimestamp: null
   name: bgpadvertisement1
   namespace: metallb-system
 spec:
@@ -83,7 +79,6 @@ status: {}
 apiVersion: metallb.io/v1beta1
 kind: BFDProfile
 metadata:
-  creationTimestamp: null
   name: bfdprofile1
   namespace: metallb-system
 spec:
@@ -99,7 +94,6 @@ status: {}
 apiVersion: metallb.io/v1beta1
 kind: Community
 metadata:
-  creationTimestamp: null
   name: communities
   namespace: metallb-system
 spec:

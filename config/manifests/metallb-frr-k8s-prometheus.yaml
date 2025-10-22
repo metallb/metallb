@@ -11,7 +11,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bfdprofiles.metallb.io
 spec:
   group: metallb.io
@@ -132,7 +132,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bgpadvertisements.metallb.io
 spec:
   group: metallb.io
@@ -349,7 +349,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bgppeers.metallb.io
 spec:
   conversion:
@@ -801,7 +801,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: communities.metallb.io
 spec:
   group: metallb.io
@@ -1418,7 +1418,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: ipaddresspools.metallb.io
 spec:
   group: metallb.io
@@ -1656,7 +1656,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: l2advertisements.metallb.io
 spec:
   group: metallb.io
@@ -1843,7 +1843,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: servicebgpstatuses.metallb.io
 spec:
   group: metallb.io
@@ -1929,7 +1929,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: servicel2statuses.metallb.io
 spec:
   group: metallb.io
@@ -2159,6 +2159,37 @@ rules:
   - get
   - list
   - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frr-k8s
+    app.kubernetes.io/instance: frr-k8s-role
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: role
+    app.kubernetes.io/part-of: frr-k8s
+  name: frr-k8s-nodestate-cleaner-role
+  namespace: metallb-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - frrk8s.metallb.io
+  resources:
+  - frrnodestates
+  verbs:
+  - get
+  - list
+  - watch
+  - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -2618,6 +2649,27 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frr-k8s
+    app.kubernetes.io/instance: frr-k8s-rolebinding
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: rolebinding
+    app.kubernetes.io/part-of: frr-k8s
+  name: frr-k8s-nodestate-cleaner-rolebinding
+  namespace: metallb-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: frr-k8s-nodestate-cleaner-role
+subjects:
+- kind: ServiceAccount
+  name: frr-k8s-daemon
+  namespace: metallb-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
     app: metallb
   name: pod-lister
   namespace: metallb-system
@@ -2815,7 +2867,7 @@ metadata:
 apiVersion: v1
 data:
   excludel2.yaml: |
-    announcedInterfacesToExclude: ["^docker.*", "^cbr.*", "^dummy.*", "^virbr.*", "^lxcbr.*", "^veth.*", "^lo$", "^cali.*", "^tunl.*", "^flannel.*", "^kube-ipvs.*", "^cni.*", "^nodelocaldns.*"]
+    announcedInterfacesToExclude: ["^docker.*", "^cbr.*", "^dummy.*", "^virbr.*", "^lxcbr.*", "^veth.*", "^lo$", "^cali.*", "^tunl.*", "^flannel.*", "^kube-ipvs.*", "^cni.*", "^nodelocaldns.*", "^lxc.*"]
 kind: ConfigMap
 metadata:
   name: metallb-excludel2
@@ -2887,7 +2939,7 @@ spec:
   - port: 443
     targetPort: webhook
   selector:
-    control-plane: webhook-server
+    control-plane: statuscleaner
 ---
 apiVersion: v1
 kind: Service
@@ -3039,34 +3091,33 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: frr-k8s
     app.kubernetes.io/part-of: frr-k8s
-    control-plane: webhook-server
-  name: frr-k8s-webhook-server
+    control-plane: statuscleaner
+  name: frr-k8s-statuscleaner
   namespace: metallb-system
 spec:
   selector:
     matchLabels:
-      control-plane: webhook-server
+      control-plane: statuscleaner
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: frr-k8s-webhook-server
       labels:
         app: frr-k8s-webhook-server
-        control-plane: webhook-server
+        control-plane: statuscleaner
     spec:
       containers:
       - args:
         - --log-level=info
-        - --webhook-mode=onlywebhook
         - --namespace=$(NAMESPACE)
         command:
-        - /frr-k8s
+        - /statuscleaner
         env:
         - name: NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3142,6 +3193,7 @@ spec:
         kubectl.kubernetes.io/default-container: frr-k8s
       labels:
         app: frr-k8s
+        app.kubernetes.io/component: frr-k8s
         control-plane: frr-k8s
     spec:
       affinity:
@@ -3227,7 +3279,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3277,7 +3329,7 @@ spec:
         env:
         - name: TINI_SUBREAPER
           value: "true"
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -3310,7 +3362,7 @@ spec:
         - --metrics-bind-address=127.0.0.1
         command:
         - /etc/frr_metrics/frr-metrics
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: frr-metrics
         ports:
         - containerPort: 7573
@@ -3341,7 +3393,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: frr-status
         volumeMounts:
         - mountPath: /var/run/frr
@@ -3352,7 +3404,7 @@ spec:
           name: frr-status
       - command:
         - /etc/frr_reloader/frr-reloader.sh
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: reloader
         volumeMounts:
         - mountPath: /var/run/frr
@@ -3367,7 +3419,7 @@ spec:
         - /bin/sh
         - -c
         - cp -rLf /tmp/frr/* /etc/frr/
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: cp-frr-files
         securityContext:
           runAsGroup: 101
@@ -3381,7 +3433,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-reloader.sh /etc/frr_reloader/
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         name: cp-reloader
         volumeMounts:
         - mountPath: /etc/frr_reloader
@@ -3390,7 +3442,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-metrics /etc/frr_metrics/
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         name: cp-metrics
         volumeMounts:
         - mountPath: /etc/frr_metrics
@@ -3399,7 +3451,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-status /etc/frr_status/
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         name: cp-frr-status
         volumeMounts:
         - mountPath: /etc/frr_status
