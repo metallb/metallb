@@ -191,7 +191,7 @@ Useful commands are:
 - `vtysh show running-conf` to see the current FRR configuration
 - `vtysh show bgp neigh <neigh-ip>` to see the status of the session. Established is the value related to a healthy BGP
 session
-- `vtysh show ipv4 / ipv6` to see the status of the advertisements
+- `vtysh show bgp ipv4 / ipv6` to see the status of the advertisements
 
 #### Invalid FRR Configuration (FRR Mode)
 
