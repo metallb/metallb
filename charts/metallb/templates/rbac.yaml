@@ -28,11 +28,17 @@ rules:
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
   resourceNames: ["bfdprofiles.metallb.io","bgpadvertisements.metallb.io",
-    "bgppeers.metallb.io","ipaddresspools.metallb.io","l2advertisements.metallb.io","communities.metallb.io"]
+    "bgppeers.metallb.io","ipaddresspools.metallb.io","l2advertisements.metallb.io","communities.metallb.io","configurationstates.metallb.io"]
   verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
   verbs: ["list", "watch"]
+- apiGroups: ["metallb.io"]
+  resources: ["configurationstates"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["metallb.io"]
+  resources: ["configurationstates/status"]
+  verbs: ["get", "patch", "update"]
 {{- if .Values.prometheus.secureMetricsPort }}
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]
@@ -60,7 +66,7 @@ rules:
   resources: ["events"]
   verbs: ["create", "patch"]
 - apiGroups: ["metallb.io"]
-  resources: ["servicel2statuses","servicel2statuses/status"]
+  resources: ["servicel2statuses","servicel2statuses/status","configurationstates","configurationstates/status"]
   verbs: ["*"]
 {{- if .Values.prometheus.secureMetricsPort }}
 - apiGroups: ["authentication.k8s.io"]
