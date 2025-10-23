@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/go-kit/log"
@@ -27,6 +29,7 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -40,23 +43,36 @@ const bgpExtrasConfigName = "bgpextras"
 
 type ConfigReconciler struct {
 	client.Client
-	Logger         log.Logger
-	Scheme         *runtime.Scheme
-	Namespace      string
-	Handler        func(log.Logger, *config.Config) SyncState
-	ValidateConfig config.Validate
-	ForceReload    func()
-	BGPType        string
-	currentConfig  *config.Config
+	Logger          log.Logger
+	Scheme          *runtime.Scheme
+	Namespace       string
+	Handler         func(log.Logger, *config.Config) SyncState
+	ValidateConfig  config.Validate
+	ForceReload     func()
+	BGPType         string
+	ConfigStateName string
+	currentConfig   *config.Config
 }
 
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	return requestHandler(r, ctx, req)
 }
 
-var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Request) (result ctrl.Result, handlerError error) {
 	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.String())
 	defer level.Info(r.Logger).Log("controller", "ConfigReconciler", "end reconcile", req.String())
+
+	var conditionErr error
+	defer func() {
+		if err := r.reportCondition(ctx, conditionErr); err != nil {
+			level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to report condition", "error", err)
+			// According to Go spec (https://go.dev/ref/spec#Defer_statements), deferred functions
+			// execute after return statements set the result parameters but before returning to caller,
+			// allowing this function to modify handlerError.
+			handlerError = errors.Join(handlerError, err)
+		}
+	}()
+
 	updates.Inc()
 
 	var ipAddressPools metallbv1beta1.IPAddressPoolList
@@ -138,6 +154,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 	if err != nil {
 		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to parse the configuration", "error", err)
+		conditionErr = fmt.Errorf("%w: %w", ErrConfiguration, err)
 		return ctrl.Result{}, nil
 	}
 
@@ -161,6 +178,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 		// of the reconciliaton loop. If we don't reset, the retry will find the config identical and will exit,
 		// which is not what we want here.
 		r.currentConfig = nil
+		conditionErr = fmt.Errorf("%w: general handler sync state error", ErrConfiguration)
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
 		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
@@ -169,6 +187,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 	case SyncStateErrorNoRetry:
 		configStale.Set(1)
 		updateErrors.Inc()
+		conditionErr = fmt.Errorf("%w: general handler sync state error", ErrConfiguration)
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
@@ -253,4 +272,50 @@ func (r *ConfigReconciler) getSecrets(ctx context.Context) (map[string]corev1.Se
 		secretsMap[secret.Name] = secret
 	}
 	return secretsMap, nil
+}
+
+func (r *ConfigReconciler) reportCondition(ctx context.Context, conditionErr error) error {
+	if r.ConfigStateName == "" {
+		return nil
+	}
+
+	condition := metav1.Condition{
+		Type:    "configReconcilerValid",
+		Status:  metav1.ConditionTrue,
+		Reason:  ErrorTypeNone,
+		Message: "",
+		// Always set to now (tracks last reconciliation, not last status change).
+		LastTransitionTime: metav1.Now(),
+	}
+
+	switch {
+	case errors.Is(conditionErr, ErrConfiguration):
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = ErrorTypeConfiguration
+		condition.Message = conditionErr.Error()
+	case conditionErr != nil:
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = ErrorTypeUnknown
+		condition.Message = conditionErr.Error()
+	}
+
+	configStatus := &metallbv1beta1.ConfigurationState{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "metallb.io/v1beta1",
+			Kind:       "ConfigurationState",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.ConfigStateName,
+			Namespace: r.Namespace,
+		},
+		Status: metallbv1beta1.ConfigurationStateStatus{
+			Conditions: []metav1.Condition{condition},
+		},
+	}
+
+	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("configReconciler"), client.ForceOwnership); err != nil {
+		return fmt.Errorf("patch %s/%s: %w", r.Namespace, r.ConfigStateName, err)
+	}
+
+	return nil
 }
