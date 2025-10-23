@@ -265,6 +265,18 @@ spec:
         {{- if .Values.speaker.wanConfig }}
         - --ml-wan-config
         {{- end }}
+        {{- if .Values.speaker.enableL2Lease }}
+        - --enable-l2-lease
+        {{- if .Values.speaker.leaseTimings.duration }}
+        - --l2-lease-duration={{ .Values.speaker.leaseTimings.duration }}s
+        {{- end }}
+        {{- if .Values.speaker.leaseTimings.renewDeadline }}
+        - --l2-lease-renew-deadline={{ .Values.speaker.leaseTimings.renewDeadline }}s
+        {{- end }}
+        {{- if .Values.speaker.leaseTimings.retryPeriod }}
+        - --l2-lease-retry-period={{ .Values.speaker.leaseTimings.retryPeriod }}s
+        {{- end }}
+        {{- end }}
         {{- if .Values.speaker.ignoreExcludeLB}}
         - --ignore-exclude-lb
         {{- end }}

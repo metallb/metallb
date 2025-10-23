@@ -479,6 +479,11 @@ func (c *Client) Errorf(svc *corev1.Service, kind, msg string, args ...interface
 	c.events.Eventf(svc, corev1.EventTypeWarning, kind, msg, args...)
 }
 
+// KubernetesClient returns the underlying kubernetes clientset.
+func (c *Client) KubernetesClient() kubernetes.Interface {
+	return c.client
+}
+
 func webhookServer(cfg *Config) webhook.Server {
 	disableHTTP2 := func(c *tls.Config) {
 		if cfg.WebhookWithHTTP2 {
