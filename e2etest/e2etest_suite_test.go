@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"go.universe.tf/e2etest/bgptests"
+	"go.universe.tf/e2etest/configurationstatetests"
 	"go.universe.tf/e2etest/l2tests"
 	_ "go.universe.tf/e2etest/netpoltests"
 	testsconfig "go.universe.tf/e2etest/pkg/config"
@@ -191,10 +192,12 @@ var _ = ginkgo.BeforeSuite(func() {
 	l2tests.ConfigUpdater = updater
 	webhookstests.ConfigUpdater = updater
 	webhookstests.ConfigUpdaterOtherNS = updaterOtherNS
+	configurationstatetests.ConfigUpdater = updater
 	bgptests.Reporter = reporter
 	bgptests.ReportPath = reportPath
 	l2tests.Reporter = reporter
 	webhookstests.Reporter = reporter
+	configurationstatetests.Reporter = reporter
 	bgptests.PrometheusNamespace = prometheusNamespace
 	l2tests.PrometheusNamespace = prometheusNamespace
 	l2tests.NodeNics = strings.Split(nodeNics, ",")
