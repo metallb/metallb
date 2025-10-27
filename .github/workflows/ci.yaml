@@ -31,7 +31,7 @@ jobs:
       GO111MODULE: on
     steps:
       - name: Checkout Source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         #      - name: Run Gosec Security Scanner TODO reenable when gosec is compatible with go 1.23.6
         #uses: securego/gosec@v2.22.0
         #with:
@@ -45,7 +45,7 @@ jobs:
   commitlint:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v5
@@ -54,9 +54,9 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
           cache: true
@@ -93,12 +93,12 @@ jobs:
         image: [speaker, controller, configmaptocrs]
     steps:
       - name: Code checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup docker buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build and export ${{ matrix.image }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           tags: quay.io/metallb/${{ matrix.image }}:dev-amd64
@@ -107,7 +107,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Upload ${{ matrix.image }} artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           retention-days: 1
           name: image-tar-${{ matrix.image }}
@@ -117,7 +117,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Required for chart-testing
           fetch-depth: 0
@@ -127,7 +127,7 @@ jobs:
         with:
           version: v3.12.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
           check-latest: true
@@ -205,7 +205,7 @@ jobs:
           ip-family: dual
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install kernel modules
         run: |
@@ -253,7 +253,7 @@ jobs:
           artifact-name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}-${{ matrix.deployment}}
 
       - name: Publish JUnit Report
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@v6
         if: success() || failure()
         with:
           annotate_only: true
@@ -277,7 +277,7 @@ jobs:
           sudo apt-get install linux-modules-extra-$(uname -r)
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -285,14 +285,14 @@ jobs:
         uses: ./.github/workflows/composite/setup
 
       - name: Checkout Metal LB Operator
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: metallb/metallb-operator
           path: metallboperator
           ref: main
 
       - name: Checkout MetalLB
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: metallb
           fetch-depth: 0
@@ -352,7 +352,7 @@ jobs:
           artifact-name: kind_logs_use_operator
 
       - name: Publish JUnit Report
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@v6
         if: success() || failure()
         with:
           annotate_only: true
@@ -373,7 +373,7 @@ jobs:
           sudo apt-get install linux-modules-extra-$(uname -r)
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -396,7 +396,7 @@ jobs:
           artifact-name: kind-logs-oldest-k8s
 
       - name: Publish JUnit Report
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@v6
         if: success() || failure()
         with:
           annotate_only: true

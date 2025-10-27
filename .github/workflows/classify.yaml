@@ -10,7 +10,7 @@ jobs:
     if: github.actor != 'dependabot[bot]'
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
@@ -54,7 +54,7 @@ jobs:
           labels: kind/${{ steps.regex-match.outputs.group1 }}
 
       - name: Check release notes were not deleted
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const pr = await github.rest.pulls.get({
