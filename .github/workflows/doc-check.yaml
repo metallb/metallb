@@ -1,0 +1,106 @@
+name: Documentation Check
+
+on:
+  pull_request:
+    branches:
+      - "main"
+      - "v**"
+    # Only run when code changes that might affect user-facing features
+    paths:
+      - 'api/**'
+      - 'configsamples/**'
+      - 'charts/metallb/**'
+      - 'config/crd/**'
+      - 'website/content/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-documentation:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Checkout base branch
+        run: git fetch origin ${{ github.event.pull_request.base.ref }}
+
+      - name: Run documentation check
+        id: doc_check
+        run: |
+          # Run the check and capture output
+          set +e  # Don't fail the workflow on non-zero exit
+          python3 scripts/check_docs_local.py "origin/${{ github.event.pull_request.base.ref }}" > doc_check_output.txt 2>&1
+          exit_code=$?
+          set -e
+
+          # Set flags based on content
+          if grep -q "Feature changes detected" doc_check_output.txt; then
+            echo "has_features=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_features=false" >> $GITHUB_OUTPUT
+          fi
+
+          if grep -q "Documentation updated" doc_check_output.txt; then
+            echo "has_doc_updates=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_doc_updates=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Always show the output in logs
+          cat doc_check_output.txt
+
+          # Exit without failing the job
+          exit 0
+
+      - name: Comment on PR - Feature changes detected
+        if: steps.doc_check.outputs.has_features == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const hasDocUpdates = '${{ steps.doc_check.outputs.has_doc_updates }}' === 'true';
+
+            // Read the output file
+            let output = '';
+            try {
+              output = fs.readFileSync('doc_check_output.txt', 'utf8');
+            } catch (error) {
+              output = 'Error reading documentation check output';
+            }
+
+            let body = '🤖 **Documentation Check - Action Recommended**\n\n';
+            body += '**Feature changes detected in this PR that may need documentation:**\n\n';
+            body += '```\n' + output + '\n```\n\n';
+
+            if (hasDocUpdates) {
+              body += '✅ Great! This PR already includes documentation updates.\n\n';
+            } else {
+              body += '📝 **Recommendation:** Consider updating relevant documentation sections.\n\n';
+            }
+
+            body += '*This is an automated, non-blocking check to help ensure new features are properly documented.*';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Comment on PR - No action needed
+        if: steps.doc_check.outputs.has_features == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🤖 **Documentation Check - No Action Needed**\n\n✅ No user-facing feature changes detected that require documentation updates.\n\n*This is an automated check to help ensure new features are properly documented.*'
+            });
