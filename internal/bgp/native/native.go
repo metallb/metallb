@@ -80,8 +80,8 @@ func (sm *sessionManager) NewSession(l log.Logger, args bgp.SessionParameters) (
 	go ret.sendKeepalives()
 	go ret.run()
 
-	stats.sessionUp.WithLabelValues(ret.PeerAddress).Set(0)
-	stats.prefixes.WithLabelValues(ret.PeerAddress).Set(0)
+	stats.sessionUp.WithLabelValues(ret.peerName).Set(0)
+	stats.prefixes.WithLabelValues(ret.peerName).Set(0)
 
 	return ret, nil
 }
