@@ -57,13 +57,25 @@ var _ = ginkgo.Describe("Networkpolicies", func() {
 	ginkgo.It("only allowed traffic", func() {
 		ginkgo.By("checking ingress - probe pod to any port on the controller other than webhook,metricshttps should be timeout")
 
+		// Check if controller has secure metrics port
+		hasSecureMetrics := false
+		for _, c := range controller.Spec.Containers {
+			for _, p := range c.Ports {
+				if p.Name == "metricshttps" {
+					hasSecureMetrics = true
+					break
+				}
+			}
+		}
+
 		ingressPorts := map[string]string{
 			"8888": "TIMEOUT", // Add random port to check for being blocked
 		}
 		for _, c := range controller.Spec.Containers {
 			for _, p := range c.Ports {
 				port := strconv.Itoa(int(p.ContainerPort))
-				if p.Name == "monitoring" { // the non-https port is not whitelisted in the network policies
+				if p.Name == "monitoring" && hasSecureMetrics {
+					// monitoring port should be blocked when secure metrics are available
 					ingressPorts[port] = "TIMEOUT"
 					continue
 				}

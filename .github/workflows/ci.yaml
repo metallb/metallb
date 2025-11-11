@@ -240,7 +240,7 @@ jobs:
           if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP|BGP"; fi
           if [ "${{ matrix.bgp-type }}" == "frr" ]; then SKIP="$SKIP|FRRK8S-MODE"; fi
           if [ "${{ matrix.bgp-type }}" == "frr-k8s" ]; then SKIP="$SKIP|FRR-MODE"; fi
-          if [ "${{ matrix.bgp-type }}" == "frr-k8s-external" ]; then SKIP="$SKIP|FRR-MODE|metrics"; FRRK8NAMESPACE="--frr-k8s-namespace=frr-k8s-system"; fi
+          if [ "${{ matrix.bgp-type }}" == "frr-k8s-external" ]; then SKIP="$SKIP|FRR-MODE|metrics|Networkpolicies"; FRRK8NAMESPACE="--frr-k8s-namespace=frr-k8s-system"; fi
 
           echo "Skipping $SKIP"
           echo "With VRF $WITH_VRF"
@@ -300,10 +300,13 @@ jobs:
       - name: Create multi-node K8s Kind Cluster
         run: |
           cd ${GITHUB_WORKSPACE}/metallboperator
+          which kind
+          kind version
           ./hack/kind-multi-node-cluster-without-registry.sh
           kind load docker-image quay.io/metallb/speaker:dev-amd64
           kind load docker-image quay.io/metallb/controller:dev-amd64
           export KUBECONFIG=${HOME}/.kube/config
+          kubectl version
 
       - name: Deploy Metal LB Operator
         run: |

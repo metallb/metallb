@@ -15,7 +15,7 @@ runs:
         sudo apt-get update
         sudo apt-get install python3-pip arping ndisc6
         sudo pip3 install -r dev-env/requirements.txt
-        GO111MODULE="on" go get sigs.k8s.io/kind@v0.19.0
+        GO111MODULE="on" go install sigs.k8s.io/kind@v0.30.0
         go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
         #NOTE: This pulls the ginkgo version that is pinned in go.mod
         go install github.com/onsi/ginkgo/v2/ginkgo
