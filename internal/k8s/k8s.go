@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -28,8 +29,6 @@ import (
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-
-	"errors"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -186,9 +185,34 @@ func New(cfg *Config) (*Client, error) {
 		ForceSync:      reload,
 	}
 
+	// Build ConfigStateRef early so it can be passed to reconcilers
+	configStateRef := &metallbv1beta1.ConfigurationState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "controller",
+			Namespace: cfg.Namespace,
+			Labels: map[string]string{
+				"metallb.io/component-type": "controller",
+			},
+		},
+	}
+
+	if cfg.ProcessName == "metallb-speaker" {
+		configStateRef = &metallbv1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "speaker-" + cfg.NodeName,
+				Namespace: cfg.Namespace,
+				Labels: map[string]string{
+					"metallb.io/component-type": "speaker",
+					"metallb.io/node-name":      cfg.NodeName,
+				},
+			},
+		}
+	}
+
 	if cfg.ConfigChanged != nil {
 		if err = (&controllers.ConfigReconciler{
 			Client:         mgr.GetClient(),
+			ConfigStateRef: configStateRef,
 			Logger:         cfg.Logger,
 			Scheme:         mgr.GetScheme(),
 			Namespace:      cfg.Namespace,
@@ -204,6 +228,7 @@ func New(cfg *Config) (*Client, error) {
 	if cfg.PoolChanged != nil {
 		if err = (&controllers.PoolReconciler{
 			Client:         mgr.GetClient(),
+			ConfigStateRef: configStateRef,
 			Logger:         cfg.Logger,
 			Scheme:         mgr.GetScheme(),
 			Namespace:      cfg.Namespace,
@@ -275,6 +300,18 @@ func New(cfg *Config) (*Client, error) {
 		}); err != nil {
 			return nil, err
 		}
+	}
+
+	// Setup reconciler
+	cc := controllers.ConfigurationStateReconciler{
+		Client:         mgr.GetClient(),
+		ConfigStateRef: configStateRef,
+		Logger:         cfg.Logger,
+		Scheme:         mgr.GetScheme(),
+	}
+	if err := cc.SetupWithManager(mgr); err != nil {
+		level.Error(c.logger).Log("error", err, "unable to create controller", "configurationstatus")
+		return nil, errors.Join(err, errors.New("failed to create configuration status reconciler"))
 	}
 
 	if cfg.ServiceChanged != nil {

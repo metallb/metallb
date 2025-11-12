@@ -35,4 +35,11 @@ const (
 	LabelServiceNamespace = "metallb.io/service-namespace"
 )
 
+// Error types for condition reporting.
+const (
+	ErrorTypeNone          = "noError"
+	ErrorTypeConfiguration = "configurationError"
+	ErrorTypeInfra         = "infraError"
+)
+
 var errRetry = errors.New("event handling failed, retrying")

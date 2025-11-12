@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/go-kit/log"
@@ -27,6 +28,7 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -47,6 +49,7 @@ type ConfigReconciler struct {
 	ValidateConfig config.Validate
 	ForceReload    func()
 	BGPType        string
+	ConfigStateRef *metallbv1beta1.ConfigurationState
 	currentConfig  *config.Config
 }
 
@@ -57,6 +60,15 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.String())
 	defer level.Info(r.Logger).Log("controller", "ConfigReconciler", "end reconcile", req.String())
+
+	var resultErr error
+	errType := ErrorTypeNone
+	defer func() {
+		if err := r.reportCondition(ctx, resultErr, errType); err != nil {
+			level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to report condition", "error", err)
+		}
+	}()
+
 	updates.Inc()
 
 	var ipAddressPools metallbv1beta1.IPAddressPoolList
@@ -138,6 +150,8 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 	if err != nil {
 		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to parse the configuration", "error", err)
+		resultErr = err
+		errType = ErrorTypeConfiguration
 		return ctrl.Result{}, nil
 	}
 
@@ -161,6 +175,8 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 		// of the reconciliaton loop. If we don't reset, the retry will find the config identical and will exit,
 		// which is not what we want here.
 		r.currentConfig = nil
+		resultErr = fmt.Errorf("general handler sync state error")
+		errType = ErrorTypeConfiguration
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
 		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
@@ -169,6 +185,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 	case SyncStateErrorNoRetry:
 		configStale.Set(1)
 		updateErrors.Inc()
+		errType = ErrorTypeConfiguration
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
@@ -253,4 +270,45 @@ func (r *ConfigReconciler) getSecrets(ctx context.Context) (map[string]corev1.Se
 		secretsMap[secret.Name] = secret
 	}
 	return secretsMap, nil
+}
+
+func (r *ConfigReconciler) reportCondition(ctx context.Context, resultErr error, errType string) error {
+	if r.ConfigStateRef == nil {
+		return nil
+	}
+
+	owner := "configReconciler"
+	condition := metav1.Condition{
+		Type:    "configReconcilerValid",
+		Status:  metav1.ConditionTrue,
+		Reason:  errType,
+		Message: "",
+		// Always set to now (tracks last reconciliation, not last status change).
+		LastTransitionTime: metav1.Now(),
+	}
+
+	if resultErr != nil {
+		condition.Status = metav1.ConditionFalse
+		condition.Message = resultErr.Error()
+	}
+
+	configStatus := &metallbv1beta1.ConfigurationState{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "metallb.io/v1beta1",
+			Kind:       "ConfigurationState",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.ConfigStateRef.Name,
+			Namespace: r.ConfigStateRef.Namespace,
+		},
+		Status: metallbv1beta1.ConfigurationStateStatus{
+			Conditions: []metav1.Condition{condition},
+		},
+	}
+
+	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner(owner), client.ForceOwnership); err != nil {
+		return fmt.Errorf("patch %s/%s: %w", r.ConfigStateRef.Namespace, r.ConfigStateRef.Name, err)
+	}
+
+	return nil
 }
