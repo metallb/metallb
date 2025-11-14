@@ -1,8 +1,7 @@
 {
     "metadata": {
         "name": "metallb-testnodename",
-        "namespace": "testnamespace",
-        "creationTimestamp": null
+        "namespace": "testnamespace"
     },
     "spec": {
         "bgp": {

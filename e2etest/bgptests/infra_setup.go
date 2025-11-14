@@ -3,11 +3,10 @@
 package bgptests
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
-
-	"errors"
 
 	"go.universe.tf/e2etest/pkg/container"
 	"go.universe.tf/e2etest/pkg/executor"
@@ -148,6 +147,13 @@ func KindnetContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontai
 	if err != nil {
 		return nil, err
 	}
+	for _, c := range containers {
+		out, err := c.Exec("/bin/bash", "-c", "sysctl -w net.ipv6.conf.all.forwarding=1")
+		if err != nil {
+			return nil, fmt.Errorf("failed to set up ipv6 forwarding %s %s %w", c.Name, out, err)
+		}
+	}
+
 	return containers, nil
 }
 
@@ -187,6 +193,12 @@ func VRFContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontainer.
 	err = multiHopSetUp(vrfContainers, vrfNextHopSettings, cs)
 	if err != nil {
 		return nil, err
+	}
+	for _, c := range vrfContainers {
+		out, err := c.Exec("/bin/bash", "-c", "sysctl -w net.ipv6.conf.all.forwarding=1")
+		if err != nil {
+			return nil, fmt.Errorf("failed to set up ipv6 forwarding %s %s %w", c.Name, out, err)
+		}
 	}
 
 	return vrfContainers, nil
@@ -600,7 +612,7 @@ func validateContainersNames(containerNames string) error {
 
 // containsMultiHop returns true if the given containers list include a multi-hop container.
 func containsMultiHop(frrContainers []*frrcontainer.FRR) bool {
-	var multiHop = false
+	multiHop := false
 	for _, frr := range frrContainers {
 		if strings.Contains(frr.Name, "multi-hop") {
 			multiHop = true

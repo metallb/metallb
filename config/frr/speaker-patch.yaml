@@ -23,13 +23,19 @@ spec:
           emptyDir: {}
         - name: metrics
           emptyDir: {}
+        - name: frr-tmp
+          emptyDir: {}
+        - name: frr-lib
+          emptyDir: {}
+        - name: frr-log
+          emptyDir: {}
       initContainers:
         # Copies the initial config files with the right permissions to the shared volume.
         - name: cp-frr-files
           securityContext:
             runAsUser: 100
             runAsGroup: 101
-          image: quay.io/frrouting/frr:9.1.0
+          image: quay.io/frrouting/frr:10.4.1
           command: ["/bin/sh", "-c", "cp -rLf /tmp/frr/* /etc/frr/"]
           volumeMounts:
             - name: frr-startup
@@ -53,9 +59,11 @@ spec:
       containers:
         - name: frr
           securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               add: ["NET_ADMIN", "NET_RAW", "SYS_ADMIN", "NET_BIND_SERVICE"]
-          image: quay.io/frrouting/frr:9.1.0
+          image: quay.io/frrouting/frr:10.4.1
           env:
             - name: TINI_SUBREAPER
               value: "true"
@@ -91,7 +99,10 @@ spec:
             failureThreshold: 30
             periodSeconds: 5
         - name: reloader
-          image: quay.io/frrouting/frr:9.1.0
+          image: quay.io/frrouting/frr:10.4.1
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
           command: ["/etc/frr_reloader/frr-reloader.sh"]
           volumeMounts:
             - name: frr-sockets
@@ -100,8 +111,13 @@ spec:
               mountPath: /etc/frr
             - name: reloader
               mountPath: /etc/frr_reloader
+            - name: frr-log
+              mountPath: /var/log/frr
         - name: frr-metrics
-          image: quay.io/frrouting/frr:9.1.0
+          image: quay.io/frrouting/frr:10.4.1
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
           command: ["/etc/frr_metrics/frr-metrics"]
           args:
             - --metrics-port=7473

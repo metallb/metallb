@@ -26,7 +26,7 @@ all_binaries = set(["controller", "speaker", "configmaptocrs"])
 all_architectures = set(["amd64", "arm", "arm64", "ppc64le", "s390x"])
 default_network = "kind"
 extra_network = "network2"
-controller_gen_version = "v0.17.2"
+controller_gen_version = "v0.19.0"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
 kind_path = os.path.join(build_path, "kind")
@@ -561,7 +561,7 @@ apiServer:
     frr_k8s_ns = "frr-k8s-system"
     if bgp_type == "frr-k8s-external":
         run(
-            "{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.20/config/all-in-one/frr-k8s.yaml".format(
+            "{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.21/config/all-in-one/frr-k8s.yaml".format(
                 kubectl_path
             ),
             echo=True,
@@ -757,7 +757,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
     )
     run(
         "docker run -d --privileged --network kind --rm --ulimit core=-1 --name frr --volume %s:/etc/frr "
-        "quay.io/frrouting/frr:9.1.0" % frr_volume_dir,
+        "quay.io/frrouting/frr:10.4.1" % frr_volume_dir,
         echo=True,
     )
 
@@ -880,8 +880,11 @@ def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     run('rm -f "%s"/config.yaml' % dev_env_dir)
 
     # cleanup extra bridge
-    run("docker network rm {bridge_name}".format(bridge_name=extra_network), warn=True)
-    run("docker network rm vrf-net", warn=True)
+    run(
+        "docker network rm -f {bridge_name}".format(bridge_name=extra_network),
+        warn=True,
+    )
+    run("docker network rm -f vrf-net", warn=True)
 
 
 @task(
@@ -1134,7 +1137,7 @@ def lint(ctx, env="container"):
     convenient to install the golangci-lint binaries on the host. This can be
     achieved by running `inv lint --env host`.
     """
-    version = "2.1.6"
+    version = "2.5.0"
     golangci_cmd = "golangci-lint run --timeout 10m0s ./..."
 
     if env == "container":
@@ -1482,7 +1485,7 @@ def _align_helm_crds(source, output):
 @task
 def generateapidocs(ctx):
     """Generates the docs for the CRDs"""
-    run("go install github.com/elastic/crd-ref-docs@v0.0.12")
+    run("go install github.com/elastic/crd-ref-docs@v0.2.0")
     run(
         "crd-ref-docs --source-path=./api --config=website/generatecrddoc/crdgen.yaml --templates-dir=website/generatecrddoc/template --renderer markdown --output-path=/tmp/generated_apidoc.md"
     )
@@ -1643,3 +1646,103 @@ def get_command_version(get_version_command: str, version_prefix: str) -> Option
 def is_ipv4(addr):
     ip = ipaddress.ip_network(addr)
     return ip.version == 4
+
+
+@task(
+    help={
+        "version": "version of frr-k8s to bump to (e.g., 0.0.21).",
+    }
+)
+def bumpfrrk8s(ctx, version):
+    """Bump the frr-k8s version across the codebase."""
+    # Validate version format
+    try:
+        semver.parse_version_info(version)
+    except ValueError:
+        raise Exit(message="Invalid version format: {}".format(version))
+
+    # Get current version from Chart.yaml
+    current_version = None
+    with open("charts/metallb/Chart.yaml", "r") as f:
+        in_frr_k8s_block = False
+        for line in f:
+            if "- name: frr-k8s" in line:
+                in_frr_k8s_block = True
+            elif in_frr_k8s_block and "version:" in line:
+                match = re.search(r"version:\s+(\d+\.\d+\.\d+)", line)
+                if match:
+                    current_version = match.group(1)
+                    break
+
+    if not current_version:
+        raise Exit(message="Could not determine current frr-k8s version")
+
+    print("Bumping frr-k8s from v{} to v{}".format(current_version, version))
+
+    # Update tasks.py - the URL in dev_env function
+    run(
+        r"sed -i 's#metallb/frr-k8s/v{}/config/all-in-one/frr-k8s.yaml#metallb/frr-k8s/v{}/config/all-in-one/frr-k8s.yaml#g' tasks.py".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Update go.mod files
+    run(
+        r"sed -i 's/github.com\/metallb\/frr-k8s v{}/github.com\/metallb\/frr-k8s v{}/g' go.mod".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+    run(
+        r"sed -i 's/github.com\/metallb\/frr-k8s v{}/github.com\/metallb\/frr-k8s v{}/g' e2etest/go.mod".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Update kustomization.yaml files
+    run(
+        r"sed -i 's#frr-k8s/config/default/?timeout=120&ref=v{}#frr-k8s/config/default/?timeout=120\&ref=v{}#g' config/frr-k8s/kustomization.yaml".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+    run(
+        r"sed -i 's#frr-k8s/config/prometheus/?timeout=120&ref=v{}#frr-k8s/config/prometheus/?timeout=120\&ref=v{}#g' config/prometheus-frr-k8s/kustomization.yaml".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Update helm Chart.yaml
+    run(
+        r"sed -i '/- name: frr-k8s$/,/^$/{{ /^  version:/s/{}/{}/; }}' charts/metallb/Chart.yaml".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Update helm README.md
+    run(
+        r"sed -i 's/| https:\/\/metallb.github.io\/frr-k8s | frr-k8s | {} |/| https:\/\/metallb.github.io\/frr-k8s | frr-k8s | {} |/g' charts/metallb/README.md".format(
+            current_version, version
+        ),
+        echo=True,
+    )
+
+    # Run go mod tidy to update go.sum files
+    print("Running go mod tidy...")
+    run("go mod tidy", echo=True)
+    run("cd e2etest && go mod tidy", echo=True)
+
+    # Update helm dependencies
+    print("Updating helm dependencies...")
+    run("helm dependency update charts/metallb", echo=True)
+
+    # Regenerate manifests
+    print("Regenerating manifests...")
+    generatemanifests(ctx)
+
+    print("")
+    print("Successfully bumped frr-k8s to v{}".format(version))

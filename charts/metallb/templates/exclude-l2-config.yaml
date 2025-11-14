@@ -22,4 +22,5 @@ data:
     - ^kube-ipvs.*
     - ^cni.*
     - ^nodelocaldns.*
+    - ^lxc.*
 {{- end }}
