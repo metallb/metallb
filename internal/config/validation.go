@@ -5,6 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
@@ -146,22 +147,26 @@ func DontValidate(c ClusterResources) error {
 // any options that are available only in the native implementation.
 func DiscardNativeOnly(c ClusterResources) error {
 	if len(c.Peers) > 1 {
-		peerAddrHasNodeSelectors := make(map[string]bool) // if a peer has nodeSelectors, we can have multiple peers with the same address
+		// Group peers by their identifier (address/interface + VRF)
+		peersByID := make(map[string][]metallbv1beta2.BGPPeer)
 		routerID := c.Peers[0].Spec.RouterID
-		peer0 := peerIdentifier(c.Peers[0].Spec)
-		peerAddrHasNodeSelectors[peer0] = len(c.Peers[0].Spec.NodeSelectors) > 0
-		for _, p := range c.Peers[1:] {
+
+		for _, p := range c.Peers {
 			if p.Spec.RouterID != routerID {
-				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
+				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, routerID)
 			}
 			peerID := peerIdentifier(p.Spec)
-			if hadNodeSelectors, ok := peerAddrHasNodeSelectors[peerID]; ok {
-				// make sure there is at least one nodeSelector for this peer
-				if len(p.Spec.NodeSelectors) == 0 || !hadNodeSelectors {
-					return fmt.Errorf("duplicate peer %s has no nodeSelectors, in FRR mode each duplicate peer must have nodeSelectors to differentiate", p.Spec.Address)
+			peersByID[peerID] = append(peersByID[peerID], p)
+		}
+
+		// Check duplicate peers
+		for peerID, peers := range peersByID {
+			if len(peers) > 1 {
+				// Multiple peers with the same address/interface + VRF
+				if err := validateDuplicatePeers(peerID, peers); err != nil {
+					return err
 				}
 			}
-			peerAddrHasNodeSelectors[peerID] = len(p.Spec.NodeSelectors) > 0
 		}
 	}
 	for _, p := range c.Peers {
@@ -227,6 +232,103 @@ func peerIdentifier(peer metallbv1beta2.BGPPeerSpec) string {
 		id = peer.Interface
 	}
 	return fmt.Sprintf("%s-%s", id, peer.VRFName)
+}
+
+// validateDuplicatePeers validates that duplicate peers (same address/interface + VRF)
+// either have non-overlapping node selectors, or are compatible if they might overlap.
+func validateDuplicatePeers(peerID string, peers []metallbv1beta2.BGPPeer) error {
+	// Check if all duplicate peers have node selectors
+	for _, p := range peers {
+		if len(p.Spec.NodeSelectors) == 0 {
+			return fmt.Errorf("duplicate peer %s has no nodeSelectors, in FRR mode each duplicate peer must have nodeSelectors to differentiate", p.Spec.Address)
+		}
+	}
+
+	// For each pair of peers, check if they could overlap
+	for i := range peers {
+		for j := i + 1; j < len(peers); j++ {
+			peer1 := peers[i].Spec
+			peer2 := peers[j].Spec
+
+			// Check if the node selectors might overlap
+			// Note: We can't definitively determine overlap without knowing all node labels,
+			// so we check if selectors are obviously disjoint. If uncertain, we require compatibility.
+			canOverlap := nodeSelectorsCanOverlap(peer1.NodeSelectors, peer2.NodeSelectors)
+
+			if canOverlap {
+				// Selectors might overlap, so peers must be compatible
+				if !arePeersCompatible(peer1, peer2) {
+					return fmt.Errorf("duplicate peers with address/interface %s might select the same nodes but have incompatible configurations (different ASN, ports, timers, BFD profiles, etc.)", peerID)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// arePeersCompatible returns true if two peer configurations are compatible
+// (i.e., it would be safe for them to run on the same node).
+// Two peers are compatible if they would create the exact same BGP session configuration.
+// This means all fields must match except NodeSelectors (which determine node eligibility).
+func arePeersCompatible(p1, p2 metallbv1beta2.BGPPeerSpec) bool {
+	// Create copies and clear the NodeSelectors since those don't affect session compatibility
+	p1Copy := p1
+	p2Copy := p2
+	p1Copy.NodeSelectors = nil
+	p2Copy.NodeSelectors = nil
+
+	return reflect.DeepEqual(p1Copy, p2Copy)
+}
+
+// nodeSelectorsCanOverlap returns true if two sets of node selectors might select
+// overlapping nodes. This is a best-effort check - it returns true (assume overlap)
+// unless it can definitively prove the selectors are mutually exclusive.
+func nodeSelectorsCanOverlap(selectors1, selectors2 []metav1.LabelSelector) bool {
+	// If either selector list is empty (matches all nodes), they definitely overlap
+	if len(selectors1) == 0 || len(selectors2) == 0 {
+		return true
+	}
+
+	// Each peer matches nodes that satisfy ANY of its selectors (OR logic)
+	// Two peers can overlap if ANY selector from peer1 can match the same node as ANY selector from peer2
+
+	// We can only prove non-overlap in simple cases:
+	// - If selectors have contradicting labels (e.g., zone=a vs zone=b)
+
+	// For now, we use a conservative approach: assume overlap unless we can prove otherwise
+	// This means users need to ensure compatibility or use clearly disjoint selectors
+
+	// Check each pair of selectors for obvious conflicts
+	for _, sel1 := range selectors1 {
+		for _, sel2 := range selectors2 {
+			if !areLabelSelectorsObviouslyDisjoint(sel1, sel2) {
+				// Can't prove these are disjoint, so they might overlap
+				return true
+			}
+		}
+	}
+
+	// All selector pairs are obviously disjoint
+	return false
+}
+
+// areLabelSelectorsObviouslyDisjoint returns true if two label selectors are
+// clearly mutually exclusive (i.e., no node could match both).
+// This only detects simple cases like: key=value1 vs key=value2 where value1 != value2
+func areLabelSelectorsObviouslyDisjoint(sel1, sel2 metav1.LabelSelector) bool {
+	// Check for contradicting MatchLabels
+	for key, value1 := range sel1.MatchLabels {
+		if value2, exists := sel2.MatchLabels[key]; exists && value1 != value2 {
+			// Same key, different values = mutually exclusive
+			return true
+		}
+	}
+
+	// TODO: Could add more sophisticated checks for MatchExpressions
+	// For now, we only detect the simple MatchLabels case
+
+	return false
 }
 
 type poolSelector struct {
