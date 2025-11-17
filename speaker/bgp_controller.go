@@ -65,7 +65,8 @@ type bgpController struct {
 	logger             log.Logger
 	myNode             string
 	nodeLabels         labels.Set
-	peers              []*peer
+	peers              []*peer // filtered peers that should run on this node
+	allPeers           []*peer // all configured peers before filtering
 	svcAds             map[string][]*bgp.Advertisement
 	activeAds          map[string]sets.Set[string] // svc -> the peers it is advertised to
 	activeAdsMutex     sync.RWMutex
@@ -80,13 +81,13 @@ func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
 	newPeers := make([]*peer, 0, len(cfg.Peers))
 newPeers:
 	for _, p := range cfg.Peers {
-		for i, ep := range c.peers {
+		for i, ep := range c.allPeers {
 			if ep == nil {
 				continue
 			}
 			if reflect.DeepEqual(p, ep.cfg) {
 				newPeers = append(newPeers, ep)
-				c.peers[i] = nil
+				c.allPeers[i] = nil
 				continue newPeers
 			}
 		}
@@ -102,10 +103,15 @@ newPeers:
 		})
 	}
 
-	oldPeers := c.peers
-	c.peers = newPeers
+	oldAllPeers := c.allPeers
+	c.allPeers = newPeers
 
-	for _, p := range oldPeers {
+	// Filter peers by node eligibility and deduplicate before assigning
+	filteredPeers, removed, err := c.filterAndDeduplicatePeers(l, newPeers)
+	c.peers = filteredPeers
+
+	// Close sessions for removed peers (both obsolete and filtered out)
+	for _, p := range oldAllPeers {
 		if p == nil {
 			continue
 		}
@@ -119,13 +125,28 @@ newPeers:
 		level.Debug(l).Log("event", "peerRemoved", "peer", p.id, "reason", "removedFromConfig", "msg", "peer deconfigured, BGP session closed")
 	}
 
-	err := c.syncBFDProfiles(cfg.BFDProfiles)
-	if err != nil {
-		return errors.Join(err, errors.New("failed to sync bfd profiles"))
+	// Close sessions for peers filtered out due to node selector mismatch or duplicates
+	for _, p := range removed {
+		level.Info(l).Log("event", "peerRemoved", "peer", p.id, "reason", p.cfg.Name, "msg", "peer filtered, closing BGP session")
+		if p.session != nil {
+			if closeErr := p.session.Close(); closeErr != nil {
+				level.Error(l).Log("op", "setConfig", "error", closeErr, "peer", p.id, "msg", "failed to shut down BGP session")
+			}
+		}
 	}
-	err = c.sessionManager.SyncExtraInfo(cfg.BGPExtras)
+
+	// If duplicates were found, return error before syncing BFD/sessions
 	if err != nil {
-		return errors.Join(err, errors.New("failed to sync extra info"))
+		return err
+	}
+
+	bfdErr := c.syncBFDProfiles(cfg.BFDProfiles)
+	if bfdErr != nil {
+		return errors.Join(bfdErr, errors.New("failed to sync bfd profiles"))
+	}
+	extraErr := c.sessionManager.SyncExtraInfo(cfg.BGPExtras)
+	if extraErr != nil {
+		return errors.Join(extraErr, errors.New("failed to sync extra info"))
 	}
 
 	return c.syncPeers(l)
@@ -133,6 +154,51 @@ newPeers:
 
 func (c *bgpController) SetEventCallback(callback func(interface{})) {
 	c.sessionManager.SetEventCallback(callback)
+}
+
+// filterAndDeduplicatePeers filters peers based on node selector eligibility
+// and removes duplicates (same address/interface for the same node).
+// Returns the filtered peer list, the list of removed peers, and an error if duplicates were found.
+func (c *bgpController) filterAndDeduplicatePeers(l log.Logger, peers []*peer) ([]*peer, []*peer, error) {
+	var filtered []*peer
+	var removed []*peer
+	var duplicateFound bool
+	seen := make(map[string]bool) // track peer IDs we've already added
+
+	for _, p := range peers {
+		// Check if peer matches this node's labels
+		shouldRun := len(p.cfg.NodeSelectors) == 0 // no selectors = match all nodes
+		for _, ns := range p.cfg.NodeSelectors {
+			if ns.Matches(c.nodeLabels) {
+				shouldRun = true
+				break
+			}
+		}
+
+		if !shouldRun {
+			// Peer doesn't match this node's selectors
+			removed = append(removed, p)
+			continue
+		}
+
+		// Check for duplicates
+		if seen[p.id] {
+			level.Error(l).Log("op", "filterAndDeduplicatePeers", "peer", p.id, "msg", "duplicate peer found in config, please ensure each peer has a unique address or interface per node via nodeSelectors")
+			removed = append(removed, p)
+			duplicateFound = true
+			continue
+		}
+
+		seen[p.id] = true
+		filtered = append(filtered, p)
+	}
+
+	var err error
+	if duplicateFound {
+		err = fmt.Errorf("duplicate peers found for this node")
+	}
+
+	return filtered, removed, err
 }
 
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
@@ -206,49 +272,20 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 
 // Called when either the peer list or node labels have changed,
 // implying that the set of running BGP sessions may need tweaking.
+// Note: This function expects c.peers to already be filtered and deduplicated
+// by filterAndDeduplicatePeers.
 func (c *bgpController) syncPeers(l log.Logger) error {
 	var (
-		errs           int
-		needUpdateAds  bool
-		duplicatePeers = make(map[string]bool) // address/interface -> true if already seen
+		errs          int
+		needUpdateAds bool
 	)
 	for _, p := range c.peers {
-		// First, determine if the peering should be active for this
-		// node.
-		shouldRun := false
-		if len(p.cfg.NodeSelectors) == 0 {
-			shouldRun = true
-		}
-		for _, ns := range p.cfg.NodeSelectors {
-			if ns.Matches(c.nodeLabels) {
-				shouldRun = true
-				break
-			}
-		}
+		// c.peers already contains only peers that should run on this node (filtered by node selectors)
+		// and are deduplicated. We just need to manage session lifecycle.
 
-		// Now, compare current state to intended state, and correct.
-		if p.session != nil && !shouldRun {
-			// Oops, session is running but shouldn't be. Shut it down.
-			level.Info(l).Log("event", "peerRemoved", "peer", p.id, "reason", "filteredByNodeSelector", "msg", "peer deconfigured, closing BGP session")
-			if err := p.session.Close(); err != nil {
-				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.id, "msg", "failed to shut down BGP session")
-			}
-			p.session = nil
-
-			// Remove from the list of deduplicate peers.
-			delete(duplicatePeers, p.id)
-		} else if p.session == nil && shouldRun {
-			// Session doesn't exist, but should be running. Create
-			// it.
-
-			// Check for duplicate peers based on address or interface.
-			if _, ok := duplicatePeers[p.id]; ok {
-				level.Error(l).Log("op", "syncPeers", "peer", p.id, "msg", "duplicate peer found in config, please ensure each peer has a unique address or interface per node via nodeSelectors")
-				errs++
-				continue
-			}
-			duplicatePeers[p.id] = true
-
+		// Compare current state to intended state, and correct.
+		if p.session == nil {
+			// Session doesn't exist, but should be running. Create it.
 			level.Info(l).Log("event", "peerAdded", "peer", p.id, "msg", "peer configured, starting BGP session")
 			var routerID net.IP
 			if p.cfg.RouterID != nil {
@@ -291,11 +328,8 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 				p.session = s
 				needUpdateAds = true
 			}
-		} else {
-			// Session is running and should be, nothing to do.
-			// Add it to the list of deduplicate peers.
-			duplicatePeers[p.id] = true
 		}
+		// If session exists, it should continue running (nothing to do)
 	}
 	if needUpdateAds {
 		// Some new sessions came up, resync advertisement state.
@@ -508,6 +542,28 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	}
 	c.nodeLabels = ns
 	level.Info(l).Log("event", "nodeLabelsChanged", "msg", "Node labels changed, resyncing BGP peers")
+
+	// Re-filter ALL configured peers based on new node labels and deduplicate
+	filteredPeers, removed, err := c.filterAndDeduplicatePeers(l, c.allPeers)
+	c.peers = filteredPeers
+
+	// Close sessions for peers that no longer match node selectors
+	for _, p := range removed {
+		level.Info(l).Log("event", "peerRemoved", "peer", p.id, "reason", "nodeLabelsChanged", "msg", "peer no longer matches node selectors, closing BGP session")
+		if p.session != nil {
+			if closeErr := p.session.Close(); closeErr != nil {
+				level.Error(l).Log("op", "setNode", "error", closeErr, "peer", p.id, "msg", "failed to shut down BGP session")
+			}
+		}
+	}
+
+	// If duplicates were found after re-filtering, log but continue with syncPeers
+	// (syncPeers will handle starting new sessions for eligible peers)
+	if err != nil {
+		// Don't return error here - we want syncPeers to run and establish valid sessions
+		level.Warn(l).Log("event", "duplicatePeersDetected", "error", err, "msg", "duplicate peers detected after node label change")
+	}
+
 	return c.syncPeers(l)
 }
 
