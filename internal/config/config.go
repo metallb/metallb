@@ -252,9 +252,6 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	cfg.BGPExtras = bgpExtrasFor(resources)
-	if err != nil {
-		return nil, err
-	}
 
 	err = validateConfig(cfg)
 	if err != nil {
