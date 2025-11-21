@@ -77,7 +77,8 @@ jobs:
           inv lint -e host
           inv verifylicense
           inv gomodtidy
-          inv checkchanges --action="run inv gomodtidy"
+          inv e2etestgodep
+          inv checkchanges --action="run inv gomodtidy and inv e2etestgodep"
           inv generatemanifests
           inv checkchanges --action="run inv generatemanifests"
           inv generateapidocs
