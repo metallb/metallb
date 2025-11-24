@@ -627,7 +627,8 @@ func poolCount(p *config.Pool) (int64, int64, int64) {
 		}
 		sz := int64(math.Pow(2, float64(b-o)))
 
-		cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
+		cidrCopy := copyCIDR(cidr)
+		cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidrCopy)})
 		firstIP := cur.First().IP
 		lastIP := cur.Last().IP
 
@@ -697,7 +698,8 @@ func (a *Allocator) getIPFromCIDR(cidr *net.IPNet, avoidBuggyIPs bool, svc strin
 		sharing: sharingKey,
 		backend: backendKey,
 	}
-	c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
+	cidrCopy := copyCIDR(cidr)
+	c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidrCopy)})
 	for pos := c.First(); pos != nil; pos = c.Next() {
 		if avoidBuggyIPs && ipConfusesBuggyFirmwares(pos.IP) {
 			continue
@@ -760,5 +762,18 @@ func (a *Allocator) updatePoolStats(p *config.Pool) {
 		AvailableIPv6: ipv6 - int64(len(a.poolIPV6InUse[p.Name])),
 		AssignedIPv4:  int64(len(a.poolIPV4InUse[p.Name])),
 		AssignedIPv6:  int64(len(a.poolIPV6InUse[p.Name])),
+	}
+}
+
+// copyCIDR creates a new copy of a CIDR, useful for passing to functions that
+// mutate it (e.g. ipaddr.NewPrefix).
+func copyCIDR(cidr *net.IPNet) *net.IPNet {
+	ip := make(net.IP, len(cidr.IP))
+	copy(ip, cidr.IP)
+	mask := make(net.IPMask, len(cidr.Mask))
+	copy(mask, cidr.Mask)
+	return &net.IPNet{
+		IP:   ip,
+		Mask: mask,
 	}
 }
