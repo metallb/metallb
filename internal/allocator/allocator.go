@@ -265,13 +265,14 @@ func (a *Allocator) Unassign(svc string) {
 }
 
 // getFreeIPsFromPool determines, with best effort, an ipv4 and an ipv6 available from the provided pool.
+// Returns an error if no available IPs are found.
 func (a *Allocator) getFreeIPsFromPool(
 	pool *config.Pool,
 	svcKey string,
 	ports []Port,
 	sharingKey,
 	backendKey string,
-) *Allocation {
+) (*Allocation, error) {
 	allocation := &Allocation{
 		PoolName: pool.Name,
 		IPV4:     nil,
@@ -286,7 +287,10 @@ func (a *Allocator) getFreeIPsFromPool(
 			allocation.setIPForFamily(cidrIPFamily, ip)
 		}
 	}
-	return allocation
+	if allocation.IPV4 == nil && allocation.IPV6 == nil {
+		return nil, fmt.Errorf("no available IPs in pool %s", pool.Name)
+	}
+	return allocation, nil
 }
 
 // findBestPoolForService returns the ipPool corresponding with the most suitable pool for a serviceIPFamily.
@@ -310,7 +314,10 @@ func (a *Allocator) findBestPoolForService(
 		secondaryIPFamily = ipfamily.IPv4
 	}
 	for _, pool := range pools {
-		allocation := a.getFreeIPsFromPool(pool, svcKey, ports, sharingKey, backendKey)
+		allocation, err := a.getFreeIPsFromPool(pool, svcKey, ports, sharingKey, backendKey)
+		if err != nil { // the pool has no available ips, try next pool
+			continue
+		}
 		// This can happen only in case serviceIPFamily is ipv4 or ipv6.
 		if ip := allocation.getIPForFamily(serviceIPFamily); ip != nil {
 			return allocation, nil
@@ -448,7 +455,10 @@ func (a *Allocator) AllocateFromPool(
 		return nil, fmt.Errorf("unknown pool %q", poolName)
 	}
 
-	poolIps := a.getFreeIPsFromPool(pool, svcKey, ports, sharingKey, backendKey)
+	poolIps, err := a.getFreeIPsFromPool(pool, svcKey, ports, sharingKey, backendKey)
+	if err != nil {
+		return nil, err
+	}
 	ips, err := poolIps.selectIPsForFamilyAndPolicy(serviceIPFamily, serviceIPFamilyPolicy)
 	if err != nil {
 		return nil, err
@@ -484,7 +494,10 @@ func (a *Allocator) AllocateFromPoolForAdditionalFamily(
 		return nil, fmt.Errorf("unknown pool %q", poolName)
 	}
 
-	poolIps := a.getFreeIPsFromPool(pool, svcKey, ports, sharingKey, backendKey)
+	poolIps, err := a.getFreeIPsFromPool(pool, svcKey, ports, sharingKey, backendKey)
+	if err != nil {
+		return nil, err
+	}
 	additionalIPs, err := poolIps.selectIPsForFamilyAndPolicy(additionalFamily, v1.IPFamilyPolicySingleStack)
 	if err != nil {
 		return nil, err
