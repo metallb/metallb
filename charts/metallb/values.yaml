@@ -265,6 +265,16 @@ speaker:
   # -- Speaker log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none`
   logLevel: info
   tolerateMaster: true
+  # Enable Kubernetes Lease coordination for Layer2 announcements
+  enableL2Lease: false
+  # Lease timing configuration for Layer2 announcements (when enableL2Lease is true)
+  leaseTimings:
+    # Duration of the lease in seconds (default: 15s)
+    duration: 15
+    # Renew deadline in seconds (default: 10s)
+    renewDeadline: 10
+    # Retry period in seconds (default: 2s)
+    retryPeriod: 2
   memberlist:
     # --  When enabled: false, the speaker pods must run on all nodes
     enabled: true
