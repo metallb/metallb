@@ -1429,6 +1429,17 @@ def gomodtidy(ctx):
 
 
 @task
+def e2etestgodep(ctx):
+    """Runs go mod tidy and go work sync in e2etest directory"""
+    res = run("cd e2etest && go mod tidy", echo=True)
+    if not res.ok:
+        raise Exit(message="go mod tidy failed in e2etest")
+    res = run("cd e2etest && go work sync", echo=True)
+    if not res.ok:
+        raise Exit(message="go work sync failed in e2etest")
+
+
+@task
 def generatemanifests(ctx):
     """Re-generates the all-in-one manifests under config/manifests"""
     generate_manifest(ctx, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
