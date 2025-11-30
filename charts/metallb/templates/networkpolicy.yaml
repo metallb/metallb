@@ -5,7 +5,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny
-  namespace: {{ .Release.Namespace | quote }}
+  namespace: {{ include "metallb.namespace" . | quote }}
 spec:
   podSelector: {}
   policyTypes:
@@ -17,7 +17,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: controller
-  namespace: {{ .Release.Namespace | quote }}
+  namespace: {{ include "metallb.namespace" . | quote }}
 spec:
   podSelector:
     matchLabels:

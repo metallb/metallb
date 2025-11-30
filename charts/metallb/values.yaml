@@ -5,6 +5,7 @@
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
+namespaceOverride: ""
 loadBalancerClass: ""
 
 # To configure MetalLB, you must specify ONE of the following two
@@ -364,6 +365,7 @@ speaker:
 
 crds:
   enabled: true
+  namespaceOverride: ""
   validationFailurePolicy: Fail
 
 # frrk8s contains the configuration related to using an frrk8s instance
