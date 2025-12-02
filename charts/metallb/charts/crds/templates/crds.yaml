@@ -338,7 +338,7 @@ spec:
       clientConfig:
         service:
           name: metallb-webhook-service
-          namespace: {{ include "crds.namespace" }}
+          namespace: {{ include "crds.namespace" . }}
           path: /convert
       conversionReviewVersions:
         - v1beta1
