@@ -8,7 +8,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ template "metallb.fullname" . }}-speaker-monitor
-  namespace: {{ .Release.Namespace | quote }}
+  namespace: {{ include "metallb.namespace" . | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: speaker
@@ -60,7 +60,7 @@ spec:
   jobLabel: {{ .Values.prometheus.serviceMonitor.jobLabel | quote }}
   namespaceSelector:
     matchNames:
-      - {{ .Release.Namespace }}
+      - {{ include "metallb.namespace" . }}
   selector:
     matchLabels:
       name: {{ template "metallb.fullname" . }}-speaker-monitor-service
@@ -77,7 +77,7 @@ metadata:
     name: {{ template "metallb.fullname" . }}-speaker-monitor-service
     {{- include "metallb.labels" . | nindent 4 }}
   name: {{ template "metallb.fullname" . }}-speaker-monitor-service
-  namespace: {{ .Release.Namespace | quote }}
+  namespace: {{ include "metallb.namespace" . | quote }}
 spec:
   selector:
     {{- include "metallb.selectorLabels" . | nindent 4 }}
@@ -100,7 +100,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ template "metallb.fullname" . }}-controller-monitor
-  namespace: {{ .Release.Namespace | quote }}
+  namespace: {{ include "metallb.namespace" . | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     {{- if .Values.prometheus.serviceMonitor.controller.additionalLabels }}
@@ -136,7 +136,7 @@ spec:
   jobLabel: {{ .Values.prometheus.serviceMonitor.jobLabel | quote }}
   namespaceSelector:
     matchNames:
-      - {{ .Release.Namespace }}
+      - {{ include "metallb.namespace" . }}
   selector:
     matchLabels:
       name: {{ template "metallb.fullname" . }}-controller-monitor-service
@@ -152,6 +152,7 @@ metadata:
   labels:
     name: {{ template "metallb.fullname" . }}-controller-monitor-service
   name: {{ template "metallb.fullname" . }}-controller-monitor-service
+  namespace: {{ include "metallb.namespace" . | quote }}
 spec:
   selector:
     {{- include "metallb.selectorLabels" . | nindent 4 }}
@@ -169,7 +170,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ template "metallb.fullname" . }}-prometheus
-  namespace: {{ .Release.Namespace | quote }}
+  namespace: {{ include "metallb.namespace" . | quote }}
 rules:
   - apiGroups:
       - ""
@@ -186,7 +187,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ template "metallb.fullname" . }}-prometheus
-  namespace: {{ .Release.Namespace | quote }}
+  namespace: {{ include "metallb.namespace" . | quote }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

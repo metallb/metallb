@@ -25,6 +25,19 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 
 {{/*
+Construct the namespace for all namespaced resources
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+Preserve the default behavior of the Release namespace if no override is provided
+*/}}
+{{- define "metallb.namespace" -}}
+{{- if .Values.namespaceOverride -}}
+{{- .Values.namespaceOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- .Release.Namespace -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "metallb.chart" -}}

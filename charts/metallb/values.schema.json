@@ -151,6 +151,10 @@
       "description": "Override chart name",
       "type": "string"
     },
+    "namespaceOverride": {
+      "description": "Override namespace for namespaced resources",
+      "type": "string"
+    },
     "fullNameOverride": {
       "description": "Override fully qualified app name",
       "type": "string"
