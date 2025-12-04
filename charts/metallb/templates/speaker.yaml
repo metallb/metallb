@@ -203,6 +203,12 @@ spec:
           emptyDir: {}
         - name: metrics
           emptyDir: {}
+        - name: frr-tmp
+          emptyDir: {}
+        - name: frr-lib
+          emptyDir: {}
+        - name: frr-log
+          emptyDir: {}
       initContainers:
         # Copies the initial config files with the right permissions to the shared volume.
         - name: cp-frr-files
@@ -216,6 +222,10 @@ spec:
               mountPath: /tmp/frr
             - name: frr-conf
               mountPath: /etc/frr
+          {{- with .Values.speaker.initContainers.cpFrrFiles.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         # Copies the reloader to the shared volume between the speaker and reloader.
         - name: cp-reloader
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
@@ -223,6 +233,10 @@ spec:
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
+          {{- with .Values.speaker.initContainers.cpReloader.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         # Copies the metrics exporter
         - name: cp-metrics
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
@@ -230,6 +244,10 @@ spec:
           volumeMounts:
             - name: metrics
               mountPath: /etc/frr_metrics
+          {{- with .Values.speaker.initContainers.cpMetrics.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       shareProcessNamespace: true
       {{- end }}
       containers:
@@ -373,6 +391,8 @@ spec:
       {{- if .Values.speaker.frr.enabled }}
       - name: frr
         securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
           capabilities:
             add:
             - NET_ADMIN
@@ -391,6 +411,10 @@ spec:
             mountPath: /var/run/frr
           - name: frr-conf
             mountPath: /etc/frr
+          - name: frr-tmp
+            mountPath: /var/tmp/frr
+          - name: frr-lib
+            mountPath: /var/lib/frr
         # The command is FRR's default entrypoint & waiting for the log file to appear and tailing it.
         # If the log file isn't created in 60 seconds the tail fails and the container is restarted.
         # This workaround is needed to have the frr logs as part of kubectl logs -c frr < speaker_pod_name >.
@@ -439,6 +463,9 @@ spec:
         {{- if .Values.speaker.frr.image.pullPolicy }}
         imagePullPolicy: {{ .Values.speaker.frr.image.pullPolicy }}
         {{- end }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
         command: ["/etc/frr_reloader/frr-reloader.sh"]
         volumeMounts:
           - name: frr-sockets
@@ -447,12 +474,17 @@ spec:
             mountPath: /etc/frr
           - name: reloader
             mountPath: /etc/frr_reloader
+          - name: frr-log
+            mountPath: /var/log/frr
         {{- with .Values.speaker.reloader.resources }}
         resources:
           {{- toYaml . | nindent 12 }}
         {{- end }}
       - name: frr-metrics
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
         command: ["/etc/frr_metrics/frr-metrics"]
         args:
           - --metrics-port={{ .Values.speaker.frr.metricsPort }}
@@ -464,7 +496,7 @@ spec:
             value: /dev/null
         ports:
           - containerPort: {{ .Values.speaker.frr.metricsPort }}
-            name: monitoring
+            name: frrmetrics
         volumeMounts:
           - name: frr-sockets
             mountPath: /var/run/frr
@@ -481,6 +513,9 @@ spec:
       - name: kube-rbac-proxy
         image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag }}
         imagePullPolicy: {{ .Values.prometheus.rbacProxy.pullPolicy }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
         args:
           - --logtostderr
           - --secure-listen-address=:{{ .Values.prometheus.secureMetricsPort }}
@@ -510,6 +545,9 @@ spec:
       - name: kube-rbac-proxy-frr
         image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.prometheus.rbacProxy.pullPolicy }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
         args:
           - --logtostderr
           - --secure-listen-address=:{{ .Values.speaker.frr.secureMetricsPort }}

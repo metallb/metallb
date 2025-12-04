@@ -17,7 +17,7 @@ Kubernetes: `>= 1.19.0-0`
 | Repository | Name | Version |
 |------------|------|---------|
 |  | crds | 0.0.0 |
-| https://metallb.github.io/frr-k8s | frr-k8s | 0.0.20 |
+| https://metallb.github.io/frr-k8s | frr-k8s | 0.0.21 |
 
 ## Values
 
@@ -58,6 +58,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.tlsCipherSuites | string | `""` |  |
 | controller.tlsMinVersion | string | `"VersionTLS12"` |  |
 | controller.tolerations | list | `[]` |  |
+| controller.webhookMode | string | `"enabled"` |  |
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
 | frrk8s.enabled | bool | `false` |  |
@@ -67,6 +68,9 @@ Kubernetes: `>= 1.19.0-0`
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
 | nameOverride | string | `""` |  |
+| networkpolicies.apiPort | int | `6443` |  |
+| networkpolicies.defaultDeny | bool | `false` |  |
+| networkpolicies.enabled | bool | `false` |  |
 | prometheus.controllerMetricsTLSSecret | string | `""` |  |
 | prometheus.metricsPort | int | `7472` |  |
 | prometheus.namespace | string | `""` |  |
@@ -124,7 +128,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.frr.enabled | bool | `true` |  |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"quay.io/frrouting/frr"` |  |
-| speaker.frr.image.tag | string | `"9.1.0"` |  |
+| speaker.frr.image.tag | string | `"10.4.1"` |  |
 | speaker.frr.metricsPort | int | `7473` |  |
 | speaker.frr.resources | object | `{}` |  |
 | speaker.frrMetrics.resources | object | `{}` |  |
@@ -132,6 +136,9 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.image.pullPolicy | string | `nil` |  |
 | speaker.image.repository | string | `"quay.io/metallb/speaker"` |  |
 | speaker.image.tag | string | `nil` |  |
+| speaker.initContainers.cpFrrFiles.resources | object | `{}` |  |
+| speaker.initContainers.cpMetrics.resources | object | `{}` |  |
+| speaker.initContainers.cpReloader.resources | object | `{}` |  |
 | speaker.labels | object | `{}` |  |
 | speaker.livenessProbe.enabled | bool | `true` |  |
 | speaker.livenessProbe.failureThreshold | int | `3` |  |

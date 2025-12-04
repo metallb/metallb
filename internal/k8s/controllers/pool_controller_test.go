@@ -38,6 +38,7 @@ func TestPoolController(t *testing.T) {
 		validResources          bool
 		expectReconcileFails    bool
 		expectForceReloadCalled bool
+		wantConditions          []v1.Condition
 	}{
 		{
 			desc:                    "handler returns SyncStateSuccess, valid resources",
@@ -45,6 +46,13 @@ func TestPoolController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantConditions: []v1.Condition{
+				{
+					Type:   "poolReconcilerValid",
+					Status: v1.ConditionTrue,
+					Reason: ErrorTypeNone,
+				},
+			},
 		},
 		{
 			desc:                    "handler returns SyncStateError, valid resources",
@@ -52,6 +60,14 @@ func TestPoolController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    true,
 			expectForceReloadCalled: false,
+			wantConditions: []v1.Condition{
+				{
+					Type:    "poolReconcilerValid",
+					Status:  v1.ConditionFalse,
+					Reason:  ErrorTypeConfiguration,
+					Message: "configuration error: general handler sync state error",
+				},
+			},
 		},
 		{
 			desc:                    "handler returns SyncStateErrorNoRetry, valid resources",
@@ -59,6 +75,14 @@ func TestPoolController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantConditions: []v1.Condition{
+				{
+					Type:    "poolReconcilerValid",
+					Status:  v1.ConditionFalse,
+					Reason:  ErrorTypeConfiguration,
+					Message: "configuration error: general handler sync state error",
+				},
+			},
 		},
 		{
 			desc:                    "handler returns SyncStateReprocessAll, valid resources",
@@ -66,6 +90,14 @@ func TestPoolController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: true,
+			wantConditions: []v1.Condition{
+				{
+					Type:    "poolReconcilerValid",
+					Status:  v1.ConditionTrue,
+					Reason:  ErrorTypeNone,
+					Message: "",
+				},
+			},
 		},
 		{
 			desc:                    "handler returns SyncStateSuccess, invalid resources",
@@ -73,64 +105,97 @@ func TestPoolController(t *testing.T) {
 			validResources:          false,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantConditions: []v1.Condition{
+				{
+					Type:    "poolReconcilerValid",
+					Status:  v1.ConditionFalse,
+					Reason:  ErrorTypeConfiguration,
+					Message: "configuration error: parsing address pool pool1: pool has no prefixes defined",
+				},
+			},
 		},
 	}
 	for _, test := range tests {
-		var resources metallbcfg.ClusterResources
-		if test.validResources {
-			resources = poolControllerValidResources
-		} else {
-			resources = poolControllerInvalidResources
-		}
-
-		initObjects := objectsFromResources(resources)
-		fakeClient, err := newFakeClient(initObjects)
-		if err != nil {
-			t.Fatalf("test %s failed to create fake client: %v", test.desc, err)
-		}
-
-		expectedCfg, err := metallbcfg.For(resources, metallbcfg.DontValidate)
-		if err != nil && test.validResources {
-			t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
-		}
-
-		cmpOpt := cmpopts.IgnoreUnexported(metallbcfg.Pool{})
-
-		mockHandler := func(l log.Logger, pools *metallbcfg.Pools) SyncState {
-			if !cmp.Equal(expectedCfg.Pools, pools, cmpOpt) {
-				t.Errorf("test %s failed, handler called with unexpected config: %s", test.desc, cmp.Diff(expectedCfg.Pools, pools, cmpOpt))
+		t.Run(test.desc, func(t *testing.T) {
+			var resources metallbcfg.ClusterResources
+			if test.validResources {
+				resources = poolControllerValidResources
+			} else {
+				resources = poolControllerInvalidResources
 			}
-			return test.handlerRes
-		}
 
-		calledForceReload := false
-		mockForceReload := func() { calledForceReload = true }
+			initObjects := objectsFromResources(resources)
 
-		r := &PoolReconciler{
-			Client:         fakeClient,
-			Logger:         log.NewNopLogger(),
-			Scheme:         scheme.Scheme,
-			Namespace:      testNamespace,
-			ValidateConfig: metallbcfg.DontValidate,
-			Handler:        mockHandler,
-			ForceReload:    mockForceReload,
-		}
-		req := reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: testNamespace,
-			},
-		}
+			configStateRef := &v1beta1.ConfigurationState{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "controller",
+					Namespace: testNamespace,
+				},
+			}
+			initObjects = append(initObjects, configStateRef)
 
-		_, err = r.Reconcile(context.TODO(), req)
-		failedReconcile := err != nil
+			fakeClient, err := newFakeClient(initObjects)
+			if err != nil {
+				t.Fatalf("test %s failed to create fake client: %v", test.desc, err)
+			}
 
-		if test.expectReconcileFails != failedReconcile {
-			t.Errorf("test %s failed: fail reconcile expected: %v, got: %v. err: %v", test.desc, test.expectReconcileFails, failedReconcile, err)
-		}
+			expectedCfg, err := metallbcfg.For(resources, metallbcfg.DontValidate)
+			if err != nil && test.validResources {
+				t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
+			}
 
-		if test.expectForceReloadCalled != calledForceReload {
-			t.Errorf("test %s failed: call force reload expected: %v, got: %v", test.desc, test.expectForceReloadCalled, calledForceReload)
-		}
+			cmpOpt := cmpopts.IgnoreUnexported(metallbcfg.Pool{})
+
+			mockHandler := func(l log.Logger, pools *metallbcfg.Pools) SyncState {
+				if !cmp.Equal(expectedCfg.Pools, pools, cmpOpt) {
+					t.Errorf("test %s failed, handler called with unexpected config: %s", test.desc, cmp.Diff(expectedCfg.Pools, pools, cmpOpt))
+				}
+				return test.handlerRes
+			}
+
+			calledForceReload := false
+			mockForceReload := func() { calledForceReload = true }
+
+			r := &PoolReconciler{
+				Client:          fakeClient,
+				Logger:          log.NewNopLogger(),
+				Scheme:          scheme.Scheme,
+				Namespace:       testNamespace,
+				ValidateConfig:  metallbcfg.DontValidate,
+				Handler:         mockHandler,
+				ForceReload:     mockForceReload,
+				ConfigStateName: configStateRef.Name,
+			}
+			req := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: testNamespace,
+				},
+			}
+
+			_, err = r.Reconcile(context.TODO(), req)
+			failedReconcile := err != nil
+
+			if test.expectReconcileFails != failedReconcile {
+				t.Errorf("%s: fail reconcile expected: %v, got: %v. err: %v", test.desc, test.expectReconcileFails, failedReconcile, err)
+			}
+
+			if test.expectForceReloadCalled != calledForceReload {
+				t.Errorf("%s: call force reload expected: %v, got: %v", test.desc, test.expectForceReloadCalled, calledForceReload)
+			}
+
+			var gotConfigState v1beta1.ConfigurationState
+			if err := fakeClient.Get(context.Background(), types.NamespacedName{
+				Name:      configStateRef.Name,
+				Namespace: configStateRef.Namespace,
+			}, &gotConfigState); err != nil {
+				t.Fatalf("%s: failed to get ConfigurationState: %v", test.desc, err)
+			}
+
+			opts := cmpopts.IgnoreFields(v1.Condition{}, "LastTransitionTime")
+			if diff := cmp.Diff(test.wantConditions, gotConfigState.Status.Conditions, opts); diff != "" {
+				t.Errorf("%s: conditions mismatch (-want +got):\n%s", test.desc, diff)
+			}
+		})
 	}
 }
 

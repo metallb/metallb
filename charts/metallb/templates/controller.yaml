@@ -95,9 +95,11 @@ spec:
         ports:
         - name: monitoring
           containerPort: {{ .Values.prometheus.metricsPort }}
+        {{- if and .Values.controller.webhookMode (ne .Values.controller.webhookMode "disabled") }}
         - containerPort: 9443
           name: webhook-server
           protocol: TCP
+        {{- end }}
         volumeMounts:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: cert
@@ -138,6 +140,9 @@ spec:
       - name: kube-rbac-proxy
         image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag }}
         imagePullPolicy: {{ .Values.prometheus.rbacProxy.pullPolicy }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
         args:
           - --logtostderr
           - --secure-listen-address=:{{ .Values.prometheus.secureMetricsPort }}

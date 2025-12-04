@@ -11,7 +11,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bfdprofiles.metallb.io
 spec:
   group: metallb.io
@@ -132,7 +132,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bgpadvertisements.metallb.io
 spec:
   group: metallb.io
@@ -349,7 +349,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: bgppeers.metallb.io
 spec:
   conversion:
@@ -801,7 +801,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: communities.metallb.io
 spec:
   group: metallb.io
@@ -855,6 +855,140 @@ spec:
             type: object
           status:
             description: CommunityStatus defines the observed state of Community.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: configurationstates.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: ConfigurationState
+    listKind: ConfigurationStateList
+    plural: configurationstates
+    singular: configurationstate
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.result
+      name: Result
+      type: string
+    - jsonPath: .status.errorSummary
+      name: ErrorSummary
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ConfigurationState is a status-only CRD that reports configuration validation results from MetalLB components.
+          Labels:
+            - metallb.io/component-type: "controller" or "speaker"
+            - metallb.io/node-name: node name (only for speaker)
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          status:
+            description: ConfigurationStateStatus defines the observed state of ConfigurationState.
+            properties:
+              conditions:
+                description: Conditions contains the status conditions from the reconcilers
+                  running in this component.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              errorSummary:
+                description: |-
+                  ErrorSummary contains the aggregated error messages from reconciliation failures.
+                  This field is empty when Result is "Valid".
+                type: string
+              result:
+                description: Result indicates the configuration validation result.
+                enum:
+                - Valid
+                - Invalid
+                - Unknown
+                type: string
             type: object
         type: object
     served: true
@@ -1418,7 +1552,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: ipaddresspools.metallb.io
 spec:
   group: metallb.io
@@ -1656,7 +1790,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: l2advertisements.metallb.io
 spec:
   group: metallb.io
@@ -1843,7 +1977,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: servicebgpstatuses.metallb.io
 spec:
   group: metallb.io
@@ -1929,7 +2063,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: servicel2statuses.metallb.io
 spec:
   group: metallb.io
@@ -2159,6 +2293,37 @@ rules:
   - get
   - list
   - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frr-k8s
+    app.kubernetes.io/instance: frr-k8s-role
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: role
+    app.kubernetes.io/part-of: frr-k8s
+  name: frr-k8s-nodestate-cleaner-role
+  namespace: metallb-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - frrk8s.metallb.io
+  resources:
+  - frrnodestates
+  verbs:
+  - get
+  - list
+  - watch
+  - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -2487,6 +2652,7 @@ rules:
   - ipaddresspools.metallb.io
   - l2advertisements.metallb.io
   - communities.metallb.io
+  - configurationstates.metallb.io
   resources:
   - customresourcedefinitions
   verbs:
@@ -2504,6 +2670,26 @@ rules:
   verbs:
   - list
   - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - configurationstates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - configurationstates/status
+  verbs:
+  - get
+  - patch
+  - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -2540,6 +2726,8 @@ rules:
   resources:
   - servicel2statuses
   - servicel2statuses/status
+  - configurationstates
+  - configurationstates/status
   verbs:
   - '*'
 - apiGroups:
@@ -2609,6 +2797,27 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: frr-k8s-daemon-role
+subjects:
+- kind: ServiceAccount
+  name: frr-k8s-daemon
+  namespace: metallb-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frr-k8s
+    app.kubernetes.io/instance: frr-k8s-rolebinding
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: rolebinding
+    app.kubernetes.io/part-of: frr-k8s
+  name: frr-k8s-nodestate-cleaner-rolebinding
+  namespace: metallb-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: frr-k8s-nodestate-cleaner-role
 subjects:
 - kind: ServiceAccount
   name: frr-k8s-daemon
@@ -2815,7 +3024,7 @@ metadata:
 apiVersion: v1
 data:
   excludel2.yaml: |
-    announcedInterfacesToExclude: ["^docker.*", "^cbr.*", "^dummy.*", "^virbr.*", "^lxcbr.*", "^veth.*", "^lo$", "^cali.*", "^tunl.*", "^flannel.*", "^kube-ipvs.*", "^cni.*", "^nodelocaldns.*"]
+    announcedInterfacesToExclude: ["^docker.*", "^cbr.*", "^dummy.*", "^virbr.*", "^lxcbr.*", "^veth.*", "^lo$", "^cali.*", "^tunl.*", "^flannel.*", "^kube-ipvs.*", "^cni.*", "^nodelocaldns.*", "^lxc.*"]
 kind: ConfigMap
 metadata:
   name: metallb-excludel2
@@ -2887,7 +3096,7 @@ spec:
   - port: 443
     targetPort: webhook
   selector:
-    control-plane: webhook-server
+    control-plane: statuscleaner
 ---
 apiVersion: v1
 kind: Service
@@ -3015,6 +3224,7 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: true
       nodeSelector:
         kubernetes.io/os: linux
       securityContext:
@@ -3039,34 +3249,33 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: frr-k8s
     app.kubernetes.io/part-of: frr-k8s
-    control-plane: webhook-server
-  name: frr-k8s-webhook-server
+    control-plane: statuscleaner
+  name: frr-k8s-statuscleaner
   namespace: metallb-system
 spec:
   selector:
     matchLabels:
-      control-plane: webhook-server
+      control-plane: statuscleaner
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: frr-k8s-webhook-server
       labels:
         app: frr-k8s-webhook-server
-        control-plane: webhook-server
+        control-plane: statuscleaner
     spec:
       containers:
       - args:
         - --log-level=info
-        - --webhook-mode=onlywebhook
         - --namespace=$(NAMESPACE)
         command:
-        - /frr-k8s
+        - /statuscleaner
         env:
         - name: NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3142,6 +3351,7 @@ spec:
         kubectl.kubernetes.io/default-container: frr-k8s
       labels:
         app: frr-k8s
+        app.kubernetes.io/component: frr-k8s
         control-plane: frr-k8s
     spec:
       affinity:
@@ -3227,7 +3437,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3277,7 +3487,7 @@ spec:
         env:
         - name: TINI_SUBREAPER
           value: "true"
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -3310,7 +3520,7 @@ spec:
         - --metrics-bind-address=127.0.0.1
         command:
         - /etc/frr_metrics/frr-metrics
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: frr-metrics
         ports:
         - containerPort: 7573
@@ -3341,7 +3551,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: frr-status
         volumeMounts:
         - mountPath: /var/run/frr
@@ -3352,7 +3562,7 @@ spec:
           name: frr-status
       - command:
         - /etc/frr_reloader/frr-reloader.sh
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: reloader
         volumeMounts:
         - mountPath: /var/run/frr
@@ -3367,7 +3577,7 @@ spec:
         - /bin/sh
         - -c
         - cp -rLf /tmp/frr/* /etc/frr/
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.4.1
         name: cp-frr-files
         securityContext:
           runAsGroup: 101
@@ -3381,7 +3591,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-reloader.sh /etc/frr_reloader/
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         name: cp-reloader
         volumeMounts:
         - mountPath: /etc/frr_reloader
@@ -3390,7 +3600,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-metrics /etc/frr_metrics/
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         name: cp-metrics
         volumeMounts:
         - mountPath: /etc/frr_metrics
@@ -3399,7 +3609,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-status /etc/frr_status/
-        image: quay.io/metallb/frr-k8s:v0.0.20
+        image: quay.io/metallb/frr-k8s:v0.0.21
         name: cp-frr-status
         volumeMounts:
         - mountPath: /etc/frr_status
@@ -3549,6 +3759,7 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: true
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux

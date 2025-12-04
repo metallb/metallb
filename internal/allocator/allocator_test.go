@@ -82,71 +82,77 @@ func noopCallback(_ string) {}
 
 func TestAssignment(t *testing.T) {
 	alloc := New(noopCallback)
-	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
-		"test": {
-			Name:       "test",
-			AutoAssign: true,
-			CIDR: []*net.IPNet{
-				ipnet("1.2.3.4/31"),
-				ipnet("1000::4/127"),
+	makePools := func() *config.Pools {
+		return &config.Pools{ByName: map[string]*config.Pool{
+			"test": {
+				Name:       "test",
+				AutoAssign: true,
+				CIDR: []*net.IPNet{
+					ipnet("1.2.3.4/31"),
+					ipnet("1000::4/127"),
+				},
 			},
-		},
-		"test2": {
-			Name:          "test2",
-			AvoidBuggyIPs: true,
-			AutoAssign:    true,
-			CIDR: []*net.IPNet{
-				ipnet("1.2.4.0/24"),
-				ipnet("1000::4:0/120"),
+			"test2": {
+				Name:          "test2",
+				AvoidBuggyIPs: true,
+				AutoAssign:    true,
+				CIDR: []*net.IPNet{
+					ipnet("1.2.4.0/24"),
+					ipnet("1000::4:0/120"),
+				},
 			},
-		},
-		"test3": {
-			Name:               "test3",
-			AvoidBuggyIPs:      true,
-			AutoAssign:         true,
-			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1")},
-			CIDR: []*net.IPNet{
-				ipnet("1.2.5.0/24"),
-				ipnet("1000::5:0/120"),
+			"test3": {
+				Name:               "test3",
+				AvoidBuggyIPs:      true,
+				AutoAssign:         true,
+				ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1")},
+				CIDR: []*net.IPNet{
+					ipnet("1.2.5.0/24"),
+					ipnet("1000::5:0/120"),
+				},
 			},
-		},
-		"test4": {
-			Name:               "test4",
-			AvoidBuggyIPs:      true,
-			AutoAssign:         true,
-			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{selector("team=metallb")}},
-			CIDR: []*net.IPNet{
-				ipnet("1.2.6.0/24"),
-				ipnet("1000::6:0/120"),
+			"test4": {
+				Name:               "test4",
+				AvoidBuggyIPs:      true,
+				AutoAssign:         true,
+				ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{selector("team=metallb")}},
+				CIDR: []*net.IPNet{
+					ipnet("1.2.6.0/24"),
+					ipnet("1000::6:0/120"),
+				},
 			},
-		},
-		"test5": {
-			Name:          "test5",
-			AvoidBuggyIPs: true,
-			AutoAssign:    true,
-			ServiceAllocations: &config.ServiceAllocation{
-				Priority: 20, Namespaces: sets.New("test-ns1"),
-				ServiceSelectors: []labels.Selector{selector("team=metallb")},
+			"test5": {
+				Name:          "test5",
+				AvoidBuggyIPs: true,
+				AutoAssign:    true,
+				ServiceAllocations: &config.ServiceAllocation{
+					Priority: 20, Namespaces: sets.New("test-ns1"),
+					ServiceSelectors: []labels.Selector{selector("team=metallb")},
+				},
+				CIDR: []*net.IPNet{
+					ipnet("1.2.7.0/24"),
+					ipnet("1000::7:0/120"),
+				},
 			},
-			CIDR: []*net.IPNet{
-				ipnet("1.2.7.0/24"),
-				ipnet("1000::7:0/120"),
+			"test6": {
+				Name:          "test6",
+				AvoidBuggyIPs: true,
+				AutoAssign:    true,
+				ServiceAllocations: &config.ServiceAllocation{
+					Priority: 20, Namespaces: sets.New("test-ns2"),
+					ServiceSelectors: []labels.Selector{selector("foo=bar")},
+				},
+				CIDR: []*net.IPNet{
+					ipnet("1.2.8.0/24"),
+					ipnet("1000::9:0/120"),
+				},
 			},
-		},
-		"test6": {
-			Name:          "test6",
-			AvoidBuggyIPs: true,
-			AutoAssign:    true,
-			ServiceAllocations: &config.ServiceAllocation{
-				Priority: 20, Namespaces: sets.New("test-ns2"),
-				ServiceSelectors: []labels.Selector{selector("foo=bar")},
-			},
-			CIDR: []*net.IPNet{
-				ipnet("1.2.8.0/24"),
-				ipnet("1000::9:0/120"),
-			},
-		},
-	}})
+		}}
+	}
+
+	originalConfig := makePools()
+	passedConfig := makePools()
+	alloc.SetPools(passedConfig)
 
 	tests := []struct {
 		desc       string
@@ -655,6 +661,9 @@ func TestAssignment(t *testing.T) {
 	for _, test := range tests {
 		if len(test.ips) == 0 {
 			alloc.Unassign(test.svcKey)
+			if !reflect.DeepEqual(originalConfig, passedConfig) {
+				t.Errorf("%q: config mutated in Unassign!", test.desc)
+			}
 			continue
 		}
 		ips := []net.IP{}
@@ -672,6 +681,9 @@ func TestAssignment(t *testing.T) {
 			} else if a := assigned(alloc, test.svcKey); !alreadyHasIPs && reflect.DeepEqual(a, test.ips) {
 				t.Errorf("%q: Assign(%q, %q) failed, but allocator did record allocation", test.desc, test.svcKey, test.ips)
 			}
+			if !reflect.DeepEqual(originalConfig, passedConfig) {
+				t.Errorf("%q: config mutated in failed Assign!", test.desc)
+			}
 
 			continue
 		}
@@ -681,6 +693,9 @@ func TestAssignment(t *testing.T) {
 		}
 		if a := assigned(alloc, test.svcKey); !reflect.DeepEqual(a, test.ips) {
 			t.Errorf("%q: ran Assign(%q, %q), but allocator has recorded allocation of %q", test.desc, test.svcKey, test.ips, a)
+		}
+		if !reflect.DeepEqual(originalConfig, passedConfig) {
+			t.Errorf("%q: config mutated in Assign!", test.desc)
 		}
 	}
 }
@@ -1229,12 +1244,17 @@ func TestPoolAllocation(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s: AllocateFromPool(%q, \"test\"): %s", test.desc, test.svcKey, err)
 		}
-		validIPs := validIP4s
-		if test.ipFamily == ipfamily.IPv6 {
+
+		var validIPs map[string]bool
+		switch test.ipFamily {
+		case ipfamily.IPv6:
 			validIPs = validIP6s
-		} else if test.ipFamily == ipfamily.DualStack {
+		case ipfamily.DualStack:
 			validIPs = validIPDualStacks
+		default:
+			validIPs = validIP4s
 		}
+
 		for _, ip := range ips {
 			if !validIPs[ip.String()] {
 				t.Errorf("%s: allocated unexpected IP %q", test.desc, ip)
@@ -1605,12 +1625,16 @@ func TestAllocation(t *testing.T) {
 			t.Errorf("%s: Allocate(%q, \"test\"): %s", test.desc, test.svcKey, err)
 		}
 
-		validIPs := validIP4s
-		if test.ipFamily == ipfamily.IPv6 {
+		var validIPs map[string]bool
+		switch test.ipFamily {
+		case ipfamily.IPv6:
 			validIPs = validIP6s
-		} else if test.ipFamily == ipfamily.DualStack {
+		case ipfamily.DualStack:
 			validIPs = validIPDualStacks
+		default:
+			validIPs = validIP4s
 		}
+
 		for _, ip := range ips {
 			if !validIPs[ip.String()] {
 				t.Errorf("%s allocated unexpected IP %q", test.desc, ip)
@@ -2022,11 +2046,14 @@ func TestAutoAssign(t *testing.T) {
 		if err != nil {
 			t.Errorf("#%d Allocate(%q, \"test\"): %s", i+1, test.svcKey, err)
 		}
-		validIPs := validIP4s
-		if test.ipFamily == ipfamily.IPv6 {
+		var validIPs map[string]bool
+		switch test.ipFamily {
+		case ipfamily.IPv6:
 			validIPs = validIP6s
-		} else if test.ipFamily == ipfamily.DualStack {
+		case ipfamily.DualStack:
 			validIPs = validIPDualStacks
+		default:
+			validIPs = validIP4s
 		}
 		for _, ip := range ips {
 			if !validIPs[ip.String()] {

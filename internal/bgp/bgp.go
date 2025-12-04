@@ -83,6 +83,7 @@ type SessionParameters struct {
 	VRFName                string
 	SessionName            string
 	DualStackAddressFamily bool
+	DisableMP              bool
 }
 type SessionManager interface {
 	NewSession(logger log.Logger, args SessionParameters) (Session, error)

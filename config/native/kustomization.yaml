@@ -7,4 +7,6 @@ resources:
 - ../rbac
 - ../controllers
 - ../webhook
+# Uncomment to install network policies
+#- ../networkpolicies
 namespace: metallb-system

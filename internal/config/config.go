@@ -135,6 +135,8 @@ type Peer struct {
 	VRF string
 	// Option to advertise v4 addresses over v6 sessions and viceversa.
 	DualStackAddressFamily bool
+	// Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily.
+	DisableMP bool
 }
 
 // Pool is the configuration of an IP address pool.
@@ -484,6 +486,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		EBGPMultiHop:           p.Spec.EBGPMultiHop,
 		VRF:                    p.Spec.VRFName,
 		DualStackAddressFamily: p.Spec.DualStackAddressFamily,
+		DisableMP:              p.Spec.DisableMP,
 	}, nil
 }
 
