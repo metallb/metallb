@@ -492,22 +492,27 @@ func (c *controller) deleteBalancerProtocol(l log.Logger, protocol config.Proto,
 }
 
 func poolFor(pools *config.Pools, ips []net.IP) string {
-	if pools == nil {
+    if pools == nil || len(ips) == 0 {
 		return ""
 	}
 	for pname, p := range pools.ByName {
-		cnt := 0
+		allMatched := true
 		for _, ip := range ips {
+		    matched := false
 			for _, cidr := range p.CIDR {
 				if cidr.Contains(ip) {
-					cnt++
+					matched = true
 					break
 				}
 			}
-			if cnt == len(ips) {
-				return pname
+		    if !matched {
+				allMatched = false
+				break
 			}
 		}
+    	if allMatched {
+    		return pname
+    	}
 	}
 	return ""
 }
