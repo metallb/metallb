@@ -1183,6 +1183,8 @@ spec:
                                 default: false
                                 description: |-
                                   To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.
+
+
                                   Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily.
                                 type: boolean
                               dualStackAddressFamily:
@@ -3013,7 +3015,7 @@ data:
     frr defaults traditional
     hostname Router
     line vty
-    log file /etc/frr/frr.log informational
+    log stdout informational
   vtysh.conf: |
     service integrated-vtysh-config
 kind: ConfigMap
@@ -3275,7 +3277,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.21
+        image: quay.io/metallb/frr-k8s:v0.0.22
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3437,7 +3439,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.21
+        image: quay.io/metallb/frr-k8s:v0.0.22
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3476,14 +3478,7 @@ spec:
       - command:
         - /bin/sh
         - -c
-        - |
-          /sbin/tini -- /usr/lib/frr/docker-start &
-          attempts=0
-          until [[ -f /etc/frr/frr.log || $attempts -eq 60 ]]; do
-            sleep 1
-            attempts=$(( $attempts + 1 ))
-          done
-          tail -f /etc/frr/frr.log
+        - /sbin/tini -- /usr/lib/frr/docker-start
         env:
         - name: TINI_SUBREAPER
           value: "true"
@@ -3497,12 +3492,14 @@ spec:
           periodSeconds: 5
         name: frr
         securityContext:
+          allowPrivilegeEscalation: false
           capabilities:
             add:
             - NET_ADMIN
             - NET_RAW
             - SYS_ADMIN
             - NET_BIND_SERVICE
+          readOnlyRootFilesystem: true
         startupProbe:
           failureThreshold: 30
           httpGet:
@@ -3515,6 +3512,10 @@ spec:
           name: frr-sockets
         - mountPath: /etc/frr
           name: frr-conf
+        - mountPath: /var/lib/frr
+          name: frr-lib
+        - mountPath: /var/tmp/frr
+          name: frr-tmp
       - args:
         - --metrics-port=7573
         - --metrics-bind-address=127.0.0.1
@@ -3524,7 +3525,7 @@ spec:
         name: frr-metrics
         ports:
         - containerPort: 7573
-          name: monitoring
+          name: frr-metrics
         volumeMounts:
         - mountPath: /var/run/frr
           name: frr-sockets
@@ -3591,7 +3592,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-reloader.sh /etc/frr_reloader/
-        image: quay.io/metallb/frr-k8s:v0.0.21
+        image: quay.io/metallb/frr-k8s:v0.0.22
         name: cp-reloader
         volumeMounts:
         - mountPath: /etc/frr_reloader
@@ -3600,7 +3601,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-metrics /etc/frr_metrics/
-        image: quay.io/metallb/frr-k8s:v0.0.21
+        image: quay.io/metallb/frr-k8s:v0.0.22
         name: cp-metrics
         volumeMounts:
         - mountPath: /etc/frr_metrics
@@ -3609,7 +3610,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-status /etc/frr_status/
-        image: quay.io/metallb/frr-k8s:v0.0.21
+        image: quay.io/metallb/frr-k8s:v0.0.22
         name: cp-frr-status
         volumeMounts:
         - mountPath: /etc/frr_status
@@ -3638,6 +3639,10 @@ spec:
         name: metrics
       - emptyDir: {}
         name: frr-status
+      - emptyDir: {}
+        name: frr-lib
+      - emptyDir: {}
+        name: frr-tmp
 ---
 apiVersion: apps/v1
 kind: DaemonSet
