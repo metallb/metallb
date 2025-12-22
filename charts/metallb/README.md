@@ -122,6 +122,7 @@ Kubernetes: `>= 1.19.0-0`
 | prometheus.speakerMetricsTLSSecret | string | `""` |  |
 | rbac.create | bool | `true` |  |
 | speaker.affinity | object | `{}` |  |
+| speaker.enableL2Lease | bool | `false` |  |
 | speaker.enabled | bool | `true` |  |
 | speaker.excludeInterfaces.enabled | bool | `true` |  |
 | speaker.extraContainers | list | `[]` |  |
@@ -140,6 +141,9 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.initContainers.cpMetrics.resources | object | `{}` |  |
 | speaker.initContainers.cpReloader.resources | object | `{}` |  |
 | speaker.labels | object | `{}` |  |
+| speaker.leaseTimings.duration | int | `15` |  |
+| speaker.leaseTimings.renewDeadline | int | `10` |  |
+| speaker.leaseTimings.retryPeriod | int | `2` |  |
 | speaker.livenessProbe.enabled | bool | `true` |  |
 | speaker.livenessProbe.failureThreshold | int | `3` |  |
 | speaker.livenessProbe.initialDelaySeconds | int | `10` |  |
