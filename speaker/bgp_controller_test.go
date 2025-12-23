@@ -494,7 +494,11 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4": nil,
+				"1.2.3.4": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
 			},
 		},
 
@@ -2426,6 +2430,151 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 			response := c.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nodes)
 			if response != test.expected {
 				t.Errorf("expected %q, got %q", test.expected, response)
+			}
+		})
+	}
+}
+
+func TestHasHealthyEndpoint(t *testing.T) {
+	tests := []struct {
+		desc       string
+		eps        []discovery.EndpointSlice
+		filterNode func(*string) bool
+		want       bool
+	}{
+		{
+			desc: "One ready endpoint",
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			filterNode: func(_ *string) bool { return false },
+			want:       true,
+		},
+		{
+			desc: "One not ready endpoint",
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(false),
+							},
+						},
+					},
+				},
+			},
+			filterNode: func(_ *string) bool { return false },
+			want:       false,
+		},
+		{
+			desc: "Two endpoints same IP, one ready one not",
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(false),
+							},
+						},
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			filterNode: func(_ *string) bool { return false },
+			want:       true,
+		},
+		{
+			desc: "Two endpoints same IP, ready then not ready",
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(false),
+							},
+						},
+					},
+				},
+			},
+			filterNode: func(_ *string) bool { return false },
+			want:       true,
+		},
+		{
+			desc: "Two endpoints same IP, both not ready",
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(false),
+							},
+						},
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(false),
+							},
+						},
+					},
+				},
+			},
+			filterNode: func(_ *string) bool { return false },
+			want:       false,
+		},
+		{
+			desc: "Mixed IPs, one ready",
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{"1.2.3.4"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(false),
+							},
+						},
+						{
+							Addresses: []string{"5.6.7.8"},
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			filterNode: func(_ *string) bool { return false },
+			want:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := hasHealthyEndpoint(tt.eps, tt.filterNode)
+			if got != tt.want {
+				t.Errorf("hasHealthyEndpoint() = %v, want %v", got, tt.want)
 			}
 		})
 	}
