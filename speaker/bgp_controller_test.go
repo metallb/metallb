@@ -493,7 +493,11 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4": nil,
+				"1.2.3.4": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
 			},
 		},
 

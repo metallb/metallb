@@ -137,14 +137,26 @@ func (c *bgpController) SetEventCallback(callback func(interface{})) {
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
 // It only checks nodes matching the given filterNode function.
 func hasHealthyEndpoint(eps []discovery.EndpointSlice, filterNode func(*string) bool) bool {
+	ready := map[string]bool{}
 	for _, slice := range eps {
 		for _, ep := range slice.Endpoints {
-			if filterNode(ep.NodeName) {
+			node := ep.NodeName
+			if filterNode(node) {
 				continue
 			}
-			if epslices.EndpointCanServe(ep.Conditions) && len(ep.Addresses) > 0 {
-				return true
+			for _, addr := range ep.Addresses {
+				if epslices.EndpointCanServe(ep.Conditions) {
+					ready[addr] = true
+				} else if _, ok := ready[addr]; !ok {
+					ready[addr] = false
+				}
 			}
+		}
+	}
+
+	for _, r := range ready {
+		if r {
+			return true
 		}
 	}
 	return false
