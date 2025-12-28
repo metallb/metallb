@@ -105,6 +105,7 @@ _Appears in:_
 | `ipAddressPoolSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | A selector for the IPAddressPools which would get advertised via this advertisement.<br />If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools. |
 | `nodeSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops. |
 | `peers` _string array_ | Peers limits the bgppeer to advertise the ips of the selected pools to.<br />When empty, the loadbalancer IP is announced to all the BGPPeers configured. |
+| `serviceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | ServiceSelectors limits the set of services that will be advertised via this advertisement.<br />If empty, all services from the selected pools are advertised.<br />This field is mutually exclusive with aggregationLength and aggregationLengthV6 -<br />services can only be selected when using the default /32 (IPv4) or /128 (IPv6) aggregation. |
 
 
 
@@ -309,6 +310,7 @@ _Appears in:_
 | `ipAddressPoolSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | A selector for the IPAddressPools which would get advertised via this advertisement.<br />If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools. |
 | `nodeSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops. |
 | `interfaces` _string array_ | A list of interfaces to announce from. The LB IP will be announced only from these interfaces.<br />If the field is not set, we advertise from all the interfaces on the host. |
+| `serviceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | ServiceSelectors limits the set of services that will be advertised via this advertisement.<br />If empty, all services from the selected pools are advertised. |
 
 
 
