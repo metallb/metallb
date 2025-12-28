@@ -39,6 +39,10 @@ type L2AdvertisementSpec struct {
 	// If the field is not set, we advertise from all the interfaces on the host.
 	// +optional
 	Interfaces []string `json:"interfaces,omitempty"`
+	// ServiceSelectors limits the set of services that will be advertised via this advertisement.
+	// If empty, all services from the selected pools are advertised.
+	// +optional
+	ServiceSelectors []metav1.LabelSelector `json:"serviceSelectors,omitempty"`
 }
 
 // L2AdvertisementStatus defines the observed state of L2Advertisement.
