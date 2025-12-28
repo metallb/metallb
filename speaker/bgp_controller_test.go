@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/config"
@@ -1938,5 +1939,494 @@ func TestPeersForService(t *testing.T) {
 				t.Errorf("%q: unexpected callback counters for service %s on Callbacked, want %v got %v", test.desc, svc, oldCallbackCounters[svc]+1, callbackCounters[svc])
 			}
 		}
+	}
+}
+
+func TestBGPAdsForService(t *testing.T) {
+	tests := []struct {
+		desc     string
+		ads      []*config.BGPAdvertisement
+		node     string
+		svc      *v1.Service
+		expected []string // expected advertisement names
+	}{
+		{
+			desc: "Empty selectors match all",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", Nodes: map[string]bool{"nodeA": true}, AggregationLength: 32},
+			},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []string{"ad1"},
+		},
+		{
+			desc: "Matching selector",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", Nodes: map[string]bool{"nodeA": true}, AggregationLength: 32, ServiceSelectors: []labels.Selector{mustSelector("app=nginx")}},
+			},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []string{"ad1"},
+		},
+		{
+			desc: "Non-matching selector",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", Nodes: map[string]bool{"nodeA": true}, AggregationLength: 32, ServiceSelectors: []labels.Selector{mustSelector("app=apache")}},
+			},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []string{},
+		},
+		{
+			desc: "Wrong node",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", Nodes: map[string]bool{"nodeB": true}, AggregationLength: 32},
+			},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []string{},
+		},
+		{
+			desc: "Multiple ads - some match",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", Nodes: map[string]bool{"nodeA": true}, AggregationLength: 32, ServiceSelectors: []labels.Selector{mustSelector("app=apache")}},
+				{Name: "ad2", Nodes: map[string]bool{"nodeA": true}, AggregationLength: 32, ServiceSelectors: []labels.Selector{mustSelector("app=nginx")}},
+				{Name: "ad3", Nodes: map[string]bool{"nodeA": true}, AggregationLength: 32}, // empty matches all
+			},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []string{"ad2", "ad3"}, // nginx match + empty match
+		},
+		{
+			desc: "Multiple selectors in single ad - OR logic",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", Nodes: map[string]bool{"nodeA": true}, AggregationLength: 32, ServiceSelectors: []labels.Selector{
+					mustSelector("app=apache"),
+					mustSelector("app=nginx"),
+				}},
+			},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []string{"ad1"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			result := bgpAdsForService(test.ads, test.node, test.svc)
+			if len(result) != len(test.expected) {
+				t.Errorf("expected %d ads, got %d", len(test.expected), len(result))
+				return
+			}
+			gotNames := sets.New[string]()
+			for _, ad := range result {
+				gotNames.Insert(ad.Name)
+			}
+			expectedNames := sets.New(test.expected...)
+			if !gotNames.Equal(expectedNames) {
+				t.Errorf("expected ads %v, got %v", expectedNames.UnsortedList(), gotNames.UnsortedList())
+			}
+		})
+	}
+}
+
+func TestCheckBGPAdvConflicts(t *testing.T) {
+	// we explicitly use config.For to make sure the pool's private fields are set,
+	// which is necessary because the conflict check function relies on them.
+	cfg, err := config.For(config.ClusterResources{
+		Pools: []metallbv1beta1.IPAddressPool{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pool"},
+				Spec:       metallbv1beta1.IPAddressPoolSpec{Addresses: []string{"10.20.30.0/24"}},
+			},
+		},
+	}, config.DontValidate)
+	if err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+	pool := cfg.Pools.ByName["test-pool"]
+
+	tests := []struct {
+		desc        string
+		ads         []*config.BGPAdvertisement
+		expectError bool
+	}{
+		{
+			desc: "No conflict - same local pref",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}},
+			},
+			expectError: false,
+		},
+		{
+			desc: "No conflict - different nodes",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeB": true}},
+			},
+			expectError: false,
+		},
+		{
+			desc: "Conflict - ad1's nodes are a subset of ad2's nodes",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeB": true, "nodeA": true}},
+			},
+			expectError: true,
+		},
+		{
+			desc: "Conflict - ad2's nodes are a subset of ad1's nodes",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeB": true, "nodeA": true}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}},
+			},
+			expectError: true,
+		},
+		{
+			desc: "No conflict - ad1's nodes are empty",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}},
+			},
+			expectError: false,
+		},
+		{
+			desc: "No conflict - ad2's nodes are empty",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{}},
+			},
+			expectError: false,
+		},
+		{
+			desc: "No conflict - different peers",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer1"}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer2"}},
+			},
+			expectError: false,
+		},
+		{
+			desc: "Single ad - no conflict",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}},
+			},
+			expectError: false,
+		},
+		{
+			desc:        "Empty ads - no conflict",
+			ads:         []*config.BGPAdvertisement{},
+			expectError: false,
+		},
+		{
+			desc: "Conflict - different local pref, same node",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}},
+			},
+			expectError: true,
+		},
+		{
+			desc: "Conflict - ad1's peers are a subset of ad2's peers",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer1"}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer2", "peer1"}},
+			},
+			expectError: true,
+		},
+		{
+			desc: "Conflict - ad2's peers are a subset of ad1's peers",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer2", "peer1"}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer1"}},
+			},
+			expectError: true,
+		},
+		{
+			desc: "Conflict - ad1's peers are a subset of ad2's peers, but ad1 also has one extra element",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer1", "peer3"}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer2", "peer1"}},
+			},
+			expectError: true,
+		},
+		{
+			desc: "Conflict - ad2's peers are a subset of ad1's peers, but ad2 also has one extra element",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer2", "peer1"}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer1", "peer3"}},
+			},
+			expectError: true,
+		},
+		{
+			desc: "Conflict - ad1's peers are empty",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}, Peers: []string{}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer1"}},
+			},
+			expectError: true,
+		},
+		{
+			desc: "Conflict - ad2's peers are empty",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, LocalPref: 100, Nodes: map[string]bool{"nodeA": true}, Peers: []string{"peer1"}},
+				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}, Peers: []string{}},
+			},
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			err := checkBGPAdvConflicts(test.ads, pool)
+			if test.expectError && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("expected no error, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
+	b := &fakeBGP{
+		t: t,
+	}
+	newBGP = b.NewSessionManager
+
+	tests := []struct {
+		desc              string
+		myNode            string
+		BGPAdvertisements []*config.BGPAdvertisement
+		svc               *v1.Service
+		expected          string
+	}{
+		{
+			desc:   "Empty selector matches all services",
+			myNode: "pandora",
+			BGPAdvertisements: []*config.BGPAdvertisement{
+				{
+					Name:              "ad1",
+					AggregationLength: 32,
+					Nodes:             map[string]bool{"pandora": true},
+					ServiceSelectors:  nil,
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "",
+		},
+		{
+			desc:   "Matching selector allows announcement",
+			myNode: "pandora",
+			BGPAdvertisements: []*config.BGPAdvertisement{
+				{
+					Name:              "ad1",
+					AggregationLength: 32,
+					Nodes:             map[string]bool{"pandora": true},
+					ServiceSelectors:  []labels.Selector{mustSelector("app=nginx")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "",
+		},
+		{
+			desc:   "Non-matching selector prevents announcement",
+			myNode: "pandora",
+			BGPAdvertisements: []*config.BGPAdvertisement{
+				{
+					Name:              "ad1",
+					AggregationLength: 32,
+					Nodes:             map[string]bool{"pandora": true},
+					ServiceSelectors:  []labels.Selector{mustSelector("app=apache")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "noMatchingAdvertisement",
+		},
+		{
+			desc:   "Multiple selectors - OR logic - one matches",
+			myNode: "pandora",
+			BGPAdvertisements: []*config.BGPAdvertisement{
+				{
+					Name:              "ad1",
+					AggregationLength: 32,
+					Nodes:             map[string]bool{"pandora": true},
+					ServiceSelectors: []labels.Selector{
+						mustSelector("app=apache"),
+						mustSelector("app=nginx"),
+					},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "",
+		},
+		{
+			desc:   "Multiple ads with different selectors - one matches",
+			myNode: "pandora",
+			BGPAdvertisements: []*config.BGPAdvertisement{
+				{
+					Name:              "ad1",
+					AggregationLength: 32,
+					Nodes:             map[string]bool{"pandora": true},
+					ServiceSelectors:  []labels.Selector{mustSelector("app=apache")},
+				},
+				{
+					Name:              "ad2",
+					AggregationLength: 32,
+					Nodes:             map[string]bool{"pandora": true},
+					ServiceSelectors:  []labels.Selector{mustSelector("app=nginx")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "",
+		},
+		{
+			desc:   "Conflicting local prefs - different ads match same service",
+			myNode: "pandora",
+			BGPAdvertisements: []*config.BGPAdvertisement{
+				{
+					Name:              "ad1",
+					AggregationLength: 32,
+					LocalPref:         100,
+					Nodes:             map[string]bool{"pandora": true},
+					ServiceSelectors:  nil, // matches all
+				},
+				{
+					Name:              "ad2",
+					AggregationLength: 32,
+					LocalPref:         200,
+					Nodes:             map[string]bool{"pandora": true},
+					ServiceSelectors:  []labels.Selector{mustSelector("app=nginx")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "conflictingAdvertisements",
+		},
+	}
+
+	l := log.NewNopLogger()
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			c, err := newController(controllerConfig{
+				MyNode:                test.myNode,
+				DisableLayer2:         true,
+				bgpType:               bgpNative,
+				BGPAdsChangedCallback: noopCallback,
+			})
+			if err != nil {
+				t.Fatalf("creating controller: %s", err)
+			}
+			c.client = &testK8S{t: t}
+
+			// we explicitly use config.For to make sure the pool's private fields are set,
+			// which is necessary because the conflict check function relies on them.
+			cfg, err := config.For(config.ClusterResources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "default"},
+						Spec:       metallbv1beta1.IPAddressPoolSpec{Addresses: []string{"10.20.30.0/24"}},
+					},
+				},
+			}, config.DontValidate)
+			if err != nil {
+				t.Fatalf("failed to create config: %v", err)
+			}
+			cfg.Pools.ByName["default"].BGPAdvertisements = test.BGPAdvertisements
+			cfg.Peers = map[string]*config.Peer{
+				"peer1": {
+					Addr:          net.ParseIP("1.2.3.4"),
+					NodeSelectors: []labels.Selector{labels.Everything()},
+				},
+			}
+			if c.SetConfig(l, cfg) == controllers.SyncStateError {
+				t.Errorf("SetConfig failed")
+			}
+
+			lbIP := net.ParseIP(test.svc.Status.LoadBalancer.Ingress[0].IP)
+			eps := []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses:  []string{"2.3.4.5"},
+							NodeName:   ptr.To(test.myNode),
+							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			}
+
+			nodes := map[string]*v1.Node{
+				test.myNode: {
+					ObjectMeta: metav1.ObjectMeta{Name: test.myNode},
+				},
+			}
+
+			response := c.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nodes)
+			if response != test.expected {
+				t.Errorf("expected %q, got %q", test.expected, response)
+			}
+		})
 	}
 }
