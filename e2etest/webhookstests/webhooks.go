@@ -144,6 +144,47 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid aggregation length 26: prefix 28 in this pool is more specific than the aggregation length for addresses 1.1.1.0/28"))
 		})
+
+		ginkgo.It("Should reject serviceSelectors with non-default aggregationLength", func() {
+			ginkgo.By("Creating AddressPool")
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pool-webhooks-test",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"1.1.1.0/24",
+							},
+						},
+					},
+				},
+			}
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Creating BGPAdvertisement with serviceSelectors and aggregationLength")
+			resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "adv-webhooks-test",
+					},
+					Spec: metallbv1beta1.BGPAdvertisementSpec{
+						AggregationLength: ptr.To(int32(24)),
+						IPAddressPools:    []string{"pool-webhooks-test"},
+						ServiceSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{"app": "nginx"},
+							},
+						},
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("serviceSelectors and aggregationLength are mutually exclusive"))
+		})
 	})
 
 	ginkgo.Context("For BGPPeer", func() {
