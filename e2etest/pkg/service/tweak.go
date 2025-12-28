@@ -59,3 +59,25 @@ func WithLoadbalancerClass(loadBalancerClass string) func(*corev1.Service) {
 		svc.Spec.LoadBalancerClass = ptr.To[string](loadBalancerClass)
 	}
 }
+
+func WithLabels(labels map[string]string) func(*corev1.Service) {
+	return func(svc *corev1.Service) {
+		if svc.Labels == nil {
+			svc.Labels = make(map[string]string)
+		}
+		for k, v := range labels {
+			svc.Labels[k] = v
+		}
+	}
+}
+
+func WithAnnotations(annotations map[string]string) func(*corev1.Service) {
+	return func(svc *corev1.Service) {
+		if svc.Annotations == nil {
+			svc.Annotations = make(map[string]string)
+		}
+		for k, v := range annotations {
+			svc.Annotations[k] = v
+		}
+	}
+}
