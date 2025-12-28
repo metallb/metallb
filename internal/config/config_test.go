@@ -4,6 +4,7 @@ package config
 
 import (
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -3811,12 +3812,94 @@ func TestContainsAdvertisement(t *testing.T) {
 			},
 			expect: false,
 		},
+		{
+			desc: "Same selectors should match",
+			advs: []*L2Advertisement{
+				{
+					Nodes:            map[string]bool{"nodeA": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=nginx")},
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes:            map[string]bool{"nodeA": true},
+				AllInterfaces:    true,
+				ServiceSelectors: []labels.Selector{selector("app=nginx")},
+			},
+			expect: true,
+		},
+		{
+			desc: "Different selectors should not match",
+			advs: []*L2Advertisement{
+				{
+					Nodes:            map[string]bool{"nodeA": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=nginx")},
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes:            map[string]bool{"nodeA": true},
+				AllInterfaces:    true,
+				ServiceSelectors: []labels.Selector{selector("app=apache")},
+			},
+			expect: false,
+		},
+		{
+			desc: "Empty vs non-empty selectors should not match",
+			advs: []*L2Advertisement{
+				{
+					Nodes:            map[string]bool{"nodeA": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{},
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes:            map[string]bool{"nodeA": true},
+				AllInterfaces:    true,
+				ServiceSelectors: []labels.Selector{selector("app=nginx")},
+			},
+			expect: false,
+		},
+		{
+			desc: "Multiple selectors in same order should match",
+			advs: []*L2Advertisement{
+				{
+					Nodes:            map[string]bool{"nodeA": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=apache"), selector("app=nginx")},
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes:            map[string]bool{"nodeA": true},
+				AllInterfaces:    true,
+				ServiceSelectors: []labels.Selector{selector("app=apache"), selector("app=nginx")},
+			},
+			expect: true,
+		},
+		{
+			desc: "Multiple selectors in different order but with same selectors should not match",
+			advs: []*L2Advertisement{
+				{
+					Nodes:            map[string]bool{"nodeA": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=apache"), selector("app=nginx")},
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes:            map[string]bool{"nodeA": true},
+				AllInterfaces:    true,
+				ServiceSelectors: []labels.Selector{selector("app=nginx"), selector("app=apache")},
+			},
+			expect: false,
+		},
 	}
 	for _, test := range tests {
-		result := containsAdvertisement(test.advs, test.toCheck)
-		if result != test.expect {
-			t.Errorf("%s: expect is %v, but result is %v", test.desc, test.expect, result)
-		}
+		t.Run(test.desc, func(t *testing.T) {
+			result := containsAdvertisement(test.advs, test.toCheck)
+			if result != test.expect {
+				t.Errorf("expect is %v, but result is %v", test.expect, result)
+			}
+		})
 	}
 }
 
@@ -3824,4 +3907,414 @@ func FuzzParseCIDR(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input string) {
 		_, _ = ParseCIDR(input)
 	})
+}
+
+func TestServiceSelectors(t *testing.T) {
+	tests := []struct {
+		desc    string
+		crs     ClusterResources
+		want    *Config
+		wantErr string
+	}{
+		{
+			desc: "BGP advertisement with service selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1.2.3.0/24"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							ServiceSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								Name:                "adv1",
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{},
+								ServiceSelectors:    []labels.Selector{selector("app=nginx")},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "L2 advertisement with service selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1.2.3.0/24"},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.L2AdvertisementSpec{
+							ServiceSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"app": "web"},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						L2Advertisements: []*L2Advertisement{
+							{
+								Nodes:            map[string]bool{},
+								AllInterfaces:    true,
+								ServiceSelectors: []labels.Selector{selector("app=web")},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "BGP advertisement with multiple service selectors (OR logic)",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1.2.3.0/24"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							ServiceSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+								{
+									MatchLabels: map[string]string{"app": "apache"},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								Name:                "adv1",
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{},
+								ServiceSelectors:    []labels.Selector{selector("app=apache"), selector("app=nginx")}, // sorted
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "BGP advertisement - serviceSelectors with non-default aggregationLength is mutually exclusive",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1.2.3.0/24"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: ptr.To[int32](24),
+							ServiceSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: "serviceSelectors and aggregationLength are mutually exclusive",
+		},
+		{
+			desc: "BGP advertisement - serviceSelectors with non-default aggregationLengthV6 is mutually exclusive",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"2001:db8::/64"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLengthV6: ptr.To[int32](64),
+							ServiceSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: "serviceSelectors and aggregationLengthV6 are mutually exclusive",
+		},
+		{
+			desc: "BGP advertisement - serviceSelectors with default aggregationLengthV4 is allowed",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1.2.3.0/24"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: ptr.To[int32](32),
+							ServiceSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								Name:                "adv1",
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{},
+								ServiceSelectors:    []labels.Selector{selector("app=nginx")},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "BGP advertisement - serviceSelectors with default aggregationLengthV6 is allowed",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1000::/64"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLengthV6: ptr.To[int32](128),
+							ServiceSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1000::/64")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								Name:                "adv1",
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{},
+								ServiceSelectors:    []labels.Selector{selector("app=nginx")},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "BGP advertisement - serviceSelectors with both default aggregationLength and aggregationLengthV6 is allowed",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1.2.3.0/24", "1000::/64"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength:   ptr.To[int32](32),
+							AggregationLengthV6: ptr.To[int32](128),
+							ServiceSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::/64")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								Name:                "adv1",
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{},
+								ServiceSelectors:    []labels.Selector{selector("app=nginx")},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "duplicate service selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1.2.3.0/24"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							ServiceSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+								{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: "duplicate definition of serviceSelectors",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := For(tt.crs, DontValidate)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Errorf("expected error containing %q, got nil", tt.wantErr)
+					return
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("expected error containing %q, got %v", tt.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			selectorComparer := cmp.Comparer(func(x, y labels.Selector) bool {
+				if x == nil && y == nil {
+					return true
+				}
+				if x == nil || y == nil {
+					return false
+				}
+				return x.String() == y.String()
+			})
+			cidrPerAddressComparer := cmp.Comparer(func(x, y map[string][]*net.IPNet) bool {
+				return true
+			})
+
+			if diff := cmp.Diff(tt.want, got, selectorComparer, cidrPerAddressComparer, cmp.AllowUnexported(Pool{})); diff != "" {
+				t.Errorf("parse returned wrong result (-want, +got)\n%s", diff)
+			}
+		})
+	}
 }

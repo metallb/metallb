@@ -18,6 +18,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 )
@@ -1696,6 +1697,232 @@ func TestClusterPolicy(t *testing.T) {
 	if !c2Found {
 		t.Fatalf("All services assigned to speaker1")
 	}
+}
+
+func TestL2ServiceSelectors(t *testing.T) {
+	fakeSL := &fakeSpeakerList{
+		speakers: map[string]bool{
+			"iris1": true,
+		},
+	}
+	c1, err := newController(controllerConfig{
+		MyNode:  "iris1",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c1.client = &testK8S{t: t}
+
+	tests := []struct {
+		desc             string
+		L2Advertisements []*config.L2Advertisement
+		svc              *v1.Service
+		expected         string
+	}{
+		{
+			desc: "Empty selector matches all services",
+			L2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes:            map[string]bool{"iris1": true},
+					AllInterfaces:    true,
+					ServiceSelectors: nil,
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "",
+		},
+		{
+			desc: "Matching selector allows announcement",
+			L2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes:            map[string]bool{"iris1": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=nginx")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "",
+		},
+		{
+			desc: "Non-matching selector prevents announcement",
+			L2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes:            map[string]bool{"iris1": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=apache")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "noMatchingAdvertisement",
+		},
+		{
+			desc: "Multiple selectors - OR logic - one matches",
+			L2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes:         map[string]bool{"iris1": true},
+					AllInterfaces: true,
+					ServiceSelectors: []labels.Selector{
+						selector("app=apache"),
+						selector("app=nginx"),
+					},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "",
+		},
+	}
+
+	l := log.NewNopLogger()
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			cfg := &config.Config{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
+					"default": {
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: test.L2Advertisements,
+					},
+				}},
+			}
+			if c1.SetConfig(l, cfg) == controllers.SyncStateError {
+				t.Errorf("SetConfig failed")
+			}
+
+			lbIP := net.ParseIP(test.svc.Status.LoadBalancer.Ingress[0].IP)
+			eps := []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses:  []string{"2.3.4.5"},
+							NodeName:   ptr.To("iris1"),
+							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			}
+
+			response := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
+			if response != test.expected {
+				t.Errorf("expected %q, got %q", test.expected, response)
+			}
+		})
+	}
+}
+
+func TestL2AdsForService(t *testing.T) {
+	ad1 := &config.L2Advertisement{Nodes: map[string]bool{"nodeA": true}, AllInterfaces: true}
+	ad2 := &config.L2Advertisement{Nodes: map[string]bool{"nodeA": true}, AllInterfaces: true, ServiceSelectors: []labels.Selector{selector("app=nginx")}}
+	ad3 := &config.L2Advertisement{Nodes: map[string]bool{"nodeA": true}, AllInterfaces: true, ServiceSelectors: []labels.Selector{selector("app=apache")}}
+	ad4 := &config.L2Advertisement{Nodes: map[string]bool{"nodeB": true}, AllInterfaces: true}
+
+	tests := []struct {
+		desc     string
+		ads      []*config.L2Advertisement
+		node     string
+		svc      *v1.Service
+		expected []*config.L2Advertisement
+	}{
+		{
+			desc:     "Empty selectors match all",
+			ads:      []*config.L2Advertisement{ad1},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []*config.L2Advertisement{ad1},
+		},
+		{
+			desc:     "Matching selector",
+			ads:      []*config.L2Advertisement{ad2},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []*config.L2Advertisement{ad2},
+		},
+		{
+			desc:     "Non-matching selector",
+			ads:      []*config.L2Advertisement{ad3},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []*config.L2Advertisement{},
+		},
+		{
+			desc:     "Wrong node",
+			ads:      []*config.L2Advertisement{ad4},
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []*config.L2Advertisement{},
+		},
+		{
+			desc:     "Multiple ads - some match",
+			ads:      []*config.L2Advertisement{ad3, ad2, ad1}, // apache selector, nginx selector, empty (matches all)
+			node:     "nodeA",
+			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
+			expected: []*config.L2Advertisement{ad2, ad1}, // nginx match + empty match
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			result := l2AdsForService(test.ads, test.node, test.svc)
+			if len(result) != len(test.expected) {
+				t.Errorf("expected %d ads, got %d", len(test.expected), len(result))
+				return
+			}
+			expectedAds := sets.New(test.expected...)
+			gotAds := sets.New(result...)
+			if !gotAds.Equal(expectedAds) {
+				t.Errorf("returned ads do not match expected")
+			}
+		})
+	}
+}
+
+func selector(s string) labels.Selector {
+	ret, err := labels.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return ret
 }
 
 func TestIPAdvertisementFor(t *testing.T) {
