@@ -1,4 +1,4 @@
-log file /etc/frr/frr.log {{.Loglevel}}
+log stdout {{.Loglevel}}
 log timestamp precision 3
 {{- if eq .Loglevel "debugging" }}
 debug zebra events

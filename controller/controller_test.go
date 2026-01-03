@@ -1297,6 +1297,9 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	if k.gotService(svc2) != nil {
 		t.Fatal("SetBalancer svc2 mutated svc2 even though it should not have allocated")
 	}
+	if !k.loggedWarning {
+		t.Fatal("SetBalancer svc2 should have produced a warning event when pool has no available IPs")
+	}
 	k.reset()
 
 	// Deleting the first LB should tell us to reprocess all services.
