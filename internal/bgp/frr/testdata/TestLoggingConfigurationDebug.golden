@@ -1,4 +1,4 @@
-log file /etc/frr/frr.log debugging
+log stdout debugging
 log timestamp precision 3
 debug zebra events
 debug zebra nht

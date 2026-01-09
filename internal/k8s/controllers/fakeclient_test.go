@@ -51,6 +51,7 @@ func newFakeClient(initObjects []client.Object) (client.WithWatch, error) {
 	return fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(initObjects...).
+		WithStatusSubresource(&v1beta1.ConfigurationState{}).
 		WithIndex(&discovery.EndpointSlice{}, epslices.SlicesServiceIndexName, func(o client.Object) []string {
 			res, err := epslices.SlicesServiceIndex(o)
 			if err != nil {

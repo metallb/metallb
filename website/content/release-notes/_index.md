@@ -2,6 +2,28 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.15.3
+
+### New Features
+
+- Add ConfigurationState CRD to expose configuration errors (when user-defined CRs cannot be reconciled) for each
+    MetalLB component (#2881, @karampok)
+- Add network policy support to Helm charts and manifests (#2773, @karampok)
+- Use FRR version 10.4.1 for FRR-mode (#2845, @karampok)
+- Bump frrk8s to 0.0.21. This brings frr 10.4.1 (#2859, @fedepaol)
+
+### Bugs or Regressions
+
+- Added `readOnlyRootFilesystem: true` and `allowPrivilegeEscalation: false` to containers missing these security flags, enhancing container security posture without affecting functionality. (#2863, @cgoncalves)
+- Bugfix: enforce allocator does not mutate the config, enabling the pool controller to not re-trigger redundant configuration. (#2889, @oribon)
+- Exclude Cilium lxc veth interfaces from ARP responder for installation with Helm (#2864, @vladonutu)
+- Fix of vulnerability in docker images (CVE-2025-22874) (#2801, @jgoodall)
+- Helm charts: add option to specify init container resources (#2794, @oribon)
+
+This release includes contributions from:
+
+Carlos Goncalves, Federico Paolinelli, John Goodall, Konstantinos Karampogias, Ori Braunshtein, Paul Cunnane, Soto Sugita, Tyler Auerbeck, unstoppableworm, Vlad Onutu
+
 ## Version 0.15.2
 
 ### Bugs or Regressions

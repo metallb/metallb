@@ -9,6 +9,7 @@ resources:
 - bases/metallb.io_communities.yaml
 - bases/metallb.io_servicel2statuses.yaml
 - bases/metallb.io_servicebgpstatuses.yaml
+- bases/metallb.io_configurationstates.yaml
 
 patches:
 - path: patches/crd-conversion-patch-bgppeers.yaml
