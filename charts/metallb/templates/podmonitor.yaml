@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   name: {{ template "metallb.fullname" . }}-controller
+  namespace: {{ include "metallb.namespace" . | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller
@@ -21,7 +22,7 @@ spec:
       app.kubernetes.io/component: controller
   namespaceSelector:
     matchNames:
-    - {{ .Release.Namespace }}
+    - {{ include "metallb.namespace" . }}
   podMetricsEndpoints:
   - port: monitoring
     path: /metrics
@@ -42,6 +43,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   name: {{ template "metallb.fullname" . }}-speaker
+  namespace: {{ include "metallb.namespace" . | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: speaker
@@ -60,7 +62,7 @@ spec:
       app.kubernetes.io/component: speaker
   namespaceSelector:
     matchNames:
-    - {{ .Release.Namespace }}
+    - {{ include "metallb.namespace" . }}
   podMetricsEndpoints:
   - port: monitoring
     path: /metrics
@@ -82,6 +84,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ template "metallb.fullname" . }}-prometheus
+  namespace: {{ include "metallb.namespace" . | quote }}
 rules:
   - apiGroups:
       - ""
@@ -96,6 +99,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ template "metallb.fullname" . }}-prometheus
+  namespace: {{ include "metallb.namespace" . | quote }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
