@@ -25,6 +25,7 @@ import (
 	"github.com/go-kit/log/level"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
@@ -90,6 +91,13 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 		return "notOwner"
 	}
 
+	adsForService := l2AdsForService(pool.L2Advertisements, c.myNode, svc)
+	serviceHasL2Adv := len(adsForService) > 0
+	if !serviceHasL2Adv {
+		level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "no advertisement matching service on my node")
+		return "noMatchingAdvertisement"
+	}
+
 	speakerMap := c.speakersForPool(l, name, pool, nodes)
 	availableNodes := nodesWithActiveSpeakers(speakerMap)
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
@@ -127,8 +135,9 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, client service, svc *v1.Service) error {
 	ifs := c.announcer.GetInterfaces()
 	updateStatus := false
+	adsForService := l2AdsForService(pool.L2Advertisements, c.myNode, svc)
 	for _, lbIP := range lbIPs {
-		ipAdv := ipAdvertisementFor(lbIP, c.myNode, pool.L2Advertisements)
+		ipAdv := ipAdvertisementFor(lbIP, c.myNode, adsForService)
 		if !ipAdv.MatchInterfaces(ifs...) {
 			level.Warn(l).Log("op", "SetBalancer", "protocol", "layer2", "service", name, "IPAdvertisement", ipAdv,
 				"localIfs", ifs, "msg", "the specified interfaces used to announce LB IP don't exist")
@@ -214,6 +223,30 @@ func poolMatchesNodeL2(pool *config.Pool, node string) bool {
 		}
 	}
 	return false
+}
+
+// l2AdvsForService returns the L2 advertisements matching the service on the given node.
+func l2AdsForService(ads []*config.L2Advertisement, node string, svc *v1.Service) []*config.L2Advertisement {
+	var result []*config.L2Advertisement
+	svcLabels := labels.Set(svc.Labels)
+	for _, ad := range ads {
+		if !ad.Nodes[node] {
+			continue
+		}
+
+		if len(ad.ServiceSelectors) == 0 {
+			result = append(result, ad)
+			continue
+		}
+
+		for _, sel := range ad.ServiceSelectors {
+			if sel.Matches(svcLabels) {
+				result = append(result, ad)
+				break
+			}
+		}
+	}
+	return result
 }
 
 func (c *layer2Controller) speakersForPool(l log.Logger, name string, pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
