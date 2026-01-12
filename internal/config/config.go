@@ -209,6 +209,8 @@ type L2Advertisement struct {
 	Interfaces []string
 	// AllInterfaces tells if all the interfaces are allowed for this advertisement
 	AllInterfaces bool
+	// EnableL2Lease enables Kubernetes Lease coordination to prevent split-brain announcements
+	EnableL2Lease bool
 }
 
 // BFDProfile describes a BFD profile to be applied to a set of peers.
