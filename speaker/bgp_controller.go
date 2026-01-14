@@ -174,6 +174,18 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 		return "notOwner"
 	}
 
+	adsForService := bgpAdsForService(pool.BGPAdvertisements, c.myNode, svc)
+	serviceHasBGPAdv := len(adsForService) > 0
+	if !serviceHasBGPAdv {
+		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "no advertisement matching service")
+		return "noMatchingAdvertisement"
+	}
+
+	if err := checkBGPAdvConflicts(adsForService, pool); err != nil {
+		level.Error(l).Log("event", "conflictingAdvertisements", "service", name, "error", err)
+		return "conflictingAdvertisements"
+	}
+
 	if k8snodes.IsNetworkUnavailable(nodes[c.myNode]) {
 		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
 		return "nodeNetworkUnavailable"
@@ -325,14 +337,11 @@ func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) 
 	return c.sessionManager.SyncBFDProfiles(profiles)
 }
 
-func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, _ service, _ *v1.Service) error {
+func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, _ service, svc *v1.Service) error {
+	adsForService := bgpAdsForService(pool.BGPAdvertisements, c.myNode, svc)
 	c.svcAds[name] = nil
 	for _, lbIP := range lbIPs {
-		for _, adCfg := range pool.BGPAdvertisements {
-			// skipping if this node is not enabled for this advertisement
-			if !adCfg.Nodes[c.myNode] {
-				continue
-			}
+		for _, adCfg := range adsForService {
 			m := net.CIDRMask(adCfg.AggregationLength, 32)
 			if lbIP.To4() == nil {
 				m = net.CIDRMask(adCfg.AggregationLengthV6, 128)
@@ -515,6 +524,44 @@ func poolMatchesNodeBGP(pool *config.Pool, node string) bool {
 		}
 	}
 	return false
+}
+
+// bgpAdsForService returns BGP advertisements matching both node and service.
+func bgpAdsForService(ads []*config.BGPAdvertisement, node string, svc *v1.Service) []*config.BGPAdvertisement {
+	var result []*config.BGPAdvertisement
+	for _, ad := range ads {
+		if !ad.Nodes[node] {
+			continue
+		}
+		// Empty selectors = match all services
+		if len(ad.ServiceSelectors) == 0 {
+			result = append(result, ad)
+			continue
+		}
+		// Check if any selector matches (OR logic)
+		svcLabels := labels.Set(svc.Labels)
+		for _, sel := range ad.ServiceSelectors {
+			if sel.Matches(svcLabels) {
+				result = append(result, ad)
+				break
+			}
+		}
+	}
+	return result
+}
+
+// checkBGPAdvConflicts checks if the bgp ads for the same service are compatible.
+// This is necessary because we don't run the validation per service when parsing the config.
+func checkBGPAdvConflicts(ads []*config.BGPAdvertisement, pool *config.Pool) error {
+	for i, ad1 := range ads {
+		for _, ad2 := range ads[i+1:] {
+			if !config.BGPAdvertisementsHaveCompatibleLocalPref(ad1, ad2, pool) {
+				return fmt.Errorf("advertisements '%s' and '%s' have conflicting LOCAL_PREF (%d vs %d)",
+					ad1.Name, ad2.Name, ad1.LocalPref, ad2.LocalPref)
+			}
+		}
+	}
+	return nil
 }
 
 func (c *bgpController) PeersForService(key string) sets.Set[string] {
