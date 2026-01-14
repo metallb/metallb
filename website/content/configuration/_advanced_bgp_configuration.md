@@ -258,6 +258,60 @@ spec:
 
 In this way, all the IPs coming from `PoolA` will be advertised only to `PeerA` and `PeerB`.
 
+### Limiting the advertisement to specific services
+
+By default, a `BGPAdvertisement` applies to all services that receive an IP from the
+associated pools. You can use `serviceSelectors` to limit the advertisement to only
+services that match specific label selectors.
+
+This is useful when you want different routing policies for different services. For
+example, you might want to advertise production services with a higher local preference
+than staging services, or advertise certain services to specific peers only.
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: production-services
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - first-pool
+  localPref: 200
+  serviceSelectors:
+  - matchLabels:
+      environment: production
+```
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: staging-services
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - first-pool
+  localPref: 100
+  serviceSelectors:
+  - matchLabels:
+      environment: staging
+```
+
+With this configuration, services labeled `environment: production` that received an IP from `first-pool` will be advertised
+with `localPref=200`, while services labeled `environment: staging` that received an IP from `first-pool` will be advertised
+with `localPref=100`.
+
+Multiple selectors in the `serviceSelectors` list are combined with OR logic - a service
+matching **any** of the selectors will be advertised via that advertisement.
+
+{{% notice note %}}
+The `serviceSelectors` field is mutually exclusive with `aggregationLength` and
+`aggregationLengthV6`. Service selectors can only be used when advertising with the
+default `/32` (IPv4) or `/128` (IPv6) aggregation length. This is because aggregated
+routes cannot be associated with individual services.
+{{% /notice %}}
+
 ### Configuring the BGP source address
 
 When a host has multiple network interfaces or multiple IP addresses
