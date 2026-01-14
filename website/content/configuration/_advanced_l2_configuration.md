@@ -148,3 +148,52 @@ In other words, if MetalLB chooses hostB to announce the VIP of pool1, the Speak
 {{% notice warning %}}
 The interface selector won't affect how MetalLB is choosing the leader for a given L2 IP. This means that if it elects a leader where the selected interface is not available, the service won't be announced. The cluster administrator is responsible to use the combination of interfaces selector and node selector to avoid the problem.
 {{% /notice %}}
+
+### Limiting the advertisement to specific services
+
+By default, an `L2Advertisement` applies to all services that receive an IP from the
+associated pools. You can use `serviceSelectors` to limit the advertisement to only
+services that match specific label selectors.
+
+This is useful when you want different L2 configurations for different services. For
+example, you might want to announce certain services only from specific interfaces or
+nodes based on their labels.
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: frontend-services
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - first-pool
+  interfaces:
+  - eth0
+  serviceSelectors:
+  - matchLabels:
+      tier: frontend
+```
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: backend-services
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - first-pool
+  interfaces:
+  - eth1
+  serviceSelectors:
+  - matchLabels:
+      tier: backend
+```
+
+With this configuration, services labeled `tier: frontend` that received an IP from `first-pool` will be announced from
+interface `eth0`, while services labeled `tier: backend` that received an IP from `first-pool` will be announced from
+interface `eth1`.
+
+Multiple selectors in the `serviceSelectors` list are combined with OR logic - a service
+matching **any** of the selectors will be advertised via that advertisement.
