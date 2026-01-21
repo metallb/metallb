@@ -1428,6 +1428,53 @@ def gomodtidy(ctx):
         raise Exit(message="go mod tidy failed")
 
 
+@task(
+    help={
+        "version": "Optional specific version to upgrade to (e.g., '0.34.1'). If not specified, upgrades to latest.",
+    }
+)
+def upgradek8sdeps(ctx, version=None):
+    """Upgrade k8s.io and sigs.k8s.io dependencies in go.mod and e2etest/go.mod."""
+
+    def get_k8s_deps(module_dir=""):
+        """Get k8s.io and sigs.k8s.io direct dependencies using go list."""
+        cmd = "go list -m -f '{{if not .Indirect}}{{.Path}}{{end}}' all"
+        if module_dir:
+            cmd = f"cd {module_dir} && {cmd}"
+
+        result = run(cmd, hide=True)
+        deps = []
+        for line in result.stdout.strip().split("\n"):
+            line = line.strip()
+            if line.startswith("k8s.io/") or line.startswith("sigs.k8s.io/"):
+                deps.append(line)
+        return deps
+
+    for module_dir in [".", "e2etest"]:
+        module_name = "main module" if module_dir == "." else "e2etest module"
+        prefix = "" if module_dir == "." else "cd e2etest && "
+
+        print(f"Upgrading k8s.io and sigs.k8s.io dependencies in {module_dir}/go.mod...")
+        deps = get_k8s_deps(module_dir if module_dir != "." else "")
+
+        for dep in deps:
+            if version:
+                print(f"  Upgrading {dep} to v{version}")
+                run(f"{prefix}go get {dep}@v{version}", echo=True)
+            else:
+                print(f"  Upgrading {dep} to latest")
+                run(f"{prefix}go get -u {dep}", echo=True)
+
+        print(f"Running go mod tidy on {module_name}...")
+        run(f"{prefix}go mod tidy", echo=True)
+        print()
+
+    print("Syncing go workspace...")
+    run("cd e2etest && go work sync", echo=True)
+
+    print("\nSuccessfully upgraded k8s.io and sigs.k8s.io dependencies")
+
+
 @task
 def generatemanifests(ctx):
     """Re-generates the all-in-one manifests under config/manifests"""
