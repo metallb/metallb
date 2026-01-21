@@ -1428,6 +1428,61 @@ def gomodtidy(ctx):
         raise Exit(message="go mod tidy failed")
 
 
+@task(
+    help={
+        "version": "Optional specific version to upgrade to (e.g., '0.34.1'). If not specified, upgrades to latest.",
+    }
+)
+def upgradek8sdeps(ctx, version=None):
+    """Upgrade k8s.io and sigs.k8s.io dependencies in go.mod and e2etest/go.mod."""
+
+    def get_k8s_deps(module_dir=""):
+        """Get k8s.io and sigs.k8s.io direct dependencies using go list."""
+        cmd = "go list -m -f '{{if not .Indirect}}{{.Path}}{{end}}' all"
+        if module_dir:
+            cmd = f"cd {module_dir} && {cmd}"
+
+        result = run(cmd, hide=True)
+        deps = []
+        for line in result.stdout.strip().split("\n"):
+            line = line.strip()
+            if line.startswith("k8s.io/") or line.startswith("sigs.k8s.io/"):
+                deps.append(line)
+        return deps
+
+    # Process main go.mod
+    print("Upgrading k8s.io and sigs.k8s.io dependencies in go.mod...")
+    main_deps = get_k8s_deps()
+
+    for dep in main_deps:
+        if version:
+            print(f"  Upgrading {dep} to v{version}")
+            run(f"go get {dep}@v{version}", echo=True)
+        else:
+            print(f"  Upgrading {dep} to latest")
+            run(f"go get -u {dep}", echo=True)
+
+    print("Running go mod tidy on main module...")
+    run("go mod tidy", echo=True)
+
+    # Process e2etest/go.mod
+    print("\nUpgrading k8s.io and sigs.k8s.io dependencies in e2etest/go.mod...")
+    e2etest_deps = get_k8s_deps("e2etest")
+
+    for dep in e2etest_deps:
+        if version:
+            print(f"  Upgrading {dep} to v{version}")
+            run(f"cd e2etest && go get {dep}@v{version}", echo=True)
+        else:
+            print(f"  Upgrading {dep} to latest")
+            run(f"cd e2etest && go get -u {dep}", echo=True)
+
+    print("Running go mod tidy on e2etest module...")
+    run("cd e2etest && go mod tidy", echo=True)
+
+    print("\nSuccessfully upgraded k8s.io and sigs.k8s.io dependencies")
+
+
 @task
 def generatemanifests(ctx):
     """Re-generates the all-in-one manifests under config/manifests"""
