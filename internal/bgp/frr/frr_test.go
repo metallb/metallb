@@ -1016,9 +1016,7 @@ func TestLoggingConfigurationDebug(t *testing.T) {
 func TestLoggingConfigurationOverrideByEnvironmentVar(t *testing.T) {
 	testSetup(t)
 
-	orig := os.Getenv("FRR_LOGGING_LEVEL")
-	os.Setenv("FRR_LOGGING_LEVEL", "alerts")
-	t.Cleanup(func() { os.Setenv("FRR_LOGGING_LEVEL", orig) })
+	t.Setenv("FRR_LOGGING_LEVEL", "alerts")
 
 	l := log.NewNopLogger()
 	sessionManager := mockNewSessionManager(l, logging.LevelDebug)

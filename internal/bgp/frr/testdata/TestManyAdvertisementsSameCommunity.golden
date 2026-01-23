@@ -1,4 +1,4 @@
-log stdout 
+log stdout informational
 log timestamp precision 3
 hostname dummyhostname
 ip nht resolve-via-default
