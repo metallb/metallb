@@ -82,7 +82,7 @@ type invalidFileErr struct {
 }
 
 func (e invalidFileErr) Error() string {
-	return e.Reason
+	return fmt.Sprintf("invalid file error, reason: %s", e.Reason)
 }
 
 func testFileIsValid(fileName string) error {

@@ -103,7 +103,7 @@ func validateAgainstFRR(t *testing.T) {
 	if !strings.Contains(configFile, "Invalid") {
 		err := testFileIsValid(configFile)
 		if err != nil {
-			t.Fatalf("Failed to verify the file %s", err)
+			t.Fatalf("Failed to verify the file: %q", err)
 		}
 	}
 }

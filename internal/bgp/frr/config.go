@@ -4,12 +4,17 @@ package frr
 
 import (
 	"bytes"
+	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"reflect"
 	"strconv"
-	"syscall"
+	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -23,13 +28,14 @@ import (
 )
 
 const (
-	configFileName      = "/etc/frr_reloader/frr.conf"
-	reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
+	configFileName     = "/etc/frr_reloader/frr.conf"
+	reloaderSocketName = "/etc/frr_reloader/frr-reloader.sock"
 )
 
 var (
 	//go:embed templates/* templates/*
-	templates embed.FS
+	templates              embed.FS
+	reloadRequestIDCounter atomic.Uint64
 )
 
 type frrConfig struct {
@@ -43,6 +49,16 @@ type frrConfig struct {
 type reloadEvent struct {
 	config *frrConfig
 	useOld bool
+}
+
+type reloadRequest struct {
+	Action string `json:"action"`
+	ID     int    `json:"id"`
+}
+
+type reloadResponse struct {
+	ID     int  `json:"id"`
+	Result bool `json:"result"`
 }
 
 // TODO: having global prefix lists works only because we advertise all the addresses
@@ -255,32 +271,69 @@ func templateConfig(data interface{}) (string, error) {
 
 // writeConfig writes the FRR configuration file (represented as a string)
 // to 'filename'.
-func writeConfig(config string, filename string) error {
+func writeConfig(config string, filename string, mu *sync.Mutex) error {
+	mu.Lock()
+	defer mu.Unlock()
 	return os.WriteFile(filename, []byte(config), 0600)
 }
 
 // reloadConfig requests that FRR reloads the configuration file. This is
 // called after updating the configuration.
 var reloadConfig = func() error {
-	pidFile, found := os.LookupEnv("FRR_RELOADER_PID_FILE")
+	socketPath, found := os.LookupEnv("FRR_RELOADER_SOCKET")
 	if !found {
-		pidFile = reloaderPidFileName
+		socketPath = reloaderSocketName
 	}
 
-	pid, err := os.ReadFile(pidFile)
-	if err != nil {
-		return err
+	// Generate unique request ID
+	requestID := int(reloadRequestIDCounter.Add(1))
+
+	// Create the reload request
+	request := reloadRequest{
+		Action: "reload",
+		ID:     requestID,
 	}
 
-	pidInt, err := strconv.Atoi(string(pid))
+	requestBody, err := json.Marshal(request)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal reload request: %w", err)
 	}
 
-	// send HUP signal to FRR reloader
-	err = syscall.Kill(pidInt, syscall.SIGHUP)
+	// Create HTTP client with Unix socket transport
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
+		},
+		Timeout: 30 * time.Second,
+	}
+
+	// Make the HTTP POST request
+	resp, err := client.Post("http://unix/", "application/json", bytes.NewReader(requestBody))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to send reload request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("reload request failed with status: %d", resp.StatusCode)
+	}
+
+	// Parse the response
+	var response reloadResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return fmt.Errorf("failed to decode reload response: %w", err)
+	}
+
+	// Verify the response ID matches
+	if response.ID != requestID {
+		return fmt.Errorf("response ID mismatch: expected %d, got %d", requestID, response.ID)
+	}
+
+	// Check if the reload was successful
+	if !response.Result {
+		return fmt.Errorf("FRR reload failed")
 	}
 
 	return nil
@@ -289,18 +342,13 @@ var reloadConfig = func() error {
 // generateAndReloadConfigFile takes a 'struct frrConfig' and, using a template,
 // generates and writes a valid FRR configuration file. If this completes
 // successfully it will also force FRR to reload that configuration file.
-func generateAndReloadConfigFile(config *frrConfig, l log.Logger) error {
-	filename, found := os.LookupEnv("FRR_CONFIG_FILE")
-	if !found {
-		filename = configFileName
-	}
-
+func generateAndReloadConfigFile(config *frrConfig, l log.Logger, filename string, fileLock *sync.Mutex) error {
 	configString, err := templateConfig(config)
 	if err != nil {
 		level.Error(l).Log("op", "reload", "error", err, "cause", "template", "config", config)
 		return err
 	}
-	err = writeConfig(configString, filename)
+	err = writeConfig(configString, filename, fileLock)
 	if err != nil {
 		level.Error(l).Log("op", "reload", "error", err, "cause", "writeConfig", "config", config)
 		return err
@@ -315,46 +363,63 @@ func generateAndReloadConfigFile(config *frrConfig, l log.Logger) error {
 }
 
 // debouncer takes a function that processes an frrConfig, a channel where
-// the update requests are sent, and squashes any requests coming in a given timeframe
-// as a single request.
+// the update requests are sent, and pools any requests coming in during a reload.
+// When a reload is in progress, all incoming configs are pooled, and the latest
+// one will be reloaded after the current reload completes.
 func debouncer(body func(config *frrConfig) error,
 	reload <-chan reloadEvent,
-	reloadInterval time.Duration,
+	_ time.Duration,
 	failureRetryInterval time.Duration,
 	l log.Logger) {
+	var configToUse atomic.Pointer[frrConfig]
+	triggerReload := make(chan struct{}, 1)
+
+	// Reload goroutine: waits for trigger signal, loads latest config atomically, and reloads.
+	// On failure, waits for retry interval then triggers a retry (unless already triggered).
 	go func() {
-		var config *frrConfig
-		var timeOut <-chan time.Time
-		timerSet := false
 		for {
+			<-triggerReload
+			cfg := configToUse.Load()
+			level.Debug(l).Log("op", "reload", "action", "start reload")
+			err := body(cfg)
+			if err != nil {
+				level.Error(l).Log("op", "reload", "error", err, "action", "retry after interval")
+				time.Sleep(failureRetryInterval)
+
+				// Trigger retry if not already pending (non-blocking).
+				select {
+				case triggerReload <- struct{}{}:
+				default:
+				}
+			}
+		}
+	}()
+
+	// Main event loop: receives reload events and triggers reloads.
+	// The config is stored atomically first, then a trigger is sent (non-blocking).
+	// This ordering guarantees the reload goroutine always sees the latest config.
+	go func() {
+		for newCfg := range reload {
+			config := configToUse.Load()
+
+			if newCfg.useOld && config == nil {
+				level.Debug(l).Log("op", "reload", "action", "ignore config", "reason", "nil config")
+				continue // just ignore the event
+			}
+			if !newCfg.useOld && reflect.DeepEqual(newCfg.config, configToUse.Load()) {
+				level.Debug(l).Log("op", "reload", "action", "ignore config", "reason", "same config")
+				continue // config hasn't changed
+			}
+			if !newCfg.useOld {
+				configToUse.Store(newCfg.config)
+			}
+
+			// Store new config atomically, then trigger reload if not already pending.
 			select {
-			case newCfg, ok := <-reload:
-				if !ok { // the channel was closed
-					return
-				}
-				if newCfg.useOld && config == nil {
-					level.Debug(l).Log("op", "reload", "action", "ignore config", "reason", "nil config")
-					continue // just ignore the event
-				}
-				if !newCfg.useOld && reflect.DeepEqual(newCfg.config, config) {
-					level.Debug(l).Log("op", "reload", "action", "ignore config", "reason", "same config")
-					continue // config hasn't changed
-				}
-				if !newCfg.useOld {
-					config = newCfg.config
-				}
-				if !timerSet {
-					timeOut = time.After(reloadInterval)
-					timerSet = true
-				}
-			case <-timeOut:
-				err := body(config)
-				if err != nil {
-					timeOut = time.After(failureRetryInterval)
-					timerSet = true
-					continue
-				}
-				timerSet = false
+			case triggerReload <- struct{}{}:
+				// Successfully triggered reload
+			default:
+				// Reload already pending - the reload goroutine will pick up our latest config
 			}
 		}
 	}()

@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -16,15 +20,29 @@ import (
 const (
 	defaultSharedVolume = "/etc/frr_reloader"
 	frrReloadScript     = "/usr/lib/frr/frr-reload.py"
+	socketName          = "frr-reloader.sock"
 )
 
+type reloadRequest struct {
+	Action string `json:"action"`
+	ID     int    `json:"id"`
+}
+
+type reloadResponse struct {
+	ID     int  `json:"id"`
+	Result bool `json:"result"`
+}
+
 type reloader struct {
-	sharedVolume string
-	pidFile      string
-	fileToReload string
-	lockFile     string
-	statusFile   string
-	lockFd       *os.File
+	sharedVolume   string
+	pidFile        string
+	fileToReload   string
+	lockFile       string
+	statusFile     string
+	socketPath     string
+	lockFd         *os.File
+	reloadReqChan  chan reloadRequest
+	reloadRespChan chan reloadResponse
 }
 
 func newReloader() (*reloader, error) {
@@ -34,11 +52,14 @@ func newReloader() (*reloader, error) {
 	}
 
 	r := &reloader{
-		sharedVolume: sharedVolume,
-		pidFile:      filepath.Join(sharedVolume, "reloader.pid"),
-		fileToReload: filepath.Join(sharedVolume, "frr.conf"),
-		lockFile:     filepath.Join(sharedVolume, "lock"),
-		statusFile:   filepath.Join(sharedVolume, ".status"),
+		sharedVolume:   sharedVolume,
+		pidFile:        filepath.Join(sharedVolume, "reloader.pid"),
+		fileToReload:   filepath.Join(sharedVolume, "frr.conf"),
+		lockFile:       filepath.Join(sharedVolume, "lock"),
+		statusFile:     filepath.Join(sharedVolume, ".status"),
+		socketPath:     filepath.Join(sharedVolume, socketName),
+		reloadReqChan:  make(chan reloadRequest),
+		reloadRespChan: make(chan reloadResponse),
 	}
 
 	// Clean up any existing files
@@ -61,6 +82,73 @@ func newReloader() (*reloader, error) {
 	return r, nil
 }
 
+func (r *reloader) startHTTPServer(ctx context.Context) error {
+	// Remove existing socket file if it exists
+	os.Remove(r.socketPath)
+
+	listener, err := net.Listen("unix", r.socketPath)
+	if err != nil {
+		return fmt.Errorf("failed to create unix socket: %w", err)
+	}
+
+	// Set socket permissions
+	if err := os.Chmod(r.socketPath, 0600); err != nil {
+		listener.Close()
+		return fmt.Errorf("failed to set socket permissions: %w", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", r.handleReload)
+
+	server := &http.Server{Handler: mux}
+
+	go func() {
+		<-ctx.Done()
+		if err := server.Shutdown(context.Background()); err != nil {
+			log.Println(err)
+		}
+		listener.Close()
+	}()
+
+	go func() {
+		log.Printf("Starting HTTP server on Unix socket: %s", r.socketPath)
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			log.Printf("HTTP server error: %v", err)
+		}
+	}()
+
+	return nil
+}
+
+func (r *reloader) handleReload(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var reloadReq reloadRequest
+	if err := json.NewDecoder(req.Body).Decode(&reloadReq); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if reloadReq.Action != "reload" {
+		http.Error(w, "Invalid action", http.StatusBadRequest)
+		return
+	}
+
+	// Send reload request to channel
+	r.reloadReqChan <- reloadReq
+
+	// Wait for response
+	resp := <-r.reloadRespChan
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Println(err)
+	}
+}
+
 func (r *reloader) run() {
 	// Setup signal handlers
 	sigHup := make(chan os.Signal, 1)
@@ -68,27 +156,49 @@ func (r *reloader) run() {
 	signal.Notify(sigHup, syscall.SIGHUP)
 	signal.Notify(sigTerm, syscall.SIGTERM, syscall.SIGINT)
 
+	// Start HTTP server
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := r.startHTTPServer(ctx); err != nil {
+		log.Fatalf("Failed to start HTTP server: %v", err)
+	}
+
 	// Main event loop
 	for {
 		select {
 		case <-sigHup:
 			// Handle reload in a goroutine to allow queueing via flock
 			go r.reloadFRR()
+		case req := <-r.reloadReqChan:
+			// Handle reload request from HTTP server
+			go func() {
+				result := r.reloadFRR()
+				r.reloadRespChan <- reloadResponse{
+					ID:     req.ID,
+					Result: result,
+				}
+			}()
 		case <-sigTerm:
 			log.Println("Caught an exit signal..")
+			cancel()
 			r.cleanup()
 			return
 		}
 	}
 }
 
-func (r *reloader) reloadFRR() {
+func (r *reloader) reloadFRR() bool {
 	// Acquire exclusive lock (flock 200 in bash)
 	if err := syscall.Flock(int(r.lockFd.Fd()), syscall.LOCK_EX); err != nil {
 		log.Printf("Failed to acquire lock: %v", err)
-		return
+		return false
 	}
-	defer syscall.Flock(int(r.lockFd.Fd()), syscall.LOCK_UN)
+	defer func() {
+		if err := syscall.Flock(int(r.lockFd.Fd()), syscall.LOCK_UN); err != nil {
+			log.Print(err)
+		}
+	}()
 
 	log.Println("Caught SIGHUP and acquired lock! Reloading FRR..")
 	startTime := time.Now()
@@ -96,18 +206,19 @@ func (r *reloader) reloadFRR() {
 	// Check configuration file syntax
 	log.Println("Checking the configuration file syntax")
 	if !r.runFRRReload("--test", startTime) {
-		return
+		return false
 	}
 
 	// Apply configuration
 	log.Println("Applying the configuration file")
 	if !r.runFRRReload("--reload --overwrite", startTime) {
-		return
+		return false
 	}
 
 	elapsed := time.Since(startTime)
 	log.Printf("FRR reloaded successfully! %d seconds", int(elapsed.Seconds()))
 	r.writeStatus("success")
+	return true
 }
 
 func (r *reloader) runFRRReload(args string, startTime time.Time) bool {
@@ -182,6 +293,7 @@ func (r *reloader) writeStatus(status string) {
 func (r *reloader) cleanFiles() {
 	os.Remove(r.pidFile)
 	os.Remove(r.lockFile)
+	os.Remove(r.socketPath)
 }
 
 func (r *reloader) cleanup() {

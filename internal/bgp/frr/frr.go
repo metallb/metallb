@@ -8,12 +8,10 @@ import (
 	"os"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/bgp/community"
 	metallbconfig "go.universe.tf/metallb/internal/config"
@@ -96,7 +94,6 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 		s.advertised = oldAdvs
 		return err
 	}
-
 	s.sessionManager.reloadConfig <- reloadEvent{config: config}
 	return nil
 }
@@ -417,13 +414,17 @@ func NewSessionManager(l log.Logger, logLevel logging.Level) bgp.SessionManager 
 		reloadConfig: make(chan reloadEvent),
 		logLevel:     logLevelToFRR(logLevel),
 	}
+	filename, found := os.LookupEnv("FRR_CONFIG_FILE")
+	if !found {
+		filename = configFileName
+	}
+	fileLock := &sync.Mutex{}
+
 	reload := func(config *frrConfig) error {
-		return generateAndReloadConfigFile(config, l)
+		return generateAndReloadConfigFile(config, l, filename, fileLock)
 	}
 
 	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout, l)
-
-	reloadValidator(l, res.reloadConfig)
 
 	return res
 }
@@ -435,61 +436,19 @@ func mockNewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager
 		reloadConfig: make(chan reloadEvent),
 		logLevel:     logLevelToFRR(logLevel),
 	}
+	filename, found := os.LookupEnv("FRR_CONFIG_FILE")
+	if !found {
+		filename = configFileName
+	}
+	fileLock := &sync.Mutex{}
+
 	reload := func(config *frrConfig) error {
-		return generateAndReloadConfigFile(config, l)
+		return generateAndReloadConfigFile(config, l, filename, fileLock)
 	}
 
 	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout, l)
 
-	reloadValidator(l, res.reloadConfig)
-
 	return res
-}
-
-func reloadValidator(l log.Logger, reload chan<- reloadEvent) {
-	var tickerIntervals = 30 * time.Second
-	var prevReloadTimeStamp string
-
-	ticker := time.NewTicker(tickerIntervals)
-	go func() {
-		for range ticker.C {
-			validateReload(l, &prevReloadTimeStamp, reload)
-		}
-	}()
-}
-
-const statusFileName = "/etc/frr_reloader/.status"
-
-func validateReload(l log.Logger, prevReloadTimeStamp *string, reload chan<- reloadEvent) {
-	bytes, err := os.ReadFile(statusFileName)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			level.Error(l).Log("op", "reload-validate", "error", err, "cause", "readFile", "fileName", statusFileName)
-		}
-		return
-	}
-
-	lastReloadStatus := strings.Fields(string(bytes))
-	if len(lastReloadStatus) != 2 {
-		level.Error(l).Log("op", "reload-validate", "error", err, "cause", "Fields", "bytes", string(bytes))
-		return
-	}
-
-	timeStamp, status := lastReloadStatus[0], lastReloadStatus[1]
-	if timeStamp == *prevReloadTimeStamp {
-		return
-	}
-
-	*prevReloadTimeStamp = timeStamp
-
-	if strings.Compare(status, "failure") == 0 {
-		level.Error(l).Log("op", "reload-validate", "error", fmt.Errorf("reload failure"),
-			"cause", "frr reload failed", "status", status)
-		reload <- reloadEvent{useOld: true}
-		return
-	}
-
-	level.Info(l).Log("op", "reload-validate", "success", "reloaded config")
 }
 
 func ConfigBFDProfileToFRR(p *metallbconfig.BFDProfile) *BFDProfile {
