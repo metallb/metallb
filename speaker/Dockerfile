@@ -48,6 +48,22 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   go build -v -o /build/speaker \
   -ldflags "-X 'go.universe.tf/metallb/internal/version.gitCommit=${GIT_COMMIT}' -X 'go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}'" \
   ./speaker
+  
+RUN --mount=type=cache,target=/root/.cache/go-build \
+  --mount=type=cache,target=/go/pkg/mod \
+  --mount=type=bind,source=go.sum,target=go.sum \
+  --mount=type=bind,source=go.mod,target=go.mod \
+  --mount=type=bind,source=internal,target=internal \
+  --mount=type=bind,source=api,target=api \
+  --mount=type=bind,source=speaker,target=speaker \
+  --mount=type=bind,source=frr-tools/metrics,target=frr-tools/metrics \
+  --mount=type=bind,source=frr-tools/cp-tool,target=frr-tools/cp-tool \
+  --mount=type=bind,source=frr-tools/reloader,target=frr-tools/reloader \
+  #build frr-reloader
+  CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=$VARIANT \
+  go build -v -o /build/frr-reloader \
+  -ldflags "-X 'go.universe.tf/metallb/internal/version.gitCommit=${GIT_COMMIT}' -X 'go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}'" \
+  frr-tools/reloader/frr-reloader.go
 
 FROM gcr.io/distroless/static:latest
 
@@ -55,7 +71,7 @@ FROM gcr.io/distroless/static:latest
 COPY --from=builder /build/cp-tool /cp-tool
 COPY --from=builder /build/speaker /speaker
 COPY --from=builder /build/frr-metrics /frr-metrics
-COPY frr-tools/reloader/frr-reloader.sh /frr-reloader.sh
+COPY --from=builder /build/frr-reloader /frr-reloader
 COPY LICENSE /
 
 LABEL org.opencontainers.image.authors="metallb" \

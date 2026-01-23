@@ -3443,7 +3443,7 @@ spec:
         - mountPath: /etc/frr_status
           name: frr-status
       - command:
-        - /etc/frr_reloader/frr-reloader.sh
+        - /etc/frr_reloader/frr-reloader
         image: quay.io/frrouting/frr:10.4.1
         name: reloader
         volumeMounts:
@@ -3472,7 +3472,7 @@ spec:
       - command:
         - /bin/sh
         - -c
-        - cp -f /frr-reloader.sh /etc/frr_reloader/
+        - cp -f /frr-reloader /etc/frr_reloader/
         image: quay.io/metallb/frr-k8s:v0.0.22
         name: cp-reloader
         volumeMounts:
