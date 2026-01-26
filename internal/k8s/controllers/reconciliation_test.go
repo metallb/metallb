@@ -605,6 +605,126 @@ var _ = Describe("Layer2 Status Controller", func() {
 				return len(statuses) == 0
 			}, 5*time.Second, 200*time.Millisecond).Should(BeTrue())
 		})
+
+		It("Should delete status from other nodes when becoming leader", func() {
+			otherNodeName := "other-node"
+
+			// Create a status that belongs to another node (simulating a node that went down)
+			otherNodeStatus := &v1beta1.ServiceL2Status{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "other-node-status",
+					Namespace: speakerNamespace,
+					Labels: map[string]string{
+						LabelServiceName:      testServiceName,
+						LabelServiceNamespace: testNamespace,
+						LabelAnnounceNode:     otherNodeName,
+					},
+				},
+			}
+			err := k8sClient.Create(ctx, otherNodeStatus)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Simulate our node becoming the leader for this service
+			updateLayer2Advs([]layer2.IPAdvertisement{
+				layer2.NewIPAdvertisement(net.IP("127.0.0.2"), true, sets.Set[string]{}),
+			})
+
+			// Trigger reconciliation for the same service
+			layer2StatusUpdateChan <- NewL2StatusEvent(testNamespace, testServiceName)
+
+			// Verify our node created its own status
+			var ourStatuses []v1beta1.ServiceL2Status
+			Eventually(func() int {
+				statusList := v1beta1.ServiceL2StatusList{}
+				err := k8sClient.List(ctx, &statusList,
+					client.MatchingLabels{
+						LabelServiceName:      testServiceName,
+						LabelServiceNamespace: testNamespace,
+						LabelAnnounceNode:     testNodeName,
+					},
+				)
+				if err != nil {
+					return 0
+				}
+				ourStatuses = statusList.Items
+				return len(ourStatuses)
+			}, 5*time.Second, 200*time.Millisecond).Should(Equal(1))
+
+			// Verify our status has correct values
+			Expect(ourStatuses[0].Labels[LabelAnnounceNode]).To(Equal(testNodeName))
+			Expect(ourStatuses[0].Status.Node).To(Equal(testNodeName))
+
+			// Verify the other node's status was DELETED by the new leader
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name:      otherNodeStatus.Name,
+					Namespace: speakerNamespace,
+				}, &v1beta1.ServiceL2Status{})
+				return apierrors.IsNotFound(err)
+			}, 5*time.Second, 200*time.Millisecond).Should(BeTrue())
+
+			// Stop advertising the service
+			updateLayer2Advs([]layer2.IPAdvertisement{})
+			layer2StatusUpdateChan <- NewL2StatusEvent(testNamespace, testServiceName)
+
+			// Verify our node's status is deleted
+			Eventually(func() int {
+				statusList := v1beta1.ServiceL2StatusList{}
+				_ = k8sClient.List(ctx, &statusList,
+					client.MatchingLabels{
+						LabelServiceName:      testServiceName,
+						LabelServiceNamespace: testNamespace,
+						LabelAnnounceNode:     testNodeName,
+					},
+				)
+				return len(statusList.Items)
+			}, 5*time.Second, 200*time.Millisecond).Should(Equal(0))
+		})
+
+		It("Should not delete status from other nodes when not the leader", func() {
+			otherNodeName := "other-node"
+
+			// Create a status that belongs to another node
+			otherNodeStatus := &v1beta1.ServiceL2Status{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "other-node-status",
+					Namespace: speakerNamespace,
+					Labels: map[string]string{
+						LabelServiceName:      testServiceName,
+						LabelServiceNamespace: testNamespace,
+						LabelAnnounceNode:     otherNodeName,
+					},
+				},
+			}
+			err := k8sClient.Create(ctx, otherNodeStatus)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Our node is NOT the leader (no advertisements)
+			updateLayer2Advs([]layer2.IPAdvertisement{})
+
+			// Trigger reconciliation
+			layer2StatusUpdateChan <- NewL2StatusEvent(testNamespace, testServiceName)
+
+			// Verify the other node's status is NOT deleted (we're not the leader)
+			Consistently(func() error {
+				updatedOtherStatus := &v1beta1.ServiceL2Status{}
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name:      otherNodeStatus.Name,
+					Namespace: speakerNamespace,
+				}, updatedOtherStatus)
+				if err != nil {
+					return err
+				}
+				if updatedOtherStatus.Labels[LabelAnnounceNode] != otherNodeName {
+					return fmt.Errorf("expected label %s, got %s", otherNodeName, updatedOtherStatus.Labels[LabelAnnounceNode])
+				}
+				return nil
+			}, 3*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
+
+			// Clean up
+			err = k8sClient.Delete(ctx, otherNodeStatus)
+			Expect(err).ToNot(HaveOccurred())
+		})
 	})
 })
 

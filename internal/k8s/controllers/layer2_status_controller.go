@@ -79,6 +79,9 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	var errs []error
+	// Not the leader for this service - delete only our own status.
+	// The resource would eventually be deleted by the leader node if it is elected,
+	// but we delete it here for cases such as no new leader is elected.
 	if len(ipAdvS) == 0 {
 		for key, item := range serviceL2statuses.Items {
 			if item.Labels[LabelAnnounceNode] != r.NodeName {
@@ -91,33 +94,29 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, utilerrors.NewAggregate(errs)
 	}
 
-	deleteRedundantErrs := []error{}
-	if len(serviceL2statuses.Items) > 1 {
-		// We shouldn't get here, just in case the controller created redundant resources
-		for i := range serviceL2statuses.Items[1:] {
-			if serviceL2statuses.Items[i+1].Labels[LabelAnnounceNode] != r.NodeName {
-				continue
-			}
-			if err := r.Delete(ctx, &serviceL2statuses.Items[i+1]); err != nil && !errors.IsNotFound(err) {
-				deleteRedundantErrs = append(deleteRedundantErrs, err)
-			}
+	// We are the (sole) leader for this service.
+	var state *v1beta1.ServiceL2Status
+	for _, item := range serviceL2statuses.Items {
+		if item.Labels[LabelAnnounceNode] == r.NodeName && state == nil {
+			state = &item
+			continue
+		}
+		// Delete statuses from other nodes / redundant statuses belonging to our node
+		if err := r.Delete(ctx, &item); err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, err)
 		}
 	}
-
-	if len(deleteRedundantErrs) > 0 {
-		return ctrl.Result{}, utilerrors.NewAggregate(deleteRedundantErrs)
+	if len(errs) > 0 {
+		return ctrl.Result{}, utilerrors.NewAggregate(errs)
 	}
 
-	// creating a brand new cr
-	var state = &v1beta1.ServiceL2Status{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "l2-",
-			Namespace:    r.Namespace,
-		},
-	}
-	// update an existing cr
-	if len(serviceL2statuses.Items) > 0 {
-		state = &serviceL2statuses.Items[0]
+	if state == nil {
+		state = &v1beta1.ServiceL2Status{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "l2-",
+				Namespace:    r.Namespace,
+			},
+		}
 	}
 
 	desiredStatus := r.buildDesiredStatus(ipAdvS, serviceName, serviceNamespace)
