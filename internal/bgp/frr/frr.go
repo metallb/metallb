@@ -3,6 +3,7 @@
 package frr
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -32,6 +33,8 @@ type sessionManager struct {
 	reloadConfig chan reloadEvent
 	logLevel     string
 	sync.Mutex
+	ctx       context.Context
+	cancelCtx context.CancelFunc
 }
 
 type session struct {
@@ -411,11 +414,15 @@ var debounceTimeout = 3 * time.Second
 var failureTimeout = time.Second * 5
 
 func NewSessionManager(l log.Logger, logLevel logging.Level) bgp.SessionManager {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	res := &sessionManager{
 		sessions:     map[string]*session{},
 		bfdProfiles:  []BFDProfile{},
 		reloadConfig: make(chan reloadEvent),
 		logLevel:     logLevelToFRR(logLevel),
+		ctx:          ctx,
+		cancelCtx:    cancel,
 	}
 	reload := func(config *frrConfig) error {
 		return generateAndReloadConfigFile(config, l)
@@ -423,17 +430,21 @@ func NewSessionManager(l log.Logger, logLevel logging.Level) bgp.SessionManager 
 
 	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout, l)
 
-	reloadValidator(l, res.reloadConfig)
+	reloadValidator(res.ctx, l, res.reloadConfig)
 
 	return res
 }
 
 func mockNewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	res := &sessionManager{
 		sessions:     map[string]*session{},
 		bfdProfiles:  []BFDProfile{},
 		reloadConfig: make(chan reloadEvent),
 		logLevel:     logLevelToFRR(logLevel),
+		ctx:          ctx,
+		cancelCtx:    cancel,
 	}
 	reload := func(config *frrConfig) error {
 		return generateAndReloadConfigFile(config, l)
@@ -441,19 +452,32 @@ func mockNewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager
 
 	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout, l)
 
-	reloadValidator(l, res.reloadConfig)
+	reloadValidator(res.ctx, l, res.reloadConfig)
 
 	return res
 }
 
-func reloadValidator(l log.Logger, reload chan<- reloadEvent) {
-	var tickerIntervals = 30 * time.Second
-	var prevReloadTimeStamp string
+func (sm *sessionManager) Close() {
+	if sm.cancelCtx != nil {
+		sm.cancelCtx()
+	}
+	close(sm.reloadConfig)
+}
 
-	ticker := time.NewTicker(tickerIntervals)
+func reloadValidator(ctx context.Context, l log.Logger, reload chan<- reloadEvent) {
 	go func() {
-		for range ticker.C {
-			validateReload(l, &prevReloadTimeStamp, reload)
+		var tickerIntervals = 30 * time.Second
+		var prevReloadTimeStamp string
+
+		ticker := time.NewTicker(tickerIntervals)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				validateReload(l, &prevReloadTimeStamp, reload)
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 }
