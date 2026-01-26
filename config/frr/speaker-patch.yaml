@@ -45,7 +45,7 @@ spec:
         # Copies the reloader to the shared volume between the speaker and reloader.
         - name: cp-reloader
           image: quay.io/metallb/speaker:main
-          command: ["/cp-tool","/frr-reloader.sh","/etc/frr_reloader/frr-reloader.sh"]
+          command: ["/cp-tool","/frr-reloader","/etc/frr_reloader/frr-reloader"]
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
@@ -93,7 +93,7 @@ spec:
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
-          command: ["/etc/frr_reloader/frr-reloader.sh"]
+          command: ["/etc/frr_reloader/frr-reloader"]
           volumeMounts:
             - name: frr-sockets
               mountPath: /var/run/frr
