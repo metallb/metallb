@@ -51,7 +51,6 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM gcr.io/distroless/static:latest
 
-
 COPY --from=builder /build/cp-tool /cp-tool
 COPY --from=builder /build/speaker /speaker
 COPY --from=builder /build/frr-metrics /frr-metrics

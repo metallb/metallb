@@ -1213,6 +1213,14 @@ spec:
           spec:
             description: L2AdvertisementSpec defines the desired state of L2Advertisement.
             properties:
+              enableNDPProxy:
+                description: |-
+                  EnableNDPProxy enables kernel-level NDP proxying for IPv6 VIPs.
+                  When enabled, the speaker will configure the kernel to proxy Neighbor Discovery
+                  Protocol messages for the specified interfaces, allowing VIPs to be reachable
+                  even when the announcing interface has no IP address configured.
+                  This requires the speaker to have CAP_NET_ADMIN capability.
+                type: boolean
               interfaces:
                 description: |-
                   A list of interfaces to announce from. The LB IP will be announced only from these interfaces.
@@ -2276,6 +2284,7 @@ spec:
           capabilities:
             add:
             - NET_RAW
+            - NET_ADMIN
             drop:
             - ALL
           readOnlyRootFilesystem: true

@@ -20,6 +20,7 @@ import (
 	"maps"
 	"net"
 	"sort"
+	"sync"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -41,6 +42,10 @@ type layer2Controller struct {
 	ignoreExcludeLB bool
 	sList           SpeakerList
 	onStatusChange  func(types.NamespacedName)
+	// NDP proxy managers for each interface.
+	// Key: interface name (e.g., "eth1"), Value: NDPProxyManager for that interface
+	ndpProxyMgrs   map[string]*layer2.NDPProxyManager
+	ndpProxyMgrsMu sync.Mutex
 }
 
 func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
@@ -136,6 +141,12 @@ func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP
 			continue
 		}
 		c.announcer.SetBalancer(name, ipAdv)
+
+		// Handle NDP proxy for IPv6 addresses
+		if err := c.handleNDPProxy(l, lbIP, pool.L2Advertisements); err != nil {
+			level.Warn(l).Log("op", "SetBalancer", "protocol", "layer2", "service", name, "ip", lbIP, "error", err, "msg", "failed to enable NDP proxy")
+		}
+
 		updateStatus = true
 	}
 	if updateStatus {
@@ -148,13 +159,25 @@ func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
 	if !c.announcer.AnnounceName(name) {
 		return nil
 	}
-	c.announcer.DeleteBalancer(name)
 
 	svcNamespace, svcName, err := cache.SplitMetaNamespaceKey(name)
 	if err != nil {
 		level.Warn(l).Log("op", "DeleteBalancer", "protocol", "layer2", "service", name, "msg", "failed to split key", "err", err)
 		return err
 	}
+
+	// Get the IP advertisements for this service before deleting
+	ipAdvs := c.announcer.GetStatus(types.NamespacedName{Namespace: svcNamespace, Name: svcName})
+
+	c.announcer.DeleteBalancer(name)
+
+	// Disable NDP proxy for all IPs that were being announced
+	for _, ipAdv := range ipAdvs {
+		if err := c.disableNDPProxyForIP(ipAdv.IP()); err != nil {
+			level.Warn(l).Log("op", "DeleteBalancer", "protocol", "layer2", "service", name, "ip", ipAdv.IP(), "error", err, "msg", "failed to disable NDP proxy")
+		}
+	}
+
 	c.onStatusChange(types.NamespacedName{Name: svcName, Namespace: svcNamespace})
 	return nil
 }
@@ -241,4 +264,93 @@ func (c *layer2Controller) speakersForPool(l log.Logger, name string, pool *conf
 		}
 	}
 	return res
+}
+
+// handleNDPProxy enables NDP proxy for an IPv6 IP based on L2Advertisement settings.
+func (c *layer2Controller) handleNDPProxy(l log.Logger, ip net.IP, l2Advertisements []*config.L2Advertisement) error {
+	// Only IPv6 addresses need NDP proxy
+	if ip.To4() != nil {
+		return nil
+	}
+
+	ndpProxyIfaces := sets.New[string]()
+	for _, l2 := range l2Advertisements {
+		// Skip if this node is not in the advertisement
+		if !l2.Nodes[c.myNode] {
+			continue
+		}
+
+		// Skip if NDP proxy is not enabled for this advertisement
+		if !l2.EnableNDPProxy {
+			continue
+		}
+
+		// NDP proxy requires explicit interface specification
+		// Skip if AllInterfaces is true to avoid adding proxy entries to all interfaces
+		if l2.AllInterfaces {
+			level.Warn(l).Log("op", "SetBalancer", "protocol", "layer2", "ip", ip,
+				"msg", "NDP proxy requires explicit interface specification, ignoring AllInterfaces")
+			continue
+		}
+
+		if len(l2.Interfaces) == 0 {
+			continue
+		}
+
+		ndpProxyIfaces.Insert(l2.Interfaces...)
+	}
+
+	c.ndpProxyMgrsMu.Lock()
+
+	if c.ndpProxyMgrs == nil {
+		c.ndpProxyMgrs = make(map[string]*layer2.NDPProxyManager)
+	}
+	for iface := range ndpProxyIfaces {
+		if _, ok := c.ndpProxyMgrs[iface]; !ok {
+			mgr, err := layer2.NewNDPProxyManager(l, iface)
+			if err != nil {
+				return err
+			}
+			c.ndpProxyMgrs[iface] = mgr
+		}
+	}
+	mgrs := make(map[string]*layer2.NDPProxyManager, len(c.ndpProxyMgrs))
+	for iface, mgr := range c.ndpProxyMgrs {
+		mgrs[iface] = mgr
+	}
+
+	c.ndpProxyMgrsMu.Unlock()
+
+	for iface, mgr := range mgrs {
+		if ndpProxyIfaces.Has(iface) {
+			if err := mgr.Enable(ip); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := mgr.Disable(ip); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// disableNDPProxyForIP disables NDP proxy for an IP on all interfaces.
+func (c *layer2Controller) disableNDPProxyForIP(ip net.IP) error {
+	// Only IPv6 addresses need NDP proxy
+	if ip.To4() != nil {
+		return nil
+	}
+
+	c.ndpProxyMgrsMu.Lock()
+	defer c.ndpProxyMgrsMu.Unlock()
+
+	for _, mgr := range c.ndpProxyMgrs {
+		if err := mgr.Disable(ip); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
