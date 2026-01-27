@@ -309,6 +309,7 @@ _Appears in:_
 | `ipAddressPoolSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | A selector for the IPAddressPools which would get advertised via this advertisement.<br />If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools. |
 | `nodeSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops. |
 | `interfaces` _string array_ | A list of interfaces to announce from. The LB IP will be announced only from these interfaces.<br />If the field is not set, we advertise from all the interfaces on the host. |
+| `enableNDPProxy` _boolean_ | EnableNDPProxy enables kernel-level NDP proxying for IPv6 VIPs.<br />When enabled, the speaker will configure the kernel to proxy Neighbor Discovery<br />Protocol messages for the specified interfaces, allowing VIPs to be reachable<br />even when the announcing interface has no IP address configured.<br />This requires the speaker to have CAP_NET_ADMIN capability. |
 
 
 
