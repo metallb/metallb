@@ -1929,122 +1929,61 @@ func TestIPAdvertisementFor(t *testing.T) {
 	tests := []struct {
 		desc             string
 		ip               net.IP
-		localNode        string
 		l2Advertisements []*config.L2Advertisement
 		expect           layer2.IPAdvertisement
 	}{
 		{
-			desc:      "Not specify the IPPool related interfaces",
-			ip:        net.IP{192, 168, 10, 3},
-			localNode: "nodeA",
+			desc: "AllInterfaces set",
+			ip:   net.IP{192, 168, 10, 3},
 			l2Advertisements: []*config.L2Advertisement{
 				{
-					Nodes: map[string]bool{
-						"nodeB": true,
-						"nodeA": true,
-					},
 					Interfaces:    []string{},
 					AllInterfaces: true,
 				},
 			},
 			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.Set[string]{}),
-		}, {
-			desc:      "LocalNode doesn't match L2Advertisement",
-			ip:        net.IP{192, 168, 10, 3},
-			localNode: "nodeA",
+		},
+		{
+			desc: "Single L2Advertisement with interfaces",
+			ip:   net.ParseIP("2000:12"),
 			l2Advertisements: []*config.L2Advertisement{
 				{
-					Nodes: map[string]bool{
-						"nodeB": true,
-					},
-					Interfaces: []string{"eth0", "eth1"},
-				}, {
-					Nodes: map[string]bool{
-						"nodeA": false,
-						"nodeC": true,
-					},
-					Interfaces: []string{"eth3", "eth4"},
-				},
-			},
-			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, false, sets.Set[string]{}),
-		}, {
-			desc:      "LocalNode only match one L2Advertisement",
-			ip:        net.ParseIP("2000:12"),
-			localNode: "nodeA",
-			l2Advertisements: []*config.L2Advertisement{
-				{
-					Nodes: map[string]bool{
-						"nodeB": true,
-						"nodeA": false,
-					},
-					Interfaces: []string{"eth0"},
-				}, {
-					Nodes: map[string]bool{
-						"nodeC": true,
-						"nodeA": true,
-					},
 					Interfaces: []string{"eth1", "eth2"},
 				},
 			},
 			expect: layer2.NewIPAdvertisement(net.ParseIP("2000:12"), false, sets.New("eth1", "eth2")),
-		}, {
-			desc:      "LocalNode match multi-L2Advertisement",
-			ip:        net.IP{192, 168, 10, 3},
-			localNode: "nodeA",
+		},
+		{
+			desc: "Multiple L2Advertisements - interfaces merged",
+			ip:   net.IP{192, 168, 10, 3},
 			l2Advertisements: []*config.L2Advertisement{
 				{
-					Nodes: map[string]bool{
-						"nodeB": true,
-						"nodeA": true,
-					},
 					Interfaces: []string{"eth0", "eth1"},
 				}, {
-					Nodes: map[string]bool{
-						"nodeC": true,
-						"nodeA": true,
-					},
 					Interfaces: []string{"eth0", "eth2"},
-				}, {
-					Nodes: map[string]bool{
-						"nodeC": true,
-						"nodeD": true,
-					},
-					Interfaces: []string{"eth4", "eth3"},
 				},
 			},
 			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, false, sets.New("eth0", "eth1", "eth2")),
-		}, {
-			desc:      "LocalNode match multi-L2Advertisement, and one of them not specify interfaces",
-			ip:        net.IP{192, 168, 10, 3},
-			localNode: "nodeA",
+		},
+		{
+			desc: "Multiple L2Advertisements - one has AllInterfaces",
+			ip:   net.IP{192, 168, 10, 3},
 			l2Advertisements: []*config.L2Advertisement{
 				{
-					Nodes: map[string]bool{
-						"nodeB": true,
-						"nodeA": true,
-					},
 					Interfaces: []string{"eth0", "eth1"},
 				}, {
-					Nodes: map[string]bool{
-						"nodeC": true,
-						"nodeA": true,
-					},
 					AllInterfaces: true,
-				}, {
-					Nodes: map[string]bool{
-						"nodeC": true,
-						"nodeD": true,
-					},
-					Interfaces: []string{"eth4", "eth3"},
 				},
 			},
 			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.Set[string]{}),
 		},
 	}
 	for _, test := range tests {
-		r := ipAdvertisementFor(test.ip, test.localNode, test.l2Advertisements)
-		if !r.Equal(&test.expect) {
-			t.Errorf("%s: expect interfaces is %+v, but the result is %+v", test.desc, test.expect, r)
-		}
+		t.Run(test.desc, func(t *testing.T) {
+			r := ipAdvertisementFor(test.ip, test.l2Advertisements)
+			if !r.Equal(&test.expect) {
+				t.Errorf("expect %+v, but got %+v", test.expect, r)
+			}
+		})
 	}
 }
