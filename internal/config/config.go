@@ -33,6 +33,7 @@ import (
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/ipfamily"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -200,6 +201,8 @@ type BGPAdvertisement struct {
 	// Used to declare the intent of announcing IPs
 	// only to the BGPPeers in this list.
 	Peers []string
+	// Sorted list of service selectors to select services for which advertisement is applied.
+	ServiceSelectors []labels.Selector
 }
 
 type L2Advertisement struct {
@@ -209,6 +212,8 @@ type L2Advertisement struct {
 	Interfaces []string
 	// AllInterfaces tells if all the interfaces are allowed for this advertisement
 	AllInterfaces bool
+	// Sorted list of service selectors to select services for which advertisement is applied.
+	ServiceSelectors []labels.Selector
 }
 
 // BFDProfile describes a BFD profile to be applied to a set of peers.
@@ -738,13 +743,22 @@ func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.
 	if err != nil {
 		return nil, err
 	}
+	err = validateLabelSelectorDuplicate(crdAd.Spec.ServiceSelectors, "serviceSelectors")
+	if err != nil {
+		return nil, err
+	}
 	selected, err := selectedNodes(nodes, crdAd.Spec.NodeSelectors)
 	if err != nil {
 		return nil, errors.Join(err, fmt.Errorf("failed to parse node selector for %s", crdAd.Name))
 	}
+	serviceSelectors, err := parseSelectors(crdAd.Spec.ServiceSelectors)
+	if err != nil {
+		return nil, errors.Join(err, fmt.Errorf("failed to parse service selector for %s", crdAd.Name))
+	}
 	l2 := &L2Advertisement{
-		Nodes:      selected,
-		Interfaces: crdAd.Spec.Interfaces,
+		Nodes:            selected,
+		Interfaces:       crdAd.Spec.Interfaces,
+		ServiceSelectors: serviceSelectors,
 	}
 	if len(crdAd.Spec.Interfaces) == 0 {
 		l2.AllInterfaces = true
@@ -772,6 +786,19 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 	err = validateLabelSelectorDuplicate(crdAd.Spec.NodeSelectors, "nodeSelectors")
 	if err != nil {
 		return nil, err
+	}
+	err = validateLabelSelectorDuplicate(crdAd.Spec.ServiceSelectors, "serviceSelectors")
+	if err != nil {
+		return nil, err
+	}
+
+	if len(crdAd.Spec.ServiceSelectors) > 0 {
+		if crdAd.Spec.AggregationLength != nil && *crdAd.Spec.AggregationLength != 32 {
+			return nil, fmt.Errorf("serviceSelectors and aggregationLength are mutually exclusive, both cannot be set in %s", crdAd.Name)
+		}
+		if crdAd.Spec.AggregationLengthV6 != nil && *crdAd.Spec.AggregationLengthV6 != 128 {
+			return nil, fmt.Errorf("serviceSelectors and aggregationLengthV6 are mutually exclusive, both cannot be set in %s", crdAd.Name)
+		}
 	}
 
 	ad := &BGPAdvertisement{
@@ -815,6 +842,13 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 		return nil, errors.Join(err, fmt.Errorf("failed to parse node selector for %s", crdAd.Name))
 	}
 	ad.Nodes = selected
+
+	serviceSelectors, err := parseSelectors(crdAd.Spec.ServiceSelectors)
+	if err != nil {
+		return nil, errors.Join(err, fmt.Errorf("failed to parse service selector for %s", crdAd.Name))
+	}
+	ad.ServiceSelectors = serviceSelectors
+
 	return ad, nil
 }
 
@@ -889,21 +923,32 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 		}
 	}
 
-	// Verify that BGP ADVs set a unique local preference value per BGP update.
+	// Do not verify that BGP ADVs set a unique local preference value when service selectors are used,
+	// because in that case we don't know which services will be advertised via this advertisement.
+	if len(adv.ServiceSelectors) > 0 {
+		return nil
+	}
 	for _, bgpAdv := range pool.BGPAdvertisements {
-		if adv.LocalPref != bgpAdv.LocalPref {
-			if !advertisementsAreCompatible(adv, bgpAdv, pool) {
-				return fmt.Errorf("invalid local preference %d: local preferernce %d was "+
-					"already set for the same type of BGP update. Check existing BGP advertisements "+
-					"with common pools and aggregation lengths", adv.LocalPref, bgpAdv.LocalPref)
-			}
+		if len(bgpAdv.ServiceSelectors) > 0 {
+			continue
+		}
+		if !BGPAdvertisementsHaveCompatibleLocalPref(adv, bgpAdv, pool) {
+			return fmt.Errorf("invalid local preference %d: local preferernce %d was "+
+				"already set for the same type of BGP update. Check existing BGP advertisements "+
+				"with common pools and aggregation lengths", adv.LocalPref, bgpAdv.LocalPref)
 		}
 	}
 
 	return nil
 }
 
-func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+// BGPAdvertisementsHaveCompatibleLocalPref checks if two BGP advertisements have compatible local preferences,
+// assuming both target at least one shared service.
+func BGPAdvertisementsHaveCompatibleLocalPref(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+	if newAdv.LocalPref == adv.LocalPref {
+		return true
+	}
+
 	if isAggrLengthDifferent(newAdv, adv, pool) {
 		return true
 	}
@@ -1062,9 +1107,30 @@ func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bo
 		if !sets.New(adv.Interfaces...).Equal(sets.New(toCheck.Interfaces...)) {
 			continue
 		}
+		if !equality.Semantic.DeepEqual(adv.ServiceSelectors, toCheck.ServiceSelectors) {
+			continue
+		}
 		return true
 	}
 	return false
+}
+
+func parseSelectors(selectors []metav1.LabelSelector) ([]labels.Selector, error) {
+	if len(selectors) == 0 {
+		return nil, nil
+	}
+	result := make([]labels.Selector, 0, len(selectors))
+	for i := range selectors {
+		sel, err := metav1.LabelSelectorAsSelector(&selectors[i])
+		if err != nil {
+			return nil, fmt.Errorf("invalid service selector %v: %w", selectors[i], err)
+		}
+		result = append(result, sel)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].String() < result[j].String()
+	})
+	return result, nil
 }
 
 func selectedNodes(nodes []corev1.Node, selectors []metav1.LabelSelector) (map[string]bool, error) {
