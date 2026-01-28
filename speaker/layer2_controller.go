@@ -137,7 +137,7 @@ func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP
 	updateStatus := false
 	adsForService := l2AdsForService(pool.L2Advertisements, c.myNode, svc)
 	for _, lbIP := range lbIPs {
-		ipAdv := ipAdvertisementFor(lbIP, c.myNode, adsForService)
+		ipAdv := ipAdvertisementFor(lbIP, adsForService)
 		if !ipAdv.MatchInterfaces(ifs...) {
 			level.Warn(l).Log("op", "SetBalancer", "protocol", "layer2", "service", name, "IPAdvertisement", ipAdv,
 				"localIfs", ifs, "msg", "the specified interfaces used to announce LB IP don't exist")
@@ -180,12 +180,9 @@ func (c *layer2Controller) SetEventCallback(callback func(interface{})) {
 	// Do nothing
 }
 
-func ipAdvertisementFor(ip net.IP, localNode string, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
+func ipAdvertisementFor(ip net.IP, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
 	ifs := sets.Set[string]{}
 	for _, l2 := range l2Advertisements {
-		if matchNode := l2.Nodes[localNode]; !matchNode {
-			continue
-		}
 		if l2.AllInterfaces {
 			return layer2.NewIPAdvertisement(ip, true, sets.Set[string]{})
 		}
