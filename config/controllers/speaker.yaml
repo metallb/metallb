@@ -82,6 +82,7 @@ spec:
           capabilities:
             add:
             - NET_RAW
+            - NET_ADMIN
             drop:
             - ALL
           readOnlyRootFilesystem: true

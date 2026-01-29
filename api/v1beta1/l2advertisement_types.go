@@ -39,6 +39,13 @@ type L2AdvertisementSpec struct {
 	// If the field is not set, we advertise from all the interfaces on the host.
 	// +optional
 	Interfaces []string `json:"interfaces,omitempty"`
+	// EnableNDPProxy enables kernel-level NDP proxying for IPv6 VIPs.
+	// When enabled, the speaker will configure the kernel to proxy Neighbor Discovery
+	// Protocol messages for the specified interfaces, allowing VIPs to be reachable
+	// even when the announcing interface has no IP address configured.
+	// This requires the speaker to have CAP_NET_ADMIN capability.
+	// +optional
+	EnableNDPProxy *bool `json:"enableNDPProxy,omitempty"`
 }
 
 // L2AdvertisementStatus defines the observed state of L2Advertisement.
