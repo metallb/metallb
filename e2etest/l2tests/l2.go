@@ -377,6 +377,88 @@ var _ = ginkgo.Describe("L2", func() {
 				return node.Name
 			}, time.Minute, time.Second).Should(Equal(nodeToSet.Name))
 		})
+
+		ginkgo.It("Failure of MetalLB announcing speaker node", func() {
+			const labelKey = "l2-speaker-failure-test"
+			const labelValue = "true"
+
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				Expect(err).NotTo(HaveOccurred())
+			}()
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			if len(allNodes.Items) < 2 {
+				ginkgo.Skip("Not enough nodes")
+			}
+
+			for _, node := range allNodes.Items {
+				k8s.AddLabelToNode(node.Name, labelKey, labelValue, cs)
+			}
+			defer func() {
+				for _, node := range allNodes.Items {
+					k8s.RemoveLabelFromNode(node.Name, labelKey, cs)
+				}
+			}()
+
+			l2Advertisement := metallbv1beta1.L2Advertisement{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "speaker-failure-selector",
+				},
+				Spec: metallbv1beta1.L2AdvertisementSpec{
+					NodeSelectors: []metav1.LabelSelector{
+						{
+							MatchLabels: map[string]string{
+								labelKey: labelValue,
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("Setting advertisement with node selector for labeled nodes")
+			err = ConfigUpdater.Update(config.Resources{
+				L2Advs: []metallbv1beta1.L2Advertisement{l2Advertisement},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Getting the announcing node")
+			var announcingNode string
+			Eventually(func() string {
+				node, err := nodeForService(svc, allNodes.Items)
+				if err != nil {
+					return ""
+				}
+				announcingNode = node.Name
+				return node.Name
+			}, time.Minute, time.Second).ShouldNot(Equal(""))
+
+			ginkgo.By("Removing selector label from announcing node")
+			k8s.RemoveLabelFromNode(announcingNode, labelKey, cs)
+
+			ginkgo.By("Validating the service is announced from a different node")
+			Eventually(func() string {
+				node, err := nodeForService(svc, allNodes.Items)
+				if err != nil {
+					return ""
+				}
+				return node.Name
+			}, time.Minute, time.Second).ShouldNot(Equal(announcingNode))
+
+			ginkgo.By("Adding selector label back to announcing node")
+			k8s.AddLabelToNode(announcingNode, labelKey, labelValue, cs)
+
+			ginkgo.By("Validating the service is announced back again from the previous node")
+			Eventually(func() string {
+				node, err := nodeForService(svc, allNodes.Items)
+				if err != nil {
+					return ""
+				}
+				return node.Name
+			}, time.Minute, time.Second).Should(Equal(announcingNode))
+		})
 	})
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
