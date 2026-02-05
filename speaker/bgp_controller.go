@@ -145,11 +145,10 @@ func hasHealthyEndpoint(eps []discovery.EndpointSlice, filterNode func(*string) 
 				continue
 			}
 			for _, addr := range ep.Addresses {
-				if epslices.EndpointCanServe(ep.Conditions) {
-					ready[addr] = true
-				} else if _, ok := ready[addr]; !ok {
-					ready[addr] = false
+				if ready[addr] {
+					continue
 				}
+				ready[addr] = epslices.EndpointCanServe(ep.Conditions)
 			}
 		}
 	}
