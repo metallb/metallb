@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -34,8 +35,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"errors"
 )
 
 type bgpImplementation string
@@ -146,22 +145,16 @@ func hasHealthyEndpoint(eps []discovery.EndpointSlice, filterNode func(*string) 
 				continue
 			}
 			for _, addr := range ep.Addresses {
-				if _, ok := ready[addr]; !ok && epslices.EndpointCanServe(ep.Conditions) {
-					// Only set true if nothing else has expressed an
-					// opinion. This means that false will take precedence
-					// if there's any unready ports for a given endpoint.
-					ready[addr] = true
+				if ready[addr] {
+					continue
 				}
-				if !epslices.EndpointCanServe(ep.Conditions) {
-					ready[addr] = false
-				}
+				ready[addr] = epslices.EndpointCanServe(ep.Conditions)
 			}
 		}
 	}
 
 	for _, r := range ready {
 		if r {
-			// At least one fully healthy endpoint on this machine.
 			return true
 		}
 	}
