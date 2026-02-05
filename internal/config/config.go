@@ -209,6 +209,8 @@ type L2Advertisement struct {
 	Interfaces []string
 	// AllInterfaces tells if all the interfaces are allowed for this advertisement
 	AllInterfaces bool
+	// EnableNDPProxy enables kernel-level NDP proxying for IPv6 VIPs
+	EnableNDPProxy bool
 }
 
 // BFDProfile describes a BFD profile to be applied to a set of peers.
@@ -742,9 +744,14 @@ func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.
 	if err != nil {
 		return nil, errors.Join(err, fmt.Errorf("failed to parse node selector for %s", crdAd.Name))
 	}
+	enableNDPProxy := false
+	if crdAd.Spec.EnableNDPProxy != nil {
+		enableNDPProxy = *crdAd.Spec.EnableNDPProxy
+	}
 	l2 := &L2Advertisement{
-		Nodes:      selected,
-		Interfaces: crdAd.Spec.Interfaces,
+		Nodes:          selected,
+		Interfaces:     crdAd.Spec.Interfaces,
+		EnableNDPProxy: enableNDPProxy,
 	}
 	if len(crdAd.Spec.Interfaces) == 0 {
 		l2.AllInterfaces = true
@@ -1060,6 +1067,9 @@ func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bo
 			continue
 		}
 		if !sets.New(adv.Interfaces...).Equal(sets.New(toCheck.Interfaces...)) {
+			continue
+		}
+		if adv.EnableNDPProxy != toCheck.EnableNDPProxy {
 			continue
 		}
 		return true
