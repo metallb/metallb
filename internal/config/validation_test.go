@@ -514,7 +514,129 @@ func TestValidateFRR(t *testing.T) {
 				},
 			},
 			mustFail: true,
-		}, {
+		},
+		{
+			desc: "duplicate bgp address, with nodeSelectors, might overlap - incompatible peers",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   64500,
+							ASN:     64501,
+							Address: "1.2.3.4",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"key": "value"},
+								},
+							},
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   64500,
+							ASN:     64502, // Different ASN - incompatible
+							Address: "1.2.3.4",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"key2": "value2"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "duplicate bgp address, with nodeSelectors, might overlap - compatible peers",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   64500,
+							ASN:     64501,
+							Address: "1.2.3.4",
+							Port:    179,
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"key": "value"},
+								},
+							},
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   64500,
+							ASN:     64501, // Same config - compatible
+							Address: "1.2.3.4",
+							Port:    179,
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"key2": "value2"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: false,
+		},
+		{
+			desc: "duplicate bgp address, with obviously disjoint nodeSelectors - incompatible allowed",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   64500,
+							ASN:     64501,
+							Address: "1.2.3.4",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"zone": "us-east"},
+								},
+							},
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   64500,
+							ASN:     64502, // Different ASN but selectors are disjoint
+							Address: "1.2.3.4",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"zone": "us-west"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: false,
+		},
+		{
+			desc: "duplicate bgp address, only one with nodeSelectors",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"key": "value"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
 			desc: "duplicate bgp address, different vrfs",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
@@ -538,20 +660,16 @@ func TestValidateFRR(t *testing.T) {
 			},
 			mustFail: false,
 		}, {
-			desc: "duplicate bgp address, same vrf",
+			desc: "duplicate bgp address, same vrf, no nodeSelectors",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
 					{
 						Spec: v1beta2.BGPPeerSpec{
 							Address: "1.2.3.4",
+							VRFName: "red",
 						},
 					},
 					{
-						Spec: v1beta2.BGPPeerSpec{
-							Address: "1.2.3.4",
-							VRFName: "red",
-						},
-					}, {
 						Spec: v1beta2.BGPPeerSpec{
 							Address: "1.2.3.4",
 							VRFName: "red",
@@ -560,6 +678,39 @@ func TestValidateFRR(t *testing.T) {
 				},
 			},
 			mustFail: true,
+		}, {
+			desc: "duplicate bgp address, same vrf, with disjoint nodeSelectors and compatible config",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   64500,
+							ASN:     64501,
+							Address: "1.2.3.4",
+							VRFName: "red",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"zone": "a"},
+								},
+							},
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   64500,
+							ASN:     64501,
+							Address: "1.2.3.4",
+							VRFName: "red",
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"zone": "b"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: false,
 		},
 		{
 			desc: "two peers with interface set different",
