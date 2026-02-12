@@ -1229,7 +1229,7 @@ New features:
   now
   [multi-architecture images](https://blog.docker.com/2017/11/multi-arch-all-the-things/). MetalLB
   now supports running on all supported Kubernetes architectures:
-  amd64, arm, arm64, ppc64le, and s390x.
+  amd64, arm, arm64, ppc64le, riscv64 and s390x.
 - You can
   now
   [disable automatic address allocation]({{% relref "configuration/_index.md" %}}#controlling-automatic-address-allocation) on
