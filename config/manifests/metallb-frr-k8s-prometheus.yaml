@@ -3462,6 +3462,7 @@ spec:
                 - amd64
                 - arm64
                 - ppc64le
+                - riscv64
                 - s390x
               - key: kubernetes.io/os
                 operator: In
