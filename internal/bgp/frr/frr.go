@@ -44,6 +44,10 @@ type session struct {
 // in unit tests.
 var osHostname = os.Hostname
 
+const (
+	testDebounceTimeout = time.Millisecond
+)
+
 // sessionName() defines the format of the key of the 'sessions' map in
 // the 'frrState' struct.
 func sessionName(s session) string {
@@ -407,10 +411,9 @@ func largeCommunityPrefixList(neighbor *neighborConfig, community, ipFamily stri
 
 func (sm *sessionManager) SetEventCallback(func(interface{})) {}
 
-var debounceTimeout = 3 * time.Second
 var failureTimeout = time.Second * 5
 
-func NewSessionManager(l log.Logger, logLevel logging.Level) bgp.SessionManager {
+func NewSessionManager(l log.Logger, logLevel logging.Level, debounceTimeout time.Duration) bgp.SessionManager {
 	res := &sessionManager{
 		sessions:     map[string]*session{},
 		bfdProfiles:  []BFDProfile{},
@@ -439,7 +442,7 @@ func mockNewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager
 		return generateAndReloadConfigFile(config, l)
 	}
 
-	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout, l)
+	debouncer(reload, res.reloadConfig, testDebounceTimeout, failureTimeout, l)
 
 	reloadValidator(l, res.reloadConfig)
 
