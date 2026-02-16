@@ -274,6 +274,9 @@ spec:
         {{- if .Values.speaker.ignoreExcludeLB}}
         - --ignore-exclude-lb
         {{- end }}
+        {{- if .Values.speaker.bgpDebounceTimeout }}
+        - --bgp-debounce-timeout={{ .Values.speaker.bgpDebounceTimeout }}
+        {{- end }}
         {{- if .Values.prometheus.secureMetricsPort }}
         - --host=localhost
         {{- end }}

@@ -275,6 +275,8 @@ speaker:
     enabled: true
   # ignore the exclude-from-external-loadbalancer label
   ignoreExcludeLB: false
+  # --  BGP debounce timeout for FRR configuration reloads, in milliseconds. Only applies when BGP type is frr. Default (when unset) is 3000 ms. This feature is experimental
+  bgpDebounceTimeout: null
 
   image:
     repository: quay.io/metallb/speaker

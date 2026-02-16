@@ -367,6 +367,12 @@
             "ignoreExcludeLB": {
               "type": "boolean"
             },
+            "bgpDebounceTimeout": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0 },
+                { "type": "null" }
+              ]
+            },
             "updateStrategy": {
               "type": "object",
               "properties": {
