@@ -509,7 +509,7 @@ var newBGP = func(cfg controllerConfig) bgp.SessionManager {
 	case bgpNative:
 		return bgpnative.NewSessionManager(cfg.Logger)
 	case bgpFrr:
-		return bgpfrr.NewSessionManager(cfg.Logger, cfg.LogLevel)
+		return bgpfrr.NewSessionManager(cfg.Logger, cfg.LogLevel, cfg.BGPDebounceTimeout)
 	case bgpFrrK8s:
 		return bgpfrrk8s.NewSessionManager(cfg.Logger, cfg.LogLevel, cfg.MyNode, cfg.FRRK8sNamespace)
 	default:

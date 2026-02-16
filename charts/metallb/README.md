@@ -122,6 +122,7 @@ Kubernetes: `>= 1.19.0-0`
 | prometheus.speakerMetricsTLSSecret | string | `""` |  |
 | rbac.create | bool | `true` |  |
 | speaker.affinity | object | `{}` |  |
+| speaker.bgpDebounceTimeout | string | `nil` | BGP debounce timeout for FRR configuration reloads, in milliseconds. Only applies when BGP type is frr. Default (when unset) is 3000 ms. This feature is experimental |
 | speaker.enabled | bool | `true` |  |
 | speaker.excludeInterfaces.enabled | bool | `true` |  |
 | speaker.extraContainers | list | `[]` |  |
