@@ -106,6 +106,31 @@ func NewConfigurationStateReconcilerPredicate(namespace, name string) predicate.
 	}
 }
 
+// NewConfigStateConditionReporterPredicate returns a predicate for controllers that write
+// conditions to a ConfigurationState CR. It fires only on Create events for the
+// target CR, so that conditions are re-reported after the resource is recreated.
+// Updates are handled by Server-Side Apply field ownership.
+func NewConfigStateConditionReporterPredicate(namespace, name string) predicate.Predicate {
+	matchesTarget := func(obj client.Object) bool {
+		return obj.GetNamespace() == namespace && obj.GetName() == name
+	}
+
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return matchesTarget(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return false
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return false
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return false
+		},
+	}
+}
+
 func (r *ConfigurationStateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	p := NewConfigurationStateReconcilerPredicate(r.Namespace, r.ConfigStateName)
 
