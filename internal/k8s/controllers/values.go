@@ -35,6 +35,12 @@ const (
 	LabelServiceNamespace = "metallb.io/service-namespace"
 )
 
+// Condition types for ConfigurationState status reporting.
+const (
+	ConditionTypeConfigReconcilerValid = "configReconcilerValid"
+	ConditionTypePoolReconcilerValid   = "poolReconcilerValid"
+)
+
 // Error types for condition reporting.
 const (
 	ErrorTypeConfiguration = "ConfigurationError"
