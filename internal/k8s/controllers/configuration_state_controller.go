@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -104,6 +105,59 @@ func NewConfigurationStateReconcilerPredicate(namespace, name string) predicate.
 			return matchesTarget(e.Object)
 		},
 	}
+}
+
+// NewConfigurationStateWriterPredicate returns a predicate for controllers that write
+// a specific condition type to a ConfigurationState CR. It fires on Create and on
+// Update only when the targeted condition has meaningfully changed (ignoring
+// LastTransitionTime), so that repeated patches from reportCondition() don't cause
+// reconcile loops.
+func NewConfigurationStateWriterPredicate(namespace, name, conditionType string) predicate.Predicate {
+	matchesTarget := func(obj client.Object) bool {
+		return obj.GetNamespace() == namespace && obj.GetName() == name
+	}
+
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return matchesTarget(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			if !matchesTarget(e.ObjectNew) {
+				return false
+			}
+			return configurationStateConditionChanged(e.ObjectOld, e.ObjectNew, conditionType)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return false
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return false
+		},
+	}
+}
+
+// configurationStateConditionChanged reports whether a specific condition type on
+// two ConfigurationState objects differs in Status, Reason, or Message.
+func configurationStateConditionChanged(oldObj, newObj client.Object, conditionType string) bool {
+	oldCS, ok := oldObj.(*metallbv1beta1.ConfigurationState)
+	if !ok {
+		return false
+	}
+	newCS, ok := newObj.(*metallbv1beta1.ConfigurationState)
+	if !ok {
+		return false
+	}
+
+	oldCond := meta.FindStatusCondition(oldCS.Status.Conditions, conditionType)
+	newCond := meta.FindStatusCondition(newCS.Status.Conditions, conditionType)
+
+	if oldCond == nil && newCond == nil {
+		return false
+	}
+	if oldCond == nil || newCond == nil {
+		return true
+	}
+	return oldCond.Status != newCond.Status || oldCond.Reason != newCond.Reason || oldCond.Message != newCond.Message
 }
 
 func (r *ConfigurationStateReconciler) SetupWithManager(mgr ctrl.Manager) error {

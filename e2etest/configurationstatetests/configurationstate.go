@@ -22,6 +22,7 @@ import (
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -186,6 +187,67 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		ginkgo.By("Verifying status has valid result")
 		Eventually(func() error {
 			return stateMatches(stateName, validStatus)
+		}, 60*time.Second, 5*time.Second).Should(Succeed())
+	})
+
+	ginkgo.It("should self-heal after deletion or manual status tampering", func() {
+		stateName := "speaker-" + allNodes.Items[0].Name
+
+		ginkgo.By("Deleting the ConfigurationState resource")
+		toDelete := &metallbv1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      stateName,
+				Namespace: metallb.Namespace,
+			},
+		}
+		err := ConfigUpdater.Client().Delete(context.Background(), toDelete)
+		Expect(err).NotTo(HaveOccurred())
+
+		ginkgo.By("Verifying the ConfigurationState is recreated and returns to valid")
+		Eventually(func() error {
+			return stateMatches(stateName, validStatus)
+		}, 60*time.Second, 5*time.Second).Should(Succeed())
+
+		ginkgo.By("Tampering with the ConfigurationState condition")
+		var current metallbv1beta1.ConfigurationState
+		err = ConfigUpdater.Client().Get(context.Background(), types.NamespacedName{
+			Name:      stateName,
+			Namespace: metallb.Namespace,
+		}, &current)
+		Expect(err).NotTo(HaveOccurred())
+
+		current.Status.Conditions = []metav1.Condition{
+			{
+				Type:               "configReconcilerValid",
+				Status:             metav1.ConditionFalse,
+				Reason:             "Tampered",
+				Message:            "admin manually changed this",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+		err = ConfigUpdater.Client().Status().Update(context.Background(), &current)
+		Expect(err).NotTo(HaveOccurred())
+
+		ginkgo.By("Verifying the tampered condition is overridden back to true")
+		Eventually(func() error {
+			if err := stateMatches(stateName, validStatus); err != nil {
+				return err
+			}
+			var healed metallbv1beta1.ConfigurationState
+			if err := ConfigUpdater.Client().Get(context.Background(), types.NamespacedName{
+				Name:      stateName,
+				Namespace: metallb.Namespace,
+			}, &healed); err != nil {
+				return fmt.Errorf("failed to get ConfigurationState: %w", err)
+			}
+			cond := meta.FindStatusCondition(healed.Status.Conditions, "configReconcilerValid")
+			if cond == nil {
+				return fmt.Errorf("configReconcilerValid condition not found")
+			}
+			if cond.Status != metav1.ConditionTrue {
+				return fmt.Errorf("expected configReconcilerValid=True, got %s (reason=%s, message=%s)", cond.Status, cond.Reason, cond.Message)
+			}
+			return nil
 		}, 60*time.Second, 5*time.Second).Should(Succeed())
 	})
 
