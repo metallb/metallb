@@ -62,8 +62,8 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 })
 
 const (
-	excludeL2ConfigPath = "/etc/metallb/excludel2.yaml"
-	defaultDebounceTimeoutMs = 3000
+	excludeL2ConfigPath    = "/etc/metallb/excludel2.yaml"
+	defaultDebounceTimeout = 3 * time.Second
 )
 
 // Service offers methods to mutate a Kubernetes service object.
@@ -77,6 +77,9 @@ func main() {
 	prometheus.MustRegister(announcing)
 
 	var (
+		bgpDebounceTimeoutMs = flag.String("bgp-debounce-timeout", os.Getenv("METALLB_BGP_DEBOUNCE_TIMEOUT"),
+			"BGP debounce timeout for FRR configuration reloads, in milliseconds. Only applies when METALLB_BGP_TYPE=frr. "+
+				"Can also be set via METALLB_BGP_DEBOUNCE_TIMEOUT. Default is 3000 ms; typical values are 1000–10000 ms.")
 		namespace         = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
 		host              = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
 		mlBindAddr        = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
@@ -94,24 +97,6 @@ func main() {
 		frrK8sNamespace   = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
 	)
 
-	// Parse BGP debounce timeout from environment variable or use default (3000ms = 3 seconds).
-	// The debounce timeout throttles how often BGP/FRR configuration reloads are applied, so that
-	// bursts of updates are coalesced into fewer reloads. This setting only has an effect when
-	// running in FRR mode (METALLB_BGP_TYPE=frr). Typical values are in the 1000–10000 ms range.
-	debounceTimeoutMs := defaultDebounceTimeoutMs
-	if envTimeout := os.Getenv("METALLB_BGP_DEBOUNCE_TIMEOUT"); envTimeout != "" {
-		if parsed, err := strconv.Atoi(envTimeout); err == nil {
-			debounceTimeoutMs = parsed
-		} else {
-			fmt.Printf("invalid value for METALLB_BGP_DEBOUNCE_TIMEOUT: %s, using default %d ms\n", envTimeout, defaultDebounceTimeoutMs)
-		}
-	}
-	bgpDebounceTimeoutMs := flag.Int(
-		"bgp-debounce-timeout",
-		debounceTimeoutMs,
-		"BGP debounce timeout for FRR configuration reloads, in milliseconds. Only applies when METALLB_BGP_TYPE=frr. "+
-		"Can also be set via METALLB_BGP_DEBOUNCE_TIMEOUT. Default is 3000 ms; typical values are 1000–10000 ms.",
-	)
 	flag.Parse()
 
 	// Note: Changing the MetalLB BGP implementation type should be considered
@@ -129,12 +114,20 @@ func main() {
 
 	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB speaker starting "+version.String())
 
-	// Validate bgpDebounceTimeoutMs is positive
-	if *bgpDebounceTimeoutMs <= 0 {
-		level.Warn(logger).Log("msg", "invalid BGP debounce timeout value, must be positive", "provided", *bgpDebounceTimeoutMs, "using_default", defaultDebounceTimeoutMs)
-		*bgpDebounceTimeoutMs = defaultDebounceTimeoutMs
+	// Parse BGP debounce timeout from environment variable or use default (3 seconds).
+	// The debounce timeout throttles how often BGP/FRR configuration reloads are applied, so that
+	// bursts of updates are coalesced into fewer reloads. This setting only has an effect when
+	// running in FRR mode (METALLB_BGP_TYPE=frr). Typical values are in the 1000–10000 ms range.
+	bgpDebounceTimeout := defaultDebounceTimeout
+	if *bgpDebounceTimeoutMs != "" {
+		parsed, err := strconv.Atoi(*bgpDebounceTimeoutMs)
+		if err != nil || parsed <= 0 {
+			level.Error(logger).Log("msg", "invalid BGP debounce timeout value, must be a positive integer value", "provided", *bgpDebounceTimeoutMs)
+			os.Exit(1)
+		}
+		bgpDebounceTimeout = time.Duration(parsed) * time.Millisecond
 	}
-	level.Info(logger).Log("msg", "using BGP debounce timeout", "milliseconds", *bgpDebounceTimeoutMs)
+	level.Debug(logger).Log("msg", "using BGP debounce timeout", "milliseconds", bgpDebounceTimeout.Milliseconds())
 
 	if *namespace == "" {
 		bs, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
@@ -202,7 +195,7 @@ func main() {
 		bgpType:                bgpImplementation(bgpType),
 		InterfaceExcludeRegexp: interfacesToExclude,
 		IgnoreExcludeLB:        *ignoreLBExclude,
-		BGPDebounceTimeout:     time.Duration(*bgpDebounceTimeoutMs) * time.Millisecond,
+		BGPDebounceTimeout:     bgpDebounceTimeout,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
 			l2StatusChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
 		},
