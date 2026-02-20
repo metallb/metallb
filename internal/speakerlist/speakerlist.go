@@ -351,7 +351,6 @@ func (sl *SpeakerList) memberlistWatchEvents() {
 //   MEMBERLIST_GOSSIP_INTERVAL="150ms"
 func ApplyEnvOverrides(cfg *memberlist.Config, prefix string) {
     // Strings
-    envString(&cfg.Name, prefix, "NAME")
     envString(&cfg.BindAddr, prefix, "BIND_ADDR")
     envString(&cfg.AdvertiseAddr, prefix, "ADVERTISE_ADDR")
     envString(&cfg.DNSConfigPath, prefix, "DNS_CONFIG_PATH")
