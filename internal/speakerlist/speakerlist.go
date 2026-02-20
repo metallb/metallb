@@ -14,11 +14,11 @@ package speakerlist
 
 import (
 	"crypto/sha256"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
-	"os"
-	"strings"
 
 	"go.universe.tf/metallb/internal/k8s"
 
