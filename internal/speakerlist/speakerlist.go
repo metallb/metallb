@@ -357,8 +357,9 @@ func ApplyEnvOverrides(cfg *memberlist.Config, prefix string) {
     envString(&cfg.DNSConfigPath, prefix, "DNS_CONFIG_PATH")
 
     // Ints
-    envInt(&cfg.BindPort, prefix, "BIND_PORT", 1, 65535)
-    envInt(&cfg.AdvertisePort, prefix, "ADVERTISE_PORT", 1, 65535)
+    // Note: BindPort and AdvertisePort are configured explicitly elsewhere
+    // and are not overridden via environment variables here to avoid
+    // precedence confusion.
     envInt(&cfg.IndirectChecks, prefix, "INDIRECT_CHECKS", 0, 1_000_000)
     envInt(&cfg.RetransmitMult, prefix, "RETRANSMIT_MULT", 0, 1_000_000)
     envInt(&cfg.SuspicionMult, prefix, "SUSPICION_MULT", 0, 1_000_000)
