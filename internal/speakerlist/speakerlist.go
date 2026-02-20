@@ -385,82 +385,81 @@ func ApplyEnvOverrides(cfg *memberlist.Config, prefix string) {
 }
 
 func env(prefix, key string) (string, bool) {
-    k := prefix + strings.ToUpper(key)
-    v, ok := os.LookupEnv(k)
-    return strings.TrimSpace(v), ok
+	k := prefix + strings.ToUpper(key)
+	v, ok := os.LookupEnv(k)
+	return strings.TrimSpace(v), ok
 }
 
 func envString(dst *string, prefix, key string) {
-    val, ok := env(prefix, key)
-    if ok {
-        overrideString(dst, val, ok)
-    }
+	val, ok := env(prefix, key)
+	if ok {
+		overrideString(dst, val, ok)
+	}
 }
 
 func envInt(dst *int, prefix, key string, min, max int) {
-    val, ok := env(prefix, key)
-    if ok {
-        overrideInt(dst, val, ok, min, max)
-    }
+	val, ok := env(prefix, key)
+	if ok {
+		overrideInt(dst, val, ok, min, max)
+	}
 }
 
 func envDuration(dst *time.Duration, prefix, key string, min, max time.Duration) {
-    val, ok := env(prefix, key)
-    if ok {
-        overrideDuration(dst, val, ok, min, max)
-    }
+	val, ok := env(prefix, key)
+	if ok {
+		overrideDuration(dst, val, ok, min, max)
+	}
 }
 
 func envBool(dst *bool, prefix, key string) {
-    val, ok := env(prefix, key)
-    if ok {
-        overrideBool(dst, val, ok)
-    }
+	val, ok := env(prefix, key)
+	if ok {
+		overrideBool(dst, val, ok)
+	}
 }
 
-
 func overrideString(dst *string, val string, ok bool) {
-    if !ok {
-        return
-    }
-    *dst = val
+	if !ok {
+		return
+	}
+	*dst = val
 }
 
 func overrideInt(dst *int, val string, ok bool, min, max int) {
-    if !ok {
-        return
-    }
-    i, err := strconv.Atoi(val)
-    if err != nil {
-        return
-    }
-    if i < min || i > max {
-        return
-    }
-    *dst = i
+	if !ok {
+		return
+	}
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return
+	}
+	if i < min || i > max {
+		return
+	}
+	*dst = i
 }
 
 func overrideBool(dst *bool, val string, ok bool) {
-    if !ok {
-        return
-    }
-    b, err := strconv.ParseBool(val)
-    if err != nil {
-        return
-    }
-    *dst = b
+	if !ok {
+		return
+	}
+	b, err := strconv.ParseBool(val)
+	if err != nil {
+		return
+	}
+	*dst = b
 }
 
 func overrideDuration(dst *time.Duration, val string, ok bool, min, max time.Duration) {
-    if !ok {
-        return
-    }
-    d, err := time.ParseDuration(val)
-    if err != nil {
-        return
-    }
-    if d < min || d > max {
-        return
-    }
-    *dst = d
+	if !ok {
+		return
+	}
+	d, err := time.ParseDuration(val)
+	if err != nil {
+		return
+	}
+	if d < min || d > max {
+		return
+	}
+	*dst = d
 }
