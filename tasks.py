@@ -486,8 +486,7 @@ def dev_env(
         }
 
         if with_api_audit:
-            config["nodes"][0]["kubeadmConfigPatches"] = [
-                r"""kind: ClusterConfiguration
+            config["nodes"][0]["kubeadmConfigPatches"] = [r"""kind: ClusterConfiguration
 apiServer:
   # enable auditing flags on the API server
   extraArgs:
@@ -504,8 +503,7 @@ apiServer:
       hostPath: "/var/log/kubernetes"
       mountPath: "/var/log/kubernetes"
       readOnly: false
-      pathType: DirectoryOrCreate"""
-            ]
+      pathType: DirectoryOrCreate"""]
             config["nodes"][0]["extraMounts"] = [
                 {
                     "hostPath": "./dev-env/audit-policy.yaml",
@@ -561,7 +559,7 @@ apiServer:
     frr_k8s_ns = "frr-k8s-system"
     if bgp_type == "frr-k8s-external":
         run(
-            "{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.21/config/all-in-one/frr-k8s.yaml".format(
+            "{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.22/config/all-in-one/frr-k8s.yaml".format(
                 kubectl_path
             ),
             echo=True,

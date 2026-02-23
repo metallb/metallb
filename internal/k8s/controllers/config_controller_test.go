@@ -40,6 +40,7 @@ func TestConfigController(t *testing.T) {
 		validResources          bool
 		expectReconcileFails    bool
 		expectForceReloadCalled bool
+		wantConditions          []metav1.Condition
 	}{
 		{
 			desc:                    "handler returns SyncStateSuccess, valid resources",
@@ -47,6 +48,13 @@ func TestConfigController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantConditions: []metav1.Condition{
+				{
+					Type:   "configReconcilerValid",
+					Status: metav1.ConditionTrue,
+					Reason: ErrorTypeNone,
+				},
+			},
 		},
 		{
 			desc:                    "handler returns SyncStateError, valid resources",
@@ -54,6 +62,14 @@ func TestConfigController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    true,
 			expectForceReloadCalled: false,
+			wantConditions: []metav1.Condition{
+				{
+					Type:    "configReconcilerValid",
+					Status:  metav1.ConditionFalse,
+					Reason:  ErrorTypeConfiguration,
+					Message: "configuration error: general handler sync state error",
+				},
+			},
 		},
 		{
 			desc:                    "handler returns SyncStateErrorNoRetry, valid resources",
@@ -61,6 +77,14 @@ func TestConfigController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantConditions: []metav1.Condition{
+				{
+					Type:    "configReconcilerValid",
+					Status:  metav1.ConditionFalse,
+					Reason:  ErrorTypeConfiguration,
+					Message: "configuration error: general handler sync state error",
+				},
+			},
 		},
 		{
 			desc:                    "handler returns SyncStateReprocessAll, valid resources",
@@ -68,6 +92,14 @@ func TestConfigController(t *testing.T) {
 			validResources:          true,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: true,
+			wantConditions: []metav1.Condition{
+				{
+					Type:    "configReconcilerValid",
+					Status:  metav1.ConditionTrue,
+					Reason:  ErrorTypeNone,
+					Message: "",
+				},
+			},
 		},
 		{
 			desc:                    "handler returns SyncStateSuccess, invalid resources",
@@ -75,64 +107,98 @@ func TestConfigController(t *testing.T) {
 			validResources:          false,
 			expectReconcileFails:    false,
 			expectForceReloadCalled: false,
+			wantConditions: []metav1.Condition{
+				{
+					Type:    "configReconcilerValid",
+					Status:  metav1.ConditionFalse,
+					Reason:  ErrorTypeConfiguration,
+					Message: "configuration error: parsing peer peer1 missing local ASN",
+				},
+			},
 		},
 	}
+
 	for _, test := range tests {
-		var resources config.ClusterResources
-		if test.validResources {
-			resources = configControllerValidResources
-		} else {
-			resources = configControllerInvalidResources
-		}
-
-		initObjects := objectsFromResources(resources)
-		fakeClient, err := newFakeClient(initObjects)
-		if err != nil {
-			t.Fatalf("test %s failed to create fake client: %v", test.desc, err)
-		}
-
-		expectedCfg, err := config.For(resources, config.DontValidate)
-		if err != nil && test.validResources {
-			t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
-		}
-
-		cmpOpt := cmpopts.IgnoreUnexported(config.Pool{})
-
-		mockHandler := func(l log.Logger, cfg *config.Config) SyncState {
-			if !cmp.Equal(expectedCfg, cfg, cmpOpt) {
-				t.Errorf("test %s failed, handler called with unexpected config: %s", test.desc, cmp.Diff(expectedCfg, cfg, cmpOpt))
+		t.Run(test.desc, func(t *testing.T) {
+			var resources config.ClusterResources
+			if test.validResources {
+				resources = configControllerValidResources
+			} else {
+				resources = configControllerInvalidResources
 			}
-			return test.handlerRes
-		}
 
-		calledForceReload := false
-		mockForceReload := func() { calledForceReload = true }
+			initObjects := objectsFromResources(resources)
 
-		r := &ConfigReconciler{
-			Client:         fakeClient,
-			Logger:         log.NewNopLogger(),
-			Scheme:         scheme.Scheme,
-			Namespace:      testNamespace,
-			ValidateConfig: config.DontValidate,
-			Handler:        mockHandler,
-			ForceReload:    mockForceReload,
-		}
-		req := reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: testNamespace,
-			},
-		}
+			configStateRef := &v1beta1.ConfigurationState{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "controller",
+					Namespace: testNamespace,
+				},
+			}
+			initObjects = append(initObjects, configStateRef)
 
-		_, err = r.Reconcile(context.TODO(), req)
-		failedReconcile := err != nil
+			fakeClient, err := newFakeClient(initObjects)
+			if err != nil {
+				t.Fatalf("test %s failed to create fake client: %v", test.desc, err)
+			}
 
-		if test.expectReconcileFails != failedReconcile {
-			t.Errorf("%s: fail reconcile expected: %v, got: %v. err: %v", test.desc, test.expectReconcileFails, failedReconcile, err)
-		}
+			expectedCfg, err := config.For(resources, config.DontValidate)
+			if err != nil && test.validResources {
+				t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
+			}
 
-		if test.expectForceReloadCalled != calledForceReload {
-			t.Errorf("%s: call force reload expected: %v, got: %v", test.desc, test.expectForceReloadCalled, calledForceReload)
-		}
+			cmpOpt := cmpopts.IgnoreUnexported(config.Pool{})
+
+			mockHandler := func(l log.Logger, cfg *config.Config) SyncState {
+				if !cmp.Equal(expectedCfg, cfg, cmpOpt) {
+					t.Errorf("test %s failed, handler called with unexpected config: %s", test.desc, cmp.Diff(expectedCfg, cfg, cmpOpt))
+				}
+				return test.handlerRes
+			}
+
+			calledForceReload := false
+			mockForceReload := func() { calledForceReload = true }
+
+			r := &ConfigReconciler{
+				Client:          fakeClient,
+				Logger:          log.NewNopLogger(),
+				Scheme:          scheme.Scheme,
+				Namespace:       testNamespace,
+				ValidateConfig:  config.DontValidate,
+				Handler:         mockHandler,
+				ForceReload:     mockForceReload,
+				ConfigStateName: configStateRef.Name,
+			}
+			req := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: testNamespace,
+				},
+			}
+
+			_, err = r.Reconcile(context.TODO(), req)
+			failedReconcile := err != nil
+
+			if test.expectReconcileFails != failedReconcile {
+				t.Errorf("%s: fail reconcile expected: %v, got: %v. err: %v", test.desc, test.expectReconcileFails, failedReconcile, err)
+			}
+
+			if test.expectForceReloadCalled != calledForceReload {
+				t.Errorf("%s: call force reload expected: %v, got: %v", test.desc, test.expectForceReloadCalled, calledForceReload)
+			}
+
+			var gotConfigState v1beta1.ConfigurationState
+			if err := fakeClient.Get(context.Background(), types.NamespacedName{
+				Name:      configStateRef.Name,
+				Namespace: configStateRef.Namespace,
+			}, &gotConfigState); err != nil {
+				t.Fatalf("%s: failed to get ConfigurationState: %v", test.desc, err)
+			}
+
+			opts := cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")
+			if diff := cmp.Diff(test.wantConditions, gotConfigState.Status.Conditions, opts); diff != "" {
+				t.Errorf("%s: conditions mismatch (-want +got):\n%s", test.desc, diff)
+			}
+		})
 	}
 }
 
@@ -196,8 +262,10 @@ func TestSecretShouldntTrigger(t *testing.T) {
 	}
 
 	handlerCalled = false
-	err = fakeClient.Create(context.TODO(), &corev1.Secret{Type: corev1.SecretTypeBasicAuth, ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: testNamespace},
-		Data: map[string][]byte{"password": []byte("nopass")}})
+	err = fakeClient.Create(context.TODO(), &corev1.Secret{
+		Type: corev1.SecretTypeBasicAuth, ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: testNamespace},
+		Data: map[string][]byte{"password": []byte("nopass")},
+	})
 	if err != nil {
 		t.Fatalf("create failed on secret foo: %v", err)
 	}
@@ -268,8 +336,10 @@ var (
 			},
 		},
 		PasswordSecrets: map[string]corev1.Secret{
-			"bgpsecret": {Type: corev1.SecretTypeBasicAuth, ObjectMeta: metav1.ObjectMeta{Name: "bgpsecret", Namespace: testNamespace},
-				Data: map[string][]byte{"password": []byte("nopass")}},
+			"bgpsecret": {
+				Type: corev1.SecretTypeBasicAuth, ObjectMeta: metav1.ObjectMeta{Name: "bgpsecret", Namespace: testNamespace},
+				Data: map[string][]byte{"password": []byte("nopass")},
+			},
 		},
 		Communities: []v1beta1.Community{
 			{

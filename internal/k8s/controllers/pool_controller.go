@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/go-kit/log"
@@ -25,6 +27,7 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,18 +38,28 @@ import (
 
 type PoolReconciler struct {
 	client.Client
-	Logger         log.Logger
-	Scheme         *runtime.Scheme
-	Namespace      string
-	Handler        func(log.Logger, *config.Pools) SyncState
-	ValidateConfig config.Validate
-	ForceReload    func()
-	currentConfig  *config.Config
+	Logger          log.Logger
+	Scheme          *runtime.Scheme
+	Namespace       string
+	Handler         func(log.Logger, *config.Pools) SyncState
+	ValidateConfig  config.Validate
+	ForceReload     func()
+	ConfigStateName string
+	currentConfig   *config.Config
 }
 
-func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retError error) {
 	level.Info(r.Logger).Log("controller", "PoolReconciler", "start reconcile", req.String())
 	defer level.Info(r.Logger).Log("controller", "PoolReconciler", "end reconcile", req.String())
+
+	var conditionErr error
+	defer func() {
+		if err := r.reportCondition(ctx, conditionErr); err != nil {
+			level.Error(r.Logger).Log("controller", "PoolReconciler", "message", "failed to report condition", "error", err)
+			retError = errors.Join(retError, err)
+		}
+	}()
+
 	updates.Inc()
 
 	var ipAddressPools metallbv1beta1.IPAddressPoolList
@@ -79,6 +92,7 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	if err != nil {
 		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "error", "failed to parse the configuration", "error", err)
+		conditionErr = fmt.Errorf("%w: %w", ErrConfiguration, err)
 		return ctrl.Result{}, nil
 	}
 
@@ -93,6 +107,7 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	case SyncStateError:
 		updateErrors.Inc()
 		configStale.Set(1)
+		conditionErr = fmt.Errorf("%w: general handler sync state error", ErrConfiguration)
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
 		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
@@ -101,6 +116,7 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	case SyncStateErrorNoRetry:
 		updateErrors.Inc()
 		configStale.Set(1)
+		conditionErr = fmt.Errorf("%w: general handler sync state error", ErrConfiguration)
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
@@ -139,4 +155,50 @@ func filterPoolStatusEvent(e event.UpdateEvent) bool {
 	}
 
 	return predicate.GenerationChangedPredicate{}.Update(e)
+}
+
+func (r *PoolReconciler) reportCondition(ctx context.Context, conditionErr error) error {
+	if r.ConfigStateName == "" {
+		return nil
+	}
+
+	condition := metav1.Condition{
+		Type:    "poolReconcilerValid",
+		Status:  metav1.ConditionTrue,
+		Reason:  ErrorTypeNone,
+		Message: "",
+		// Always set to now (tracks last reconciliation, not last status change).
+		LastTransitionTime: metav1.Now(),
+	}
+
+	switch {
+	case errors.Is(conditionErr, ErrConfiguration):
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = ErrorTypeConfiguration
+		condition.Message = conditionErr.Error()
+	case conditionErr != nil:
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = ErrorTypeUnknown
+		condition.Message = conditionErr.Error()
+	}
+
+	configStatus := &metallbv1beta1.ConfigurationState{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "metallb.io/v1beta1",
+			Kind:       "ConfigurationState",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.ConfigStateName,
+			Namespace: r.Namespace,
+		},
+		Status: metallbv1beta1.ConfigurationStateStatus{
+			Conditions: []metav1.Condition{condition},
+		},
+	}
+
+	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("poolReconciler"), client.ForceOwnership); err != nil {
+		return fmt.Errorf("patch %s/%s: %w", r.Namespace, r.ConfigStateName, err)
+	}
+
+	return nil
 }

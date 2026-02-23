@@ -73,6 +73,7 @@ rules:
       - ipaddresspools.metallb.io
       - l2advertisements.metallb.io
       - communities.metallb.io
+      - configurationstates.metallb.io
     verbs:
       - create
       - delete
@@ -88,6 +89,26 @@ rules:
     verbs:
       - list
       - watch
+  - apiGroups:
+      - metallb.io
+    resources:
+      - configurationstates
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - metallb.io
+    resources:
+      - configurationstates/status
+    verbs:
+      - get
+      - patch
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -101,6 +122,8 @@ rules:
     resources:
       - "servicel2statuses"
       - "servicel2statuses/status"
+      - "configurationstates"
+      - "configurationstates/status"
     verbs:
       - "*"
   - apiGroups:

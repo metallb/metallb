@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -28,8 +29,6 @@ import (
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-
-	"errors"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -186,15 +185,29 @@ func New(cfg *Config) (*Client, error) {
 		ForceSync:      reload,
 	}
 
+	configStateName := "controller"
+	configStateLabels := map[string]string{
+		"metallb.io/component-type": "controller",
+	}
+
+	if cfg.ProcessName == "metallb-speaker" {
+		configStateName = "speaker-" + cfg.NodeName
+		configStateLabels = map[string]string{
+			"metallb.io/component-type": "speaker",
+			"metallb.io/node-name":      cfg.NodeName,
+		}
+	}
+
 	if cfg.ConfigChanged != nil {
 		if err = (&controllers.ConfigReconciler{
-			Client:         mgr.GetClient(),
-			Logger:         cfg.Logger,
-			Scheme:         mgr.GetScheme(),
-			Namespace:      cfg.Namespace,
-			ValidateConfig: cfg.ValidateConfig,
-			Handler:        cfg.ConfigHandler,
-			ForceReload:    reload,
+			Client:          mgr.GetClient(),
+			ConfigStateName: configStateName,
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			Namespace:       cfg.Namespace,
+			ValidateConfig:  cfg.ValidateConfig,
+			Handler:         cfg.ConfigHandler,
+			ForceReload:     reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
 			return nil, errors.Join(err, errors.New("unable to create controller for config"))
@@ -203,13 +216,14 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.PoolChanged != nil {
 		if err = (&controllers.PoolReconciler{
-			Client:         mgr.GetClient(),
-			Logger:         cfg.Logger,
-			Scheme:         mgr.GetScheme(),
-			Namespace:      cfg.Namespace,
-			ValidateConfig: cfg.ValidateConfig,
-			Handler:        cfg.PoolHandler,
-			ForceReload:    reload,
+			Client:          mgr.GetClient(),
+			ConfigStateName: configStateName,
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			Namespace:       cfg.Namespace,
+			ValidateConfig:  cfg.ValidateConfig,
+			Handler:         cfg.PoolHandler,
+			ForceReload:     reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
 			return nil, errors.Join(err, errors.New("failed to create config reconciler"))
@@ -275,6 +289,20 @@ func New(cfg *Config) (*Client, error) {
 		}); err != nil {
 			return nil, err
 		}
+	}
+
+	// Setup reconciler
+	cc := controllers.ConfigurationStateReconciler{
+		Client:            mgr.GetClient(),
+		Namespace:         cfg.Namespace,
+		ConfigStateName:   configStateName,
+		ConfigStateLabels: configStateLabels,
+		Logger:            cfg.Logger,
+		Scheme:            mgr.GetScheme(),
+	}
+	if err := cc.SetupWithManager(mgr); err != nil {
+		level.Error(c.logger).Log("error", err, "unable to create controller", "configurationstatus")
+		return nil, errors.Join(err, errors.New("failed to create configuration status reconciler"))
 	}
 
 	if cfg.ServiceChanged != nil {

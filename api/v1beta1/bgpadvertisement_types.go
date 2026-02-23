@@ -24,6 +24,7 @@ import (
 // NOTE: json tags are required. Any new fields you add must have json tags for the fields to be serialized.
 
 // BGPAdvertisementSpec defines the desired state of BGPAdvertisement.
+// +kubebuilder:validation:XValidation:rule="!has(self.serviceSelectors) || self.serviceSelectors.size() == 0 || ((!has(self.aggregationLength) || self.aggregationLength == 32) && (!has(self.aggregationLengthV6) || self.aggregationLengthV6 == 128))",message="serviceSelectors and aggregationLength are mutually exclusive, can only be used together with default aggregationLength (32) and aggregationLengthV6 (128)"
 type BGPAdvertisementSpec struct {
 	// The aggregation-length advertisement option lets you “roll up” the /32s into a larger prefix. Defaults to 32. Works for IPv4 addresses.
 	// +kubebuilder:validation:Minimum=1
@@ -64,6 +65,13 @@ type BGPAdvertisementSpec struct {
 	// When empty, the loadbalancer IP is announced to all the BGPPeers configured.
 	// +optional
 	Peers []string `json:"peers,omitempty"`
+
+	// ServiceSelectors limits the set of services that will be advertised via this advertisement.
+	// If empty, all services from the selected pools are advertised.
+	// This field is mutually exclusive with aggregationLength and aggregationLengthV6 -
+	// services can only be selected when using the default /32 (IPv4) or /128 (IPv6) aggregation.
+	// +optional
+	ServiceSelectors []metav1.LabelSelector `json:"serviceSelectors,omitempty"`
 }
 
 // BGPAdvertisementStatus defines the observed state of BGPAdvertisement.
