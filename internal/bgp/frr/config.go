@@ -22,9 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-var (
+const (
 	configFileName      = "/etc/frr_reloader/frr.conf"
 	reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
+)
+
+var (
 	//go:embed templates/* templates/*
 	templates embed.FS
 )
@@ -260,11 +263,11 @@ func writeConfig(config string, filename string) error {
 // called after updating the configuration.
 var reloadConfig = func() error {
 	pidFile, found := os.LookupEnv("FRR_RELOADER_PID_FILE")
-	if found {
-		reloaderPidFileName = pidFile
+	if !found {
+		pidFile = reloaderPidFileName
 	}
 
-	pid, err := os.ReadFile(reloaderPidFileName)
+	pid, err := os.ReadFile(pidFile)
 	if err != nil {
 		return err
 	}
@@ -288,8 +291,8 @@ var reloadConfig = func() error {
 // successfully it will also force FRR to reload that configuration file.
 func generateAndReloadConfigFile(config *frrConfig, l log.Logger) error {
 	filename, found := os.LookupEnv("FRR_CONFIG_FILE")
-	if found {
-		configFileName = filename
+	if !found {
+		filename = configFileName
 	}
 
 	configString, err := templateConfig(config)
@@ -297,7 +300,7 @@ func generateAndReloadConfigFile(config *frrConfig, l log.Logger) error {
 		level.Error(l).Log("op", "reload", "error", err, "cause", "template", "config", config)
 		return err
 	}
-	err = writeConfig(configString, configFileName)
+	err = writeConfig(configString, filename)
 	if err != nil {
 		level.Error(l).Log("op", "reload", "error", err, "cause", "writeConfig", "config", config)
 		return err

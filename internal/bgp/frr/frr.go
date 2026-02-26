@@ -441,8 +441,6 @@ func mockNewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager
 
 	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout, l)
 
-	reloadValidator(l, res.reloadConfig)
-
 	return res
 }
 
