@@ -65,13 +65,13 @@ to deploy to a Kubernetes cluster, head to the
 [installation](/installation/) and [usage]({{% relref
 "usage/_index.md" %}}) guides.
 
-## FRR Mode
+## FRR-K8s Mode
 
-MetalLB implements a FRR Mode that uses an [FRR](https://frrouting.org/) container as the backend for handling BGP sessions. It provides features that are not available with the native BGP implementation, such as pairing BGP sessions with BFD sessions, and advertising IPV6 addresses.
+MetalLB uses [FRR-K8s](https://github.com/metallb/frr-k8s) as the default backend for handling BGP sessions. FRR-K8s is a Kubernetes wrapper around [FRR](https://frrouting.org/) with its own API, allowing additional FRR configuration to be provided alongside MetalLB's while sharing the same BGP sessions.
 
-Despite being less battle tested than the native BGP implementation, the FRR mode is currently used by those users that require either BFD or IPV6, and it is the only supported method in the MetalLB version distributed with OpenShift. The long term plan is to make it the only BGP implementation available in MetalLB.
+It provides features that are not available with the native BGP implementation, such as pairing BGP sessions with BFD sessions and advertising IPv6 addresses.
 
-Please see the [installation](https://metallb.io/installation/) section for instructions on how to enable it.
+An alternative [FRR mode]({{% relref "concepts/bgp.md" %}}#frr-mode-deprecated) that configures FRR directly (without the FRR-K8s layer) is also available but **deprecated**. Please see the [installation](https://metallb.io/installation/) section for instructions on how to switch between modes.
 
 ## Contributing
 

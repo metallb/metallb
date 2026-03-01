@@ -99,8 +99,6 @@ func main() {
 
 	flag.Parse()
 
-	// Note: Changing the MetalLB BGP implementation type should be considered
-	//       experimental.
 	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
 	if !present {
 		bgpType = "native"
@@ -128,6 +126,10 @@ func main() {
 		bgpDebounceTimeout = time.Duration(parsed) * time.Millisecond
 	}
 	level.Debug(logger).Log("msg", "using BGP debounce timeout", "milliseconds", bgpDebounceTimeout.Milliseconds())
+
+	if bgpType == "frr" {
+		level.Warn(logger).Log("op", "startup", "msg", "The FRR mode is deprecated and will be removed in a future release. Please migrate to the frr-k8s mode, which is now the default BGP backend. See https://metallb.io/concepts/bgp/#frr-k8s-mode for details.")
+	}
 
 	if *namespace == "" {
 		bs, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
@@ -220,11 +222,7 @@ func main() {
 		validateConfig = config.DiscardNativeOnly
 	}
 
-	// listenFRRK8s := false
 	listenFRRK8s := bgpType == string(bgpFrrK8s)
-	// if bgpType == string(bgpFrrK8s) {
-	// 	listenFRRK8s = true
-	// }
 	client, err := k8s.New(&k8s.Config{
 		ProcessName: "metallb-speaker",
 		NodeName:    *myNode,

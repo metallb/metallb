@@ -334,8 +334,11 @@ speaker:
     periodSeconds: 5
   # frr contains configuration specific to the MetalLB FRR container,
   # for speaker running alongside FRR.
+  # DEPRECATED: The FRR mode is deprecated and will be removed in a future
+  # release. Use the frr-k8s mode (frrk8s.enabled) instead, which is now
+  # the default BGP backend.
   frr:
-    enabled: true
+    enabled: false
     image:
       repository: quay.io/frrouting/frr
       tag: 10.5.1
@@ -375,7 +378,7 @@ crds:
 frrk8s:
   # if set, enables frrk8s as a backend. This is mutually exclusive to frr
   # mode.
-  enabled: false
+  enabled: true
   external: false
   namespace: ""
 
@@ -383,6 +386,21 @@ frr-k8s:
   prometheus:
     rbacProxy:
       repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
+    # The FRR-K8s BGP/BFD metrics are exposed with the "frrk8s_" prefix
+    # (e.g. frrk8s_bgp_session_up, frrk8s_bfd_session_up).
+    # To rename them to the legacy "metallb_" prefix for backward compatibility
+    # with existing dashboards or alerts, uncomment section below.
+    # serviceMonitor:
+    #   enabled: true
+    #   metricRelabelings:
+    #   - sourceLabels: [__name__]
+    #     regex: "frrk8s_bgp_(.*)"
+    #     targetLabel: "__name__"
+    #     replacement: "metallb_bgp_$1"
+    #   - sourceLabels: [__name__]
+    #     regex: "frrk8s_bfd_(.*)"
+    #     targetLabel: "__name__"
+    #     replacement: "metallb_bfd_$1"
 
 # networkpolicies
 networkpolicies:

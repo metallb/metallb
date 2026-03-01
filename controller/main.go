@@ -224,6 +224,10 @@ func main() {
 		bgpType = "native"
 	}
 
+	if bgpType == "frr" {
+		level.Warn(logger).Log("op", "startup", "msg", "The FRR mode is deprecated and will be removed in a future release. Please migrate to the frr-k8s mode, which is now the default BGP backend. See https://metallb.io/concepts/bgp/#frr-k8s-mode for details.")
+	}
+
 	validation := config.ValidationFor(bgpType)
 
 	cfg := &k8s.Config{
