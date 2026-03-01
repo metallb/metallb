@@ -3,6 +3,7 @@ package main
 # validate serviceAccountName
 deny[msg] {
   input.kind == "Deployment"
+  endswith(input.metadata.name, "-controller")
   serviceAccountName := input.spec.template.spec.serviceAccountName
   not serviceAccountName == "release-name-metallb-controller"
   msg = sprintf("controller serviceAccountName '%s' does not match expected value", [serviceAccountName])
@@ -11,6 +12,7 @@ deny[msg] {
 # validate node selector includes builtin when custom ones are provided
 deny[msg] {
   input.kind == "Deployment"
+  endswith(input.metadata.name, "-controller")
   not input.spec.template.spec.nodeSelector["kubernetes.io/os"] == "linux"
   msg = "controller nodeSelector does not include '\"kubernetes.io/os\": linux'"
 }
