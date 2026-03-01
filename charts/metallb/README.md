@@ -62,7 +62,7 @@ Kubernetes: `>= 1.19.0-0`
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
 | frr-k8s.prometheus.rbacProxy.repository | string | `"registry.k8s.io/kubebuilder/kube-rbac-proxy"` |  |
-| frrk8s.enabled | bool | `false` |  |
+| frrk8s.enabled | bool | `true` |  |
 | frrk8s.external | bool | `false` |  |
 | frrk8s.namespace | string | `""` |  |
 | fullnameOverride | string | `""` |  |
@@ -127,7 +127,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.enabled | bool | `true` |  |
 | speaker.excludeInterfaces.enabled | bool | `true` |  |
 | speaker.extraContainers | list | `[]` |  |
-| speaker.frr.enabled | bool | `true` |  |
+| speaker.frr.enabled | bool | `false` |  |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"quay.io/frrouting/frr"` |  |
 | speaker.frr.image.tag | string | `"10.5.1"` |  |

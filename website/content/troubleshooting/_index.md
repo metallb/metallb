@@ -174,7 +174,8 @@ Among the speakers that are supposed to advertise the IP, pick one and check if:
 - The BGP session is up
 - The IP is being advertised
 
-The status of the session can be seen via the `metallb_bgp_session_up` metric.
+The status of the session can be seen via the `metallb_bgp_session_up` metric (or `frrk8s_bgp_session_up`
+when using the default FRR-K8s mode).
 
 #### With native mode
 
@@ -193,7 +194,12 @@ Useful commands are:
 session
 - `vtysh show ipv4 / ipv6` to see the status of the advertisements
 
-#### Invalid FRR Configuration (FRR Mode)
+#### Invalid FRR Configuration (FRR Mode - deprecated)
+
+{{% notice note %}}
+This section applies to the deprecated FRR mode. For the default FRR-K8s mode, check the FRR-K8s pod
+logs and FRRNodeState resources instead.
+{{% /notice %}}
 
 The FRR configuration that the speaker produces might be invalid. When this is the case, the speaker container
 will produce a `reload error` log.

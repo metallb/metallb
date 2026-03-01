@@ -56,27 +56,32 @@ kubectl apply -f - -n kube-system
 
 ## Installation by manifest
 
-To install MetalLB, apply the manifest:
+MetalLB offers different manifests depending on which BGP backend you need.
+Choose the one that fits your deployment:
 
-```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml
-```
-
-{{% notice note %}}
-If you want to deploy MetalLB using the [FRR mode](https://metallb.io/configuration/#enabling-bfd-support-for-bgp-sessions), apply the manifests:
-
-```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-frr.yaml
-```
-
-If you want to deploy MetalLB using the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode):
+**FRR-K8s mode (recommended)** -- includes the [FRR-K8s]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode) backend,
+which provides BGP with BFD support, IPv6, and the ability to merge additional FRR configuration:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-frr-k8s.yaml
 ```
 
-Please do note that these manifests deploy MetalLB from the main development branch. We highly encourage cloud operators to deploy a stable released version of MetalLB on production environments!
+**Native mode** -- a lightweight deployment with the built-in native BGP implementation
+(no BFD, no IPv6 BGP). Suitable for L2-only or simple BGP setups:
 
+```bash
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml
+```
+
+**FRR mode (deprecated)** -- configures [FRR directly]({{% relref "concepts/bgp.md" %}}#frr-mode-deprecated)
+without the FRR-K8s layer. Migrate to FRR-K8s mode instead:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-frr.yaml
+```
+
+{{% notice note %}}
+These manifests deploy MetalLB from the main development branch. We highly encourage cloud operators to deploy a stable released version of MetalLB on production environments!
 {{% /notice %}}
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
@@ -113,27 +118,7 @@ You can install MetalLB with
 [Kustomize](https://github.com/kubernetes-sigs/kustomize) by pointing
 at the remote kustomization file.
 
-In the following example, we are deploying MetalLB with the native bgp implementation :
-
-```yaml
-# kustomization.yml
-namespace: metallb-system
-
-resources:
-  - github.com/metallb/metallb/config/native?ref=main
-```
-
-In order to deploy the [FRR mode](https://metallb.io/configuration/#enabling-bfd-support-for-bgp-sessions):
-
-```yaml
-# kustomization.yml
-namespace: metallb-system
-
-resources:
-  - github.com/metallb/metallb/config/frr?ref=main
-```
-
-In order to deploy the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode):
+To deploy with the [FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode) (recommended):
 
 ```yaml
 # kustomization.yml
@@ -143,6 +128,25 @@ resources:
   - github.com/metallb/metallb/config/frr-k8s?ref=main
 ```
 
+To deploy with the native BGP implementation:
+
+```yaml
+# kustomization.yml
+namespace: metallb-system
+
+resources:
+  - github.com/metallb/metallb/config/native?ref=main
+```
+
+To deploy with the [FRR mode]({{% relref "concepts/bgp.md" %}}#frr-mode-deprecated) (**deprecated**):
+
+```yaml
+# kustomization.yml
+namespace: metallb-system
+
+resources:
+  - github.com/metallb/metallb/config/frr?ref=main
+```
 
 ## Installation with Helm
 
@@ -176,49 +180,55 @@ If you are using MetalLB with a kubernetes version that enforces [pod security a
 {{% /notice %}}
 
 {{% notice note %}}
-If you want to deploy MetalLB using the [FRR mode](https://metallb.io/configuration/#enabling-bfd-support-for-bgp-sessions), the following value must be set:
+By default, the Helm chart deploys MetalLB using the [FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode).
+
+If you want to deploy MetalLB using the [FRR mode]({{% relref "concepts/bgp.md" %}}#frr-mode-deprecated) instead (**deprecated**), the following values must be set:
 
 ```yaml
 speaker:
   frr:
     enabled: true
+frrk8s:
+  enabled: false
+```
+
+If you want to deploy MetalLB using the native BGP implementation (without FRR), the following values must be set:
+
+```yaml
+speaker:
+  frr:
+    enabled: false
+frrk8s:
+  enabled: false
 ```
 
 {{% /notice %}}
-
-In order to deploy the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode)
-the following value must be set:
-
-```yaml
-frrk8s:
-  enabled: true
-```
 
 ## Using the MetalLB Operator
 
 The MetalLB Operator is available on OperatorHub at [operatorhub.io/operator/metallb-operator](https://operatorhub.io/operator/metallb-operator). It eases the deployment and life-cycle of MetalLB in a cluster and allows configuring MetalLB via CRDs.
 
 {{% notice note %}}
-If you want to deploy MetalLB using the [FRR mode](https://metallb.io/configuration/#enabling-bfd-support-for-bgp-sessions), you must edit the ClusterServiceVersion resource
-named `metallb-operator`:
+The recommended BGP backend is [FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode). To enable it
+via the Operator, edit the ClusterServiceVersion resource named `metallb-operator`:
 
 ```bash
 kubectl edit csv metallb-operator
 ```
 
-and change the `BGP_TYPE` environment variable of the `manager` container to `frr`:
-
-```yaml
-- name: METALLB_BGP_TYPE
-  value: frr
-```
-
-If you want to deploy MetalLB using the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode)
-change the `BGP_TYPE` environment variable of the `manager` container to `frr-k8s`:
+and set the `METALLB_BGP_TYPE` environment variable of the `manager` container to `frr-k8s`:
 
 ```yaml
 - name: METALLB_BGP_TYPE
   value: frr-k8s
+```
+
+The [FRR mode]({{% relref "concepts/bgp.md" %}}#frr-mode-deprecated) is **deprecated**. If you are
+currently using it via the Operator, plan to migrate to `frr-k8s`:
+
+```yaml
+- name: METALLB_BGP_TYPE
+  value: frr
 ```
 
 {{% /notice %}}
@@ -252,6 +262,25 @@ methods described above:
 
 When upgrading via Helm, note that the chart is designed to automatically upgrade the CRDs;
 there is no need to upgrade them manually.
+
+{{% notice warning %}}
+**Default BGP mode change**: The Helm chart default has changed from **FRR mode** to **FRR-K8s mode**.
+If you were relying on the chart defaults (without explicitly setting `speaker.frr.enabled: true`),
+upgrading will switch your BGP backend from FRR to FRR-K8s. This changes the pod topology (FRR-K8s
+runs as a separate DaemonSet instead of a sidecar) and the Prometheus metric prefix (from `metallb_`
+to `frrk8s_`). To keep FRR mode during upgrade, pin your values explicitly:
+
+```yaml
+speaker:
+  frr:
+    enabled: true
+frrk8s:
+  enabled: false
+```
+
+See the [Prometheus metrics]({{% relref "prometheus-metrics/_index.md" %}}) page for guidance on
+metric relabeling for backward compatibility.
+{{% /notice %}}
 
 Please take the known limitations for [layer2](https://metallb.io/concepts/layer2/#limitations)
 and [bgp](https://metallb.io/concepts/bgp/#limitations) into account when performing an

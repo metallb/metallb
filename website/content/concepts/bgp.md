@@ -120,23 +120,27 @@ strategies you can employ:
   connections. For low-availability internal services, this may be
   acceptable as-is.
 
-## FRR Mode
+## FRR-K8s Mode
 
-MetalLB provides a deployment mode that uses FRR as a backend for the BGP
-layer.
+FRR-K8s is the default BGP backend for MetalLB. [FRR-K8s](https://github.com/metallb/frr-k8s)
+is a Kubernetes wrapper to [FRR](https://frrouting.org/) with its own API.
+When running in FRR-K8s mode, MetalLB generates the FRR-K8s configuration instead of configuring FRR directly.
 
-When the FRR mode is enabled, the following additional features are available:
+Compared to the native BGP implementation, the FRR-K8s mode provides:
 
 - BGP sessions with [BFD support](https://metallb.io/concepts/bgp/#limitations)
 - IPv6 Support for BGP and BFD
 - Multi Protocol BGP
+- The ability to merge additional [FRR-K8s configuration](https://github.com/metallb/frr-k8s/blob/main/API-DOCS.md)
+  instances provided by the user (or by other controllers), allowing to share the same FRR instance
+  and BGP sessions for purposes beyond MetalLB's service advertisement
 
-Please also note that with the current FRR version is not possible to peer within
-the same host, while with the native implementation allows it.
+When deploying MetalLB in FRR-K8s mode, a FRR-K8s instance will be deployed on the same nodes where
+the MetalLB speaker is deployed.
 
-### Limitations of the FRR Mode
+### Limitations of the FRR-based Modes
 
-Compared to the native implementation, the FRR mode has the following limitations:
+Compared to the native implementation, the FRR-based modes (FRR-K8s and FRR) have the following limitations:
 
 - The RouterID field of the BGPAdvertisement can be overridden, but it must be the same for all
 the advertisements (there can't be different advertisements with different RouterIDs).
@@ -147,17 +151,17 @@ the advertisements (there can't be different advertisements with different myAsn
 - In case a eBGP Peer is multiple hops away from the nodes, the ebgp-multihop flag must be set
 to true.
 
-## FRR-K8s Mode
+- It is not possible to peer within the same host (while the native implementation allows it).
 
-In 0.14.0 we added an experimental FRR-K8s backend mode. [FRR-K8s](https://github.com/metallb/frr-k8s)
-is a Kubernetes wrapper to FRR with its own API.
-When running in FRR-K8s mode, MetalLB generates the FRR-K8s configuration instead of configuring directly FRR.
+## FRR Mode (Deprecated)
 
-Additional FRR-K8s configuration instances can be provided by the user, allowing to leverage the same
-FRR instance for purpouses that go beyond the advertisement of services provided by MetalLB while sharing
-the same BGP session.
+{{% notice warning %}}
+The FRR mode is **deprecated** and will be removed in a future release. Please migrate to the
+[FRR-K8s mode](#frr-k8s-mode), which is now the default BGP backend and provides the same features
+with additional flexibility.
+{{% /notice %}}
 
-All the same features / limitations related to MetalLB in FRR mode can be applied to FRR-K8s mode.
-
-When deploying MetalLB in FRR-K8s mode, a FRR-K8s instance will be deployed on the same nodes where
-the MetalLB speaker is deployed.
+MetalLB provides a deployment mode that uses FRR directly as a backend for the BGP
+layer, without the FRR-K8s abstraction. This mode has the same features and limitations
+as the FRR-K8s mode but does not support merging additional FRR configurations from
+other controllers or users.
