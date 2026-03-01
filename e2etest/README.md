@@ -6,7 +6,7 @@ To run the MetalLB E2E test suite, you first need to create a development cluste
 inv dev-env
 ```
 
-The above command will create a cluster with backend bgp `frr`. To deploy development cluster
+The above command will create a cluster with backend bgp `frr-k8s`. To deploy development cluster
 with other types of bgp backend, you specify that with `--bgp-type` parameter. For example:
 
 ```
@@ -17,25 +17,25 @@ Running the E2E tests against the development cluster requires mandatory field `
 to match the backend bgp the dev-env was created with.
 
 ```
-inv e2etest --bgp-mode frr
+inv e2etest --bgp-mode frr-k8s
 ```
 
 Run only BGP test suite:
 
 ```
-inv e2etest --bgp-mode frr --focus BGP
+inv e2etest --bgp-mode frr-k8s --focus BGP
 ```
 
 Run only L2 test suite:
 
 ```
-inv e2etest --bgp-mode frr --focus L2
+inv e2etest --bgp-mode frr-k8s --focus L2
 ```
 
 Run with additional ginkgo parameters for example:
 
 ```
-inv e2etest --bgp-mode frr --ginkgo-params="--until-it-fails -v"
+inv e2etest --bgp-mode frr-k8s --ginkgo-params="--until-it-fails -v"
 ```
 
 The test suite will run the appropriate tests against the cluster.

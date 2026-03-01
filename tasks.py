@@ -432,7 +432,7 @@ def generate_manifest(
         "ip_family": "Optional ipfamily of the cluster."
         "Default: ipv4, supported families are 'ipv6' and 'dual'.",
         "bgp_type": "Type of BGP implementation to use."
-        "Supported: 'frr' (default), 'native', 'frr-k8s', 'frr-k8s-external'",
+        "Supported: 'frr-k8s' (default), 'native', 'frr' (deprecated), 'frr-k8s-external'",
         "frr_volume_dir": "FRR router config directory to be mounted inside frr container. "
         "Default: ./dev-env/bgp/frr-volume",
         "log_level": "Log level for the controller and the speaker."
@@ -452,7 +452,7 @@ def dev_env(
     frr_volume_dir="",
     node_img=None,
     ip_family="ipv4",
-    bgp_type="frr",
+    bgp_type="frr-k8s",
     log_level="info",
     helm_install=False,
     build_images=True,
@@ -585,7 +585,7 @@ apiServer:
         frr_values = ""
 
         if bgp_type == "frr":
-            frr_values = "--set speaker.frr.enabled=true "
+            frr_values = "--set speaker.frr.enabled=true --set frrk8s.enabled=false "
         if bgp_type == "frr-k8s":
             frr_values = "--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false "
             if with_prometheus:
@@ -602,9 +602,11 @@ apiServer:
                 )
 
         if bgp_type == "frr-k8s-external":
-            frr_values = "--set frrk8s.external=true --set frrk8s.namespace={} --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false ".format(
+            frr_values = "--set frrk8s.external=true --set frrk8s.enabled=false --set frrk8s.namespace={} --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false ".format(
                 frr_k8s_ns
             )
+        if bgp_type == "native":
+            frr_values = "--set speaker.frr.enabled=false --set frrk8s.enabled=false "
 
         run(
             "helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "

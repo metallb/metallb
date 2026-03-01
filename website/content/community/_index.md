@@ -86,7 +86,9 @@ currently have, relative to the top-level directory:
   to push routes to the peer.
 - `internal/bgp/frr` contains the code for translating the MetalLB configuration
    to the FRR configuration that is applied to the FRR container, when running
-   MetalLB in FRR mode.
+   MetalLB in FRR mode (deprecated).
+- `internal/bgp/frrk8s` contains the code for translating the MetalLB configuration
+   to FRR-K8s CRDs, when running MetalLB in FRR-K8s mode (default).
 - `internal/layer2` is an implementation of an ARP and NDP responder.
 - `internal/logging` is a logging shim that redirects both
   Kubernetes's `klog` and Go's standard library `log` output to
@@ -99,9 +101,9 @@ currently have, relative to the top-level directory:
 In addition to code, there's deployment configuration and
 documentation:
 
-- `config/manifests` contains a variety of Kubernetes manifests. The most
-  important one is `config/manifests/metallb-native.yaml`, which specifies how to
-  deploy MetalLB onto a cluster.
+- `config/manifests` contains a variety of Kubernetes manifests for deploying
+  MetalLB onto a cluster (e.g. `metallb-frr-k8s.yaml` for the default FRR-K8s
+  mode, `metallb-native.yaml` for native mode).
 - `website` contains the website for MetalLB. The `website/content`
   subdirectory is where all the pages live, in Markdown format.
 

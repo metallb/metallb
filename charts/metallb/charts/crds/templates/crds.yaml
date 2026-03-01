@@ -604,14 +604,14 @@ spec:
                     - external
                   type: string
                 ebgpMultiHop:
-                  description: To set if the BGPPeer is multi-hops away. Needed for FRR mode only.
+                  description: To set if the BGPPeer is multi-hops away. Needed for FRR-based modes (FRR-K8s, FRR) only.
                   type: boolean
                 enableGracefulRestart:
                   description: |-
                     EnableGracefulRestart allows BGP peer to continue to forward data packets
                     along known routes while the routing protocol information is being
                     restored. This field is immutable because it requires restart of the BGP
-                    session. Supported for FRR mode only.
+                    session. Supported for FRR-based modes (FRR-K8s, FRR) only.
                   type: boolean
                   x-kubernetes-validations:
                     - message: EnableGracefulRestart cannot be changed after creation
