@@ -128,7 +128,7 @@ When running in FRR-K8s mode, MetalLB generates the FRR-K8s configuration instea
 
 Compared to the native BGP implementation, the FRR-K8s mode provides:
 
-- BGP sessions with [BFD support](https://metallb.io/concepts/bgp/#limitations)
+- BGP sessions with [BFD support]({{% relref "configuration/_index.md" %}}#enabling-bfd-support-for-bgp-sessions)
 - IPv6 Support for BGP and BFD
 - Multi Protocol BGP
 - The ability to merge additional [FRR-K8s configuration](https://github.com/metallb/frr-k8s/blob/main/API-DOCS.md)
