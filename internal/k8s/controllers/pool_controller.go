@@ -27,7 +27,6 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -39,14 +38,15 @@ import (
 
 type PoolReconciler struct {
 	client.Client
-	Logger          log.Logger
-	Scheme          *runtime.Scheme
-	Namespace       string
-	Handler         func(log.Logger, *config.Pools) SyncState
-	ValidateConfig  config.Validate
-	ForceReload     func()
-	ConfigStateName string
-	currentConfig   *config.Config
+	Logger            log.Logger
+	Scheme            *runtime.Scheme
+	Namespace         string
+	Handler           func(log.Logger, *config.Pools) SyncState
+	ValidateConfig    config.Validate
+	ForceReload       func()
+	ConfigStateName   string
+	ConfigStateLabels map[string]string
+	currentConfig     *config.Config
 }
 
 func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retError error) {
@@ -141,7 +141,7 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&metallbv1beta1.Community{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
 		Watches(&metallbv1beta1.ConfigurationState{}, &handler.EnqueueRequestForObject{},
-			builder.WithPredicates(NewConfigurationStateWriterPredicate(r.Namespace, r.ConfigStateName, ConditionTypePoolReconcilerValid))).
+			builder.WithPredicates(newConfigurationStatePredicate(r.Namespace, r.ConfigStateName, ConditionTypePoolReconcilerValid))).
 		WithEventFilter(p).
 		Complete(r)
 }
@@ -161,47 +161,14 @@ func filterPoolStatusEvent(e event.UpdateEvent) bool {
 }
 
 func (r *PoolReconciler) reportCondition(ctx context.Context, conditionErr error) error {
-	if r.ConfigStateName == "" {
-		return nil
-	}
-
-	condition := metav1.Condition{
-		Type:    ConditionTypePoolReconcilerValid,
-		Status:  metav1.ConditionTrue,
-		Reason:  ErrorTypeNone,
-		Message: "",
-		// Always set to now (tracks last reconciliation, not last status change).
-		LastTransitionTime: metav1.Now(),
-	}
-
-	switch {
-	case errors.Is(conditionErr, ErrConfiguration):
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = ErrorTypeConfiguration
-		condition.Message = conditionErr.Error()
-	case conditionErr != nil:
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = ErrorTypeUnknown
-		condition.Message = conditionErr.Error()
-	}
-
-	configStatus := &metallbv1beta1.ConfigurationState{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "metallb.io/v1beta1",
-			Kind:       "ConfigurationState",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.ConfigStateName,
-			Namespace: r.Namespace,
-		},
-		Status: metallbv1beta1.ConfigurationStateStatus{
-			Conditions: []metav1.Condition{condition},
-		},
-	}
-
-	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("poolReconciler"), client.ForceOwnership); err != nil {
-		return fmt.Errorf("patch %s/%s: %w", r.Namespace, r.ConfigStateName, err)
-	}
-
-	return nil
+	return reportConfigurationStateCondition(
+		ctx,
+		r.Client,
+		r.Namespace,
+		r.ConfigStateName,
+		r.ConfigStateLabels,
+		ConditionTypePoolReconcilerValid,
+		"poolReconciler",
+		conditionErr,
+	)
 }

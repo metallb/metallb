@@ -200,14 +200,15 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.ConfigChanged != nil {
 		if err = (&controllers.ConfigReconciler{
-			Client:          mgr.GetClient(),
-			ConfigStateName: configStateName,
-			Logger:          cfg.Logger,
-			Scheme:          mgr.GetScheme(),
-			Namespace:       cfg.Namespace,
-			ValidateConfig:  cfg.ValidateConfig,
-			Handler:         cfg.ConfigHandler,
-			ForceReload:     reload,
+			Client:            mgr.GetClient(),
+			ConfigStateName:   configStateName,
+			ConfigStateLabels: configStateLabels,
+			Logger:            cfg.Logger,
+			Scheme:            mgr.GetScheme(),
+			Namespace:         cfg.Namespace,
+			ValidateConfig:    cfg.ValidateConfig,
+			Handler:           cfg.ConfigHandler,
+			ForceReload:       reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
 			return nil, errors.Join(err, errors.New("unable to create controller for config"))
@@ -216,14 +217,15 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.PoolChanged != nil {
 		if err = (&controllers.PoolReconciler{
-			Client:          mgr.GetClient(),
-			ConfigStateName: configStateName,
-			Logger:          cfg.Logger,
-			Scheme:          mgr.GetScheme(),
-			Namespace:       cfg.Namespace,
-			ValidateConfig:  cfg.ValidateConfig,
-			Handler:         cfg.PoolHandler,
-			ForceReload:     reload,
+			Client:            mgr.GetClient(),
+			ConfigStateName:   configStateName,
+			ConfigStateLabels: configStateLabels,
+			Logger:            cfg.Logger,
+			Scheme:            mgr.GetScheme(),
+			Namespace:         cfg.Namespace,
+			ValidateConfig:    cfg.ValidateConfig,
+			Handler:           cfg.PoolHandler,
+			ForceReload:       reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
 			return nil, errors.Join(err, errors.New("failed to create config reconciler"))
@@ -289,20 +291,6 @@ func New(cfg *Config) (*Client, error) {
 		}); err != nil {
 			return nil, err
 		}
-	}
-
-	// Setup reconciler
-	cc := controllers.ConfigurationStateReconciler{
-		Client:            mgr.GetClient(),
-		Namespace:         cfg.Namespace,
-		ConfigStateName:   configStateName,
-		ConfigStateLabels: configStateLabels,
-		Logger:            cfg.Logger,
-		Scheme:            mgr.GetScheme(),
-	}
-	if err := cc.SetupWithManager(mgr); err != nil {
-		level.Error(c.logger).Log("error", err, "unable to create controller", "configurationstatus")
-		return nil, errors.Join(err, errors.New("failed to create configuration status reconciler"))
 	}
 
 	if cfg.ServiceChanged != nil {
