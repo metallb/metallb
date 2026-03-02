@@ -52,7 +52,7 @@ func (r *ConfigurationStateReconciler) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, err
 		}
 
-		level.Info(r.Logger).Log("controller", r, "error", "ConfigurationState created", "name", r.ConfigStateName)
+		level.Info(r.Logger).Log("controller", r, "event", "ConfigurationState created", "name", r.ConfigStateName)
 		return ctrl.Result{}, nil
 	}
 	if err != nil {
