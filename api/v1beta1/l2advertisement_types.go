@@ -43,6 +43,14 @@ type L2AdvertisementSpec struct {
 	// If empty, all services from the selected pools are advertised.
 	// +optional
 	ServiceSelectors []metav1.LabelSelector `json:"serviceSelectors,omitempty"`
+	// GratuitousARPInterval specifies the interval in seconds between periodic gratuitous ARP
+	// announcements for allocated IPs. This helps prevent traffic blackholes caused by switch
+	// FDB entry aging when the FDB aging time is shorter than the gateway ARP timeout.
+	// When set to 0 or not specified, periodic gratuitous ARP is disabled (only failover
+	// announcements are sent).
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	GratuitousARPInterval *uint32 `json:"gratuitousARPInterval,omitempty"`
 }
 
 // L2AdvertisementStatus defines the observed state of L2Advertisement.
