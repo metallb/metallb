@@ -2,3 +2,10 @@ MetalLB is now running in the cluster.
 
 Now you can configure it via its CRs. Please refer to the metallb official docs
 on how to use the CRs.
+{{- if .Values.speaker.frr.enabled }}
+
+WARNING: The FRR mode (speaker.frr.enabled) is DEPRECATED and will be removed
+in a future release. Please migrate to the frr-k8s mode (frrk8s.enabled: true),
+which is now the default BGP backend and provides the same features with
+additional flexibility. See https://metallb.io/concepts/bgp/#frr-k8s-mode
+{{- end }}
