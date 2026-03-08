@@ -246,6 +246,11 @@ jobs:
           echo "With VRF $WITH_VRF"
           sudo -E env "PATH=$PATH" inv e2etest $FOCUS --skip $SKIP --bgp-mode ${{ matrix.bgp-type }} $WITH_VRF $FRRK8NAMESPACE -e /tmp/kind_logs
 
+      - name: Export kind logs
+        if: ${{ failure() }}
+        run:
+          kind export logs /tmp/kind_logs
+
       - name: Collect Logs
         if: ${{ failure() }}
         uses: ./.github/workflows/composite/collectlogs

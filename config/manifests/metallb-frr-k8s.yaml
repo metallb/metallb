@@ -3377,7 +3377,7 @@ spec:
         - --upstream=http://127.0.0.1:7572/
         - --logtostderr=true
         - --v=0
-        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.1
+        image: registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.13.1
         name: kube-rbac-proxy
         ports:
         - containerPort: 9140
@@ -3400,7 +3400,7 @@ spec:
         - --upstream=http://127.0.0.1:7573/
         - --logtostderr=true
         - --v=0
-        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.1
+        image: registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.13.1
         name: kube-rbac-proxy-frr
         ports:
         - containerPort: 9141
