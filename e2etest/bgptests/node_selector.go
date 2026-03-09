@@ -263,6 +263,90 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		ginkgo.Entry("IPV6", ipfamily.IPv6, "fc00:f853:0ccd:e799::/116"),
 	)
 
+	ginkgo.DescribeTable("Two advertisements - updating one nodeSelector to non-matching withdraws its service without affecting the other",
+		func(pairingIPFamily ipfamily.Family, addresses []string) {
+			var allNodes *corev1.NodeList
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			if len(allNodes.Items) < 2 {
+				ginkgo.Skip("This test requires at least 2 nodes in the cluster")
+			}
+			expectedNodesForFirstAdv := nodesForSelection(allNodes.Items, []int{0})
+			expectedNodesForSecondAdv := nodesForSelection(allNodes.Items, []int{1})
+
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "first-pool",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{addresses[0]},
+						},
+					}, {
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "second-pool",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{addresses[1]},
+						},
+					},
+				},
+				Peers: metallb.PeersForContainers(FRRContainers, pairingIPFamily),
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "first-adv",
+						},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							NodeSelectors:   k8s.SelectorsForNodes(expectedNodesForFirstAdv),
+							IPAddressPools: []string{"first-pool"},
+						},
+					}, {
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "second-adv",
+						},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							NodeSelectors:   k8s.SelectorsForNodes(expectedNodesForSecondAdv),
+							IPAddressPools: []string{"second-pool"},
+						},
+					},
+				},
+			}
+			for _, c := range FRRContainers {
+				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			firstService, _ := testservice.CreateWithBackend(cs, testNamespace, "first-lb", testservice.WithSpecificPool("first-pool"))
+			defer testservice.Delete(cs, firstService)
+			secondService, _ := testservice.CreateWithBackend(cs, testNamespace, "second-lb", testservice.WithSpecificPool("second-pool"))
+			defer testservice.Delete(cs, secondService)
+
+			ginkgo.By("Checking first service announced only from first advertisement's nodes")
+			checkServiceOnlyOnNodes(firstService, expectedNodesForFirstAdv, pairingIPFamily)
+			ginkgo.By("Checking second service announced only from second advertisement's nodes")
+			checkServiceOnlyOnNodes(secondService, expectedNodesForSecondAdv, pairingIPFamily)
+
+			ginkgo.By("Updating second BGP advertisement with non-existing node selector")
+			resources.BGPAdvs[1].Spec.NodeSelectors = []metav1.LabelSelector{
+				{MatchLabels: map[string]string{"non-existing-label": "true"}},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Validating first service still advertised only from first advertisement's nodes")
+			checkServiceOnlyOnNodes(firstService, expectedNodesForFirstAdv, pairingIPFamily)
+			ginkgo.By("Validating second service no longer advertised from second advertisement's nodes")
+			checkServiceNotOnNodes(secondService, allNodes.Items, pairingIPFamily)
+		},
+		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{"192.168.10.0/24", "192.168.16.0/24"}),
+		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{"fc00:f853:0ccd:e799::/116", "fc00:f853:0ccd:e800::/116"}),
+	)
+
 	ginkgo.Context("Peer selector", func() {
 		// nodeForPeers is a map between container index and the indexes of the nodes we want to peer it with.
 		// we cant use strings to avoid making assumptions on the names of the containers / nodes.
