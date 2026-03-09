@@ -558,12 +558,23 @@ apiServer:
 
     frr_k8s_ns = "frr-k8s-system"
     if bgp_type == "frr-k8s-external":
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            frr_k8s_manifest_path = f.name
+            result = run(
+                "curl -sL https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.22/config/all-in-one/frr-k8s.yaml",
+                hide=True,
+            )
+            f.write(
+                result.stdout.replace(
+                    "gcr.io/kubebuilder/kube-rbac-proxy",
+                    "registry.k8s.io/kubebuilder/kube-rbac-proxy",
+                )
+            )
         run(
-            "{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.22/config/all-in-one/frr-k8s.yaml".format(
-                kubectl_path
-            ),
+            "{} apply -f {}".format(kubectl_path, frr_k8s_manifest_path),
             echo=True,
         )
+        os.unlink(frr_k8s_manifest_path)
         time.sleep(2)
         run(
             "{} -n {} wait --for=condition=Ready --all pods --timeout 300s".format(

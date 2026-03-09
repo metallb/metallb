@@ -61,6 +61,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.webhookMode | string | `"enabled"` |  |
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
+| frr-k8s.prometheus.rbacProxy.repository | string | `"registry.k8s.io/kubebuilder/kube-rbac-proxy"` |  |
 | frrk8s.enabled | bool | `false` |  |
 | frrk8s.external | bool | `false` |  |
 | frrk8s.namespace | string | `""` |  |
@@ -104,7 +105,7 @@ Kubernetes: `>= 1.19.0-0`
 | prometheus.prometheusRule.staleConfig.labels.severity | string | `"warning"` |  |
 | prometheus.rbacPrometheus | bool | `true` |  |
 | prometheus.rbacProxy.pullPolicy | string | `nil` |  |
-| prometheus.rbacProxy.repository | string | `"gcr.io/kubebuilder/kube-rbac-proxy"` |  |
+| prometheus.rbacProxy.repository | string | `"registry.k8s.io/kubebuilder/kube-rbac-proxy"` |  |
 | prometheus.rbacProxy.tag | string | `"v0.12.0"` |  |
 | prometheus.scrapeAnnotations | bool | `false` |  |
 | prometheus.serviceAccount | string | `""` |  |
