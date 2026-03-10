@@ -486,8 +486,7 @@ def dev_env(
         }
 
         if with_api_audit:
-            config["nodes"][0]["kubeadmConfigPatches"] = [
-                r"""kind: ClusterConfiguration
+            config["nodes"][0]["kubeadmConfigPatches"] = [r"""kind: ClusterConfiguration
 apiServer:
   # enable auditing flags on the API server
   extraArgs:
@@ -504,8 +503,7 @@ apiServer:
       hostPath: "/var/log/kubernetes"
       mountPath: "/var/log/kubernetes"
       readOnly: false
-      pathType: DirectoryOrCreate"""
-            ]
+      pathType: DirectoryOrCreate"""]
             config["nodes"][0]["extraMounts"] = [
                 {
                     "hostPath": "./dev-env/audit-policy.yaml",
