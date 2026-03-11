@@ -39,14 +39,12 @@ rules:
 - apiGroups: ["metallb.io"]
   resources: ["configurationstates/status"]
   verbs: ["get", "patch", "update"]
-{{- if .Values.prometheus.secureMetricsPort }}
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]
   verbs: ["create"]
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
-{{- end }}
 {{- if .Values.speaker.enabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -68,14 +66,12 @@ rules:
 - apiGroups: ["metallb.io"]
   resources: ["servicel2statuses","servicel2statuses/status","configurationstates","configurationstates/status"]
   verbs: ["*"]
-{{- if .Values.prometheus.secureMetricsPort }}
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]
   verbs: ["create"]
 - apiGroups: ["authorization.k8s.io"]
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
-{{- end }}
 {{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
 - apiGroups: ["frrk8s.metallb.io"]
   resources: ["frrconfigurations"]

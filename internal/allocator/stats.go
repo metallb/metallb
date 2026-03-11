@@ -2,7 +2,10 @@
 
 package allocator
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+)
 
 var stats = struct {
 	poolCapacity     *prometheus.GaugeVec
@@ -82,11 +85,11 @@ func deleteStatsFor(pool string) {
 }
 
 func init() {
-	prometheus.MustRegister(stats.poolCapacity)
-	prometheus.MustRegister(stats.ipv4PoolCapacity)
-	prometheus.MustRegister(stats.ipv6PoolCapacity)
-	prometheus.MustRegister(stats.poolActive)
-	prometheus.MustRegister(stats.ipv4PoolActive)
-	prometheus.MustRegister(stats.ipv6PoolActive)
-	prometheus.MustRegister(stats.poolAllocated)
+	crmetrics.Registry.MustRegister(stats.poolCapacity)
+	crmetrics.Registry.MustRegister(stats.ipv4PoolCapacity)
+	crmetrics.Registry.MustRegister(stats.ipv6PoolCapacity)
+	crmetrics.Registry.MustRegister(stats.poolActive)
+	crmetrics.Registry.MustRegister(stats.ipv4PoolActive)
+	crmetrics.Registry.MustRegister(stats.ipv6PoolActive)
+	crmetrics.Registry.MustRegister(stats.poolAllocated)
 }

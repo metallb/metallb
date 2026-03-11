@@ -79,13 +79,15 @@ spec:
           livenessProbe:
             httpGet:
               path: /livez
-              port: 7473
+              port: 9121
+              scheme: HTTPS
             periodSeconds: 5
             failureThreshold: 3
           startupProbe:
             httpGet:
               path: /livez
-              port: 7473
+              port: 9121
+              scheme: HTTPS
             failureThreshold: 30
             periodSeconds: 5
         - name: reloader
@@ -110,13 +112,14 @@ spec:
             allowPrivilegeEscalation: false
           command: ["/etc/frr_metrics/frr-metrics"]
           args:
-            - --metrics-port=7473
+            - --metrics-port=9121
+            - --metrics-bind-address=0.0.0.0
           env:
             - name: VTYSH_HISTFILE
               value: /dev/null
           ports:
-            - containerPort: 7473
-              name: frrmetrics
+            - containerPort: 9121
+              name: frrmetricshttps
           volumeMounts:
             - name: frr-sockets
               mountPath: /var/run/frr
