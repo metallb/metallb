@@ -2,7 +2,10 @@
 
 package controllers
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+)
 
 var (
 	updates = prometheus.NewCounter(prometheus.CounterOpts{
@@ -35,8 +38,8 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(updates)
-	prometheus.MustRegister(updateErrors)
-	prometheus.MustRegister(configLoaded)
-	prometheus.MustRegister(configStale)
+	crmetrics.Registry.MustRegister(updates)
+	crmetrics.Registry.MustRegister(updateErrors)
+	crmetrics.Registry.MustRegister(configLoaded)
+	crmetrics.Registry.MustRegister(configStale)
 }

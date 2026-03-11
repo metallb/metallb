@@ -3,21 +3,24 @@
 package metrics
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/onsi/ginkgo/v2"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 	"go.universe.tf/e2etest/pkg/executor"
 
 	corev1 "k8s.io/api/core/v1"
-
-	"errors"
+	clientset "k8s.io/client-go/kubernetes"
 )
+
+const AgnhostImage = "registry.k8s.io/e2e-test-images/agnhost:2.43"
 
 type PrometheusResponse struct {
 	Status string                 `json:"status"`
@@ -29,9 +32,11 @@ type prometheusResponseData struct {
 	Result     model.Vector `json:"result"`
 }
 
-// MetricsForPod returns the parsed metrics for the given pod, scraping them
-// from the source pod.
-func ForPod(promPod, target *corev1.Pod, namespace string) ([]map[string]*dto.MetricFamily, error) {
+// ForPod returns the parsed metrics for the given target pod, scraping them
+// via an ephemeral debug container with curl (for TLS 1.3 compatibility).
+// The SA token is read from the prometheus container, and curl runs from
+// the debug container.
+func ForPod(cs clientset.Interface, promPod, target *corev1.Pod, namespace string) ([]map[string]*dto.MetricFamily, error) {
 	ports := make([]int, 0)
 	allMetrics := make([]map[string]*dto.MetricFamily, 0)
 	for _, c := range target.Spec.Containers {
@@ -42,27 +47,35 @@ func ForPod(promPod, target *corev1.Pod, namespace string) ([]map[string]*dto.Me
 		}
 	}
 
-	podExecutor := executor.ForPod(promPod.Namespace, promPod.Name, "prometheus")
-
-	// We add a token header to the requests, without it kube-rbac-proxy returns Unauthorized.
-	token, err := podExecutor.Exec("cat", "/var/run/secrets/kubernetes.io/serviceaccount/token")
+	tokenExec := executor.ForPod(promPod.Namespace, promPod.Name, "prometheus")
+	token, err := tokenExec.Exec("cat", "/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read SA token: %w", err)
 	}
+
+	curlExec, err := executor.ForPodDebug(cs, promPod.Namespace, promPod.Name, "prometheus", AgnhostImage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create debug container: %w", err)
+	}
+
+	ginkgo.GinkgoWriter.Printf("[ForPod] target=%s podIP=%s ports=%v\n", target.Name, target.Status.PodIP, ports)
 
 	for _, p := range ports {
 		metricsPath := path.Join(net.JoinHostPort(target.Status.PodIP, strconv.Itoa(p)), "metrics")
 		metricsURL := fmt.Sprintf("https://%s", metricsPath)
-		metrics, err := podExecutor.Exec("wget",
-			"--no-check-certificate", "-qO-", metricsURL,
-			"--header", fmt.Sprintf("Authorization: Bearer %s", token))
+		metrics, err := curlExec.Exec("curl", "-s", "-k",
+			"-H", fmt.Sprintf("Authorization: Bearer %s", token),
+			metricsURL)
 		if err != nil {
+			ginkgo.GinkgoWriter.Printf("[ForPod] curl error port %d: %v\n", p, err)
 			return nil, errors.Join(err, fmt.Errorf("failed to scrape metrics for %s", target.Name))
 		}
+		ginkgo.GinkgoWriter.Printf("[ForPod] port %d: response length=%d, first 300 chars: %.300s\n", p, len(metrics), metrics)
 		res, err := metricsFromString(metrics)
 		if err != nil {
 			return nil, err
 		}
+		ginkgo.GinkgoWriter.Printf("[ForPod] port %d: parsed %d metric families\n", p, len(res))
 		allMetrics = append(allMetrics, res)
 	}
 

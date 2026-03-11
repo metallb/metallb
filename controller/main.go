@@ -26,6 +26,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/logging"
+	"go.universe.tf/metallb/internal/tlsconfig"
 	"go.universe.tf/metallb/internal/version"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
@@ -33,7 +34,6 @@ import (
 	"github.com/go-kit/log/level"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
-	cliflag "k8s.io/component-base/cli/flag"
 )
 
 // Service offers methods to mutate a Kubernetes service object.
@@ -158,12 +158,12 @@ func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.Syn
 
 func main() {
 	var (
-		port                = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
+		port                = flag.Int("port", 9120, "HTTPS listening port for Prometheus metrics")
 		namespace           = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
 		mlSecret            = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
 		deployName          = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
 		logLevel            = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		enablePprof         = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+		pprofBindAddress    = flag.String("pprof-bind-address", "", "Bind address for pprof endpoint (e.g. 127.0.0.1:6060). Empty disables pprof.")
 		disableCertRotation = flag.Bool("disable-cert-rotation", false, "disable automatic generation and rotation of webhook TLS certificates/keys")
 		certDir             = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
 		certServiceName     = flag.String("cert-service-name", "metallb-webhook-service", "The service name used to generate the TLS cert's hostname")
@@ -171,10 +171,10 @@ func main() {
 		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
 		webhookSecretName   = flag.String("webhook-secret", "metallb-webhook-cert", "webhook secret: the name of webhook secret, default is metallb-webhook-cert")
 		webhookHTTP2        = flag.Bool("webhook-http2", false, "enables http2 for the webhook endpoint")
-		tlsMinVersion       = flag.String("tls-min-version", "", "Minimum TLS version supported for the webhook server, Possible values: "+strings.Join(cliflag.TLSPossibleVersions(), ", "))
-		tlsCipherSuites     = flag.String("tls-cipher-suites", "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,"+
-			"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,"+
-			"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_GCM_SHA384", "Comma-separated list of cipher suites for the webhook server")
+		tlsMinVersion       = flag.String("tls-min-version", "", "Minimum TLS version (VersionTLS12 or VersionTLS13). If empty, defaults to VersionTLS13.")
+		tlsCipherSuites     = flag.String("tls-cipher-suites", "", "Comma-separated list of TLS cipher suites. Only applies to TLS 1.2. If empty, uses Go defaults.")
+		tlsCurvePreferences = flag.String("tls-curve-preferences", "", "Comma-separated list of numeric CurveID values (see https://pkg.go.dev/crypto/tls#CurveID). If empty, uses Go defaults.")
+		metricsCertDir      = flag.String("metrics-cert-dir", "", "Directory containing tls.crt and tls.key for metrics TLS. If empty, auto-generated self-signed cert is used.")
 	)
 	flag.Parse()
 
@@ -186,22 +186,13 @@ func main() {
 
 	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB controller starting "+version.String())
 
-	var webhookTLSMinVersion uint16
-	var webhookTLSCipherSuites []uint16
-	if *tlsMinVersion != "" {
-		webhookTLSMinVersion, err = cliflag.TLSVersion(*tlsMinVersion)
-		if err != nil {
-			level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to parse tlsMinVersion", "value", *tlsMinVersion)
-			os.Exit(1)
-		}
+	tlsOpt, err := tlsconfig.OptFor(*tlsCipherSuites, *tlsCurvePreferences, *tlsMinVersion)
+	if err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to parse TLS configuration")
+		os.Exit(1)
 	}
-	if *tlsCipherSuites != "" {
-		webhookTLSCipherSuites, err = cliflag.TLSCipherSuites(strings.Split(*tlsCipherSuites, ","))
-		if err != nil {
-			level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to parse tlsCipherSuites", "value", *tlsCipherSuites)
-			os.Exit(1)
-		}
-	}
+
+	level.Info(logger).Log("op", "startup", "tls-min-version", *tlsMinVersion, "tls-cipher-suites", *tlsCipherSuites, "tls-curve-preferences", *tlsCurvePreferences)
 
 	if *namespace == "" {
 		bs, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
@@ -231,10 +222,10 @@ func main() {
 	validation := config.ValidationFor(bgpType)
 
 	cfg := &k8s.Config{
-		ProcessName: "metallb-controller",
-		MetricsPort: *port,
-		EnablePprof: *enablePprof,
-		Logger:      logger,
+		ProcessName:      "metallb-controller",
+		MetricsPort:      *port,
+		PprofBindAddress: *pprofBindAddress,
+		Logger:           logger,
 
 		Namespace: *namespace,
 		Listener: k8s.Listener{
@@ -244,9 +235,9 @@ func main() {
 		ValidateConfig:      validation,
 		EnableWebhook:       true,
 		WebhookWithHTTP2:    *webhookHTTP2,
-		WebHookMinVersion:   webhookTLSMinVersion,
-		WebHookCipherSuites: webhookTLSCipherSuites,
+		TLSOpt:              tlsOpt,
 		DisableCertRotation: *disableCertRotation,
+		MetricsCertDir:      *metricsCertDir,
 		WebhookSecretName:   *webhookSecretName,
 		CertDir:             *certDir,
 		CertServiceName:     *certServiceName,

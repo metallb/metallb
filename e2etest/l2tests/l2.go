@@ -601,7 +601,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("checking the metrics when no service is added")
 			Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(promPod, controllerPod, metallb.Namespace)
+				controllerMetrics, err := metrics.ForPod(cs, promPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -652,7 +652,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("checking the metrics when a service is added")
 			Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(promPod, controllerPod, metallb.Namespace)
+				controllerMetrics, err := metrics.ForPod(cs, promPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -698,7 +698,7 @@ var _ = ginkgo.Describe("L2", func() {
 					return fmt.Errorf("could not find speaker pod on announcing node %s", advNode.Name)
 				}
 
-				speakerMetrics, err := metrics.ForPod(promPod, advSpeaker, metallb.Namespace)
+				speakerMetrics, err := metrics.ForPod(cs, promPod, advSpeaker, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -752,7 +752,7 @@ var _ = ginkgo.Describe("L2", func() {
 			delete(speakerPods, advSpeaker.Spec.NodeName)
 
 			for _, p := range speakerPods {
-				speakerMetrics, err := metrics.ForPod(promPod, p, metallb.Namespace)
+				speakerMetrics, err := metrics.ForPod(cs, promPod, p, metallb.Namespace)
 				Expect(err).NotTo(HaveOccurred())
 
 				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": p.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", testNamespace, svc.Name)}, speakerMetrics)
@@ -768,7 +768,7 @@ var _ = ginkgo.Describe("L2", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
-				speakerMetrics, err := metrics.ForPod(promPod, advSpeaker, metallb.Namespace)
+				speakerMetrics, err := metrics.ForPod(cs, promPod, advSpeaker, metallb.Namespace)
 				if err != nil {
 					return err
 				}

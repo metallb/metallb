@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/yaml"
 
 	"go.universe.tf/metallb/internal/bgp"
@@ -46,6 +47,7 @@ import (
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/speakerlist"
+	"go.universe.tf/metallb/internal/tlsconfig"
 	"go.universe.tf/metallb/internal/version"
 )
 
@@ -74,27 +76,31 @@ type service interface {
 }
 
 func main() {
-	prometheus.MustRegister(announcing)
+	crmetrics.Registry.MustRegister(announcing)
 
 	var (
 		bgpDebounceTimeoutMs = flag.String("bgp-debounce-timeout", os.Getenv("METALLB_BGP_DEBOUNCE_TIMEOUT"),
 			"BGP debounce timeout for FRR configuration reloads, in milliseconds. Only applies when METALLB_BGP_TYPE=frr. "+
 				"Can also be set via METALLB_BGP_DEBOUNCE_TIMEOUT. Default is 3000 ms. This feature is experimental.")
-		namespace         = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
-		host              = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
-		mlBindAddr        = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
-		mlBindPort        = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
-		mlLabels          = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
-		mlSecretKeyPath   = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
-		mlWANConfig       = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
-		myNode            = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
-		myPod             = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
-		port              = flag.Int("port", 7472, "HTTP listening port")
-		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
-		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
-		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
-		frrK8sNamespace   = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
+		namespace           = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
+		_                   = flag.String("host", os.Getenv("METALLB_HOST"), "Deprecated: no longer used (metrics served via controller-runtime SecureServing)")
+		mlBindAddr          = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlBindPort          = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
+		mlLabels            = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
+		mlSecretKeyPath     = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
+		mlWANConfig         = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
+		myNode              = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		myPod               = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
+		port                = flag.Int("port", 9120, "HTTPS metrics listening port")
+		logLevel            = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
+		pprofBindAddress    = flag.String("pprof-bind-address", "", "Bind address for pprof endpoint (e.g. 127.0.0.1:6060). Empty disables pprof.")
+		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		ignoreLBExclude     = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
+		frrK8sNamespace     = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
+		tlsMinVersion       = flag.String("tls-min-version", "", "Minimum TLS version (VersionTLS12 or VersionTLS13). If empty, defaults to VersionTLS13.")
+		tlsCipherSuites     = flag.String("tls-cipher-suites", "", "Comma-separated list of TLS cipher suites. Only applies to TLS 1.2. If empty, uses Go defaults.")
+		tlsCurvePreferences = flag.String("tls-curve-preferences", "", "Comma-separated list of numeric CurveID values (see https://pkg.go.dev/crypto/tls#CurveID). If empty, uses Go defaults.")
+		metricsCertDir      = flag.String("metrics-cert-dir", "", "Directory containing tls.crt and tls.key for metrics TLS. If empty, auto-generated self-signed cert is used.")
 	)
 
 	flag.Parse()
@@ -111,6 +117,12 @@ func main() {
 	}
 
 	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB speaker starting "+version.String())
+
+	tlsOpt, err := tlsconfig.OptFor(*tlsCipherSuites, *tlsCurvePreferences, *tlsMinVersion)
+	if err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to parse TLS flags")
+		os.Exit(1)
+	}
 
 	// Parse BGP debounce timeout from environment variable, CLI or use default (3 seconds).
 	// The debounce timeout throttles how often BGP/FRR configuration reloads are applied, so that
@@ -229,11 +241,12 @@ func main() {
 		PodName:     *myPod,
 		Logger:      logger,
 
-		MetricsHost:   *host,
-		MetricsPort:   *port,
-		EnablePprof:   *enablePprof,
-		ReadEndpoints: true,
-		Namespace:     *namespace,
+		MetricsPort:      *port,
+		PprofBindAddress: *pprofBindAddress,
+		TLSOpt:           tlsOpt,
+		MetricsCertDir:   *metricsCertDir,
+		ReadEndpoints:    true,
+		Namespace:        *namespace,
 
 		Listener: k8s.Listener{
 			ServiceChanged: ctrl.SetBalancer,
