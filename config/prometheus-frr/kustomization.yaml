@@ -1,8 +1,6 @@
 resources:
   - ../frr
   - prometheus-operator.yaml
-patchesStrategicMerge:
-  - rbac-proxy-patch.yaml
 namespace: metallb-system
 
 patchesJson6902:

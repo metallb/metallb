@@ -3,52 +3,45 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	stdlog "log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"go.universe.tf/metallb/frr-tools/metrics/collector"
 	"go.universe.tf/metallb/frr-tools/metrics/liveness"
 	"go.universe.tf/metallb/frr-tools/metrics/vtysh"
 	"go.universe.tf/metallb/internal/logging"
+	"go.universe.tf/metallb/internal/tlsconfig"
 	"go.universe.tf/metallb/internal/version"
 )
 
 var (
-	metricsHost = flag.String("host", os.Getenv("METALLB_HOST"), "metrics HTTP host address")
-	metricsPort = flag.Uint("metrics-port", 7473, "Port to listen on for web interface.")
-	metricsPath = flag.String("metrics-path", "/metrics", "Path under which to expose metrics.")
+	metricsPort         = flag.Uint("metrics-port", 9121, "Port to listen on for web interface.")
+	metricsBindAddress  = flag.String("metrics-bind-address", "0.0.0.0", "The address the metric endpoint binds to.")
+	metricsPath         = flag.String("metrics-path", "/metrics", "Path under which to expose metrics.")
+	tlsCertFile         = flag.String("tls-cert-file", "", "x509 certificate for HTTPS. If empty, a self-signed cert is auto-generated.")
+	tlsKeyFile          = flag.String("tls-private-key-file", "", "x509 private key matching --tls-cert-file.")
+	tlsCipherSuites     = flag.String("tls-cipher-suites", "", "Comma-separated list of TLS cipher suites. If empty, uses Go defaults.")
+	tlsCurvePreferences = flag.String("tls-curve-preferences", "", "Comma-separated list of TLS curve preferences. If empty, uses Go defaults.")
+	tlsMinVersionFlag   = flag.String("tls-min-version", "", "Minimum TLS version (VersionTLS12 or VersionTLS13). If empty, defaults to VersionTLS13.")
 )
-
-func metricsHandler(logger log.Logger) http.Handler {
-	BGPCollector := collector.NewBGP(logger)
-	BFDCollector := collector.NewBFD(logger)
-
-	registry := prometheus.NewRegistry()
-	registry.MustRegister(BGPCollector)
-	registry.MustRegister(BFDCollector)
-
-	gatherers := prometheus.Gatherers{
-		prometheus.DefaultGatherer,
-		registry,
-	}
-
-	handlerOpts := promhttp.HandlerOpts{
-		ErrorLog:      stdlog.New(log.NewStdlibAdapter(level.Error(logger)), "", 0),
-		ErrorHandling: promhttp.ContinueOnError,
-		Registry:      registry,
-	}
-
-	return promhttp.HandlerFor(gatherers, handlerOpts)
-}
 
 func main() {
 	flag.Parse()
@@ -62,18 +55,112 @@ func main() {
 	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "FRR metrics exporter starting "+version.String())
 
 	mux := http.NewServeMux()
-	mux.Handle(*metricsPath, metricsHandler(logger))
+	metricsHandler, err := newMetricsHandler(logger)
+	if err != nil {
+		level.Error(logger).Log("msg", "failed to create metrics handler", "error", err)
+		os.Exit(1)
+	}
+	mux.Handle(*metricsPath, metricsHandler)
 	mux.Handle("/livez", liveness.Handler(vtysh.Run, logger))
-	level.Info(logger).Log("msg", "Starting exporter", "metricsPath", metricsPath, "port", metricsPort)
 
-	srv := &http.Server{
-		Addr:        fmt.Sprintf("%s:%d", *metricsHost, *metricsPort),
-		ReadTimeout: 3 * time.Second,
-		Handler:     mux,
+	tlsCfg, err := tlsConfigFor(*tlsCertFile, *tlsKeyFile, logger)
+	if err != nil {
+		level.Error(logger).Log("msg", "failed to configure TLS", "error", err)
+		os.Exit(1)
 	}
 
-	if err := srv.ListenAndServe(); err != nil {
+	srv := &http.Server{
+		Addr:        fmt.Sprintf("%s:%d", *metricsBindAddress, *metricsPort),
+		ReadTimeout: 3 * time.Second,
+		Handler:     mux,
+		TLSConfig:   tlsCfg,
+	}
+
+	level.Info(logger).Log("msg", "Starting exporter", "metricsPath", *metricsPath, "port", *metricsPort)
+
+	if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 		level.Error(logger).Log("error", err)
 		os.Exit(1)
 	}
+}
+
+func newMetricsHandler(logger log.Logger) (http.Handler, error) {
+	handler := promHandler(logger)
+	filter, err := rbacFilter()
+	if err != nil {
+		return nil, err
+	}
+	return filter(ctrl.Log.WithName("metrics-auth"), handler)
+}
+
+func promHandler(logger log.Logger) http.Handler {
+	BGPCollector := collector.NewBGP(logger)
+	BFDCollector := collector.NewBFD(logger)
+
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(BGPCollector)
+	registry.MustRegister(BFDCollector)
+
+	return promhttp.HandlerFor(
+		prometheus.Gatherers{prometheus.DefaultGatherer, registry},
+		promhttp.HandlerOpts{
+			ErrorLog:      stdlog.New(log.NewStdlibAdapter(level.Error(logger)), "", 0),
+			ErrorHandling: promhttp.ContinueOnError,
+			Registry:      registry,
+		},
+	)
+}
+
+func rbacFilter() (metricsserver.Filter, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("getting in-cluster config: %w", err)
+	}
+	httpClient, err := rest.HTTPClientFor(config)
+	if err != nil {
+		return nil, fmt.Errorf("creating HTTP client: %w", err)
+	}
+	return filters.WithAuthenticationAndAuthorization(config, httpClient)
+}
+
+func tlsConfigFor(certFile, keyFile string, logger log.Logger) (*tls.Config, error) {
+	tlsOpt, err := tlsconfig.TLSOptFor(*tlsCipherSuites, *tlsCurvePreferences, *tlsMinVersionFlag)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := &tls.Config{}
+	tlsOpt(cfg)
+
+	if certFile != "" && keyFile != "" {
+		return tlsConfigWithCertWatcher(cfg, certFile, keyFile, logger)
+	}
+
+	level.Info(logger).Log("msg", "using auto-generated self-signed certificate")
+	return tlsConfigWithSelfSigned(cfg)
+}
+
+func tlsConfigWithSelfSigned(cfg *tls.Config) (*tls.Config, error) {
+	cert, err := tlsconfig.SelfSignedCert()
+	if err != nil {
+		return nil, fmt.Errorf("generating self-signed cert: %w", err)
+	}
+	cfg.Certificates = []tls.Certificate{cert}
+	return cfg, nil
+}
+
+func tlsConfigWithCertWatcher(cfg *tls.Config, certFile, keyFile string, logger log.Logger) (*tls.Config, error) {
+	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+
+	cw, err := certwatcher.New(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("creating cert watcher: %w", err)
+	}
+	go func() {
+		if err := cw.Start(ctx); err != nil {
+			level.Error(logger).Log("msg", "cert watcher failed", "error", err)
+		}
+	}()
+	cfg.GetCertificate = cw.GetCertificate
+	return cfg, nil
 }

@@ -5,6 +5,7 @@ package native
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	bgpmetrics "go.universe.tf/metallb/internal/bgp/metrics"
+	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var labels = []string{"peer"}
@@ -47,10 +48,10 @@ type metrics struct {
 }
 
 func init() {
-	prometheus.MustRegister(stats.sessionUp)
-	prometheus.MustRegister(stats.updatesSent)
-	prometheus.MustRegister(stats.prefixes)
-	prometheus.MustRegister(stats.pendingPrefixes)
+	crmetrics.Registry.MustRegister(stats.sessionUp)
+	crmetrics.Registry.MustRegister(stats.updatesSent)
+	crmetrics.Registry.MustRegister(stats.prefixes)
+	crmetrics.Registry.MustRegister(stats.pendingPrefixes)
 }
 
 func (m *metrics) DeleteSession(addr string) {

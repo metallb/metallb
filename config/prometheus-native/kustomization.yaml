@@ -3,8 +3,6 @@ kind: Kustomization
 resources:
   - ../native
   - prometheus-operator.yaml
-patchesStrategicMerge:
-  - rbac-proxy-patch.yaml
 namespace: metallb-system
 patchesJson6902:
   - target:

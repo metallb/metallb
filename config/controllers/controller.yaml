@@ -14,7 +14,7 @@ spec:
   template:
     metadata:
       annotations:
-        prometheus.io/port: '7472'
+        prometheus.io/port: '9120'
         prometheus.io/scrape: 'true'
       labels:
         app: metallb
@@ -22,9 +22,8 @@ spec:
     spec:
       containers:
       - args:
-        - --port=7472
+        - --port=9120
         - --log-level=info
-        - --tls-min-version=VersionTLS12
         env:
         - name: METALLB_ML_SECRET_NAME
           value: memberlist
@@ -33,15 +32,16 @@ spec:
         image: quay.io/metallb/controller:main
         name: controller
         ports:
-        - containerPort: 7472
-          name: monitoring
+        - containerPort: 9120
+          name: metricshttps
         - containerPort: 9443
           name: webhook-server
           protocol: TCP
         livenessProbe:
           httpGet:
-            path: /metrics
-            port: monitoring
+            path: /healthz
+            port: 17472
+            host: 127.0.0.1
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 1
@@ -49,8 +49,9 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /metrics
-            port: monitoring
+            path: /readyz
+            port: 17472
+            host: 127.0.0.1
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 1

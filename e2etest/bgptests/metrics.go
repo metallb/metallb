@@ -137,7 +137,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					speakerMetrics, err := metrics.ForPod(promPod, metricsPod, metallb.Namespace)
+					speakerMetrics, err := metrics.ForPod(cs, promPod, metricsPod, metallb.Namespace)
 					if err != nil {
 						return err
 					}
@@ -275,7 +275,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 			ginkgo.By("checking the metrics when no service is added")
 			Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(promPod, controllerPod, metallb.Namespace)
+				controllerMetrics, err := metrics.ForPod(cs, promPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -318,7 +318,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					speakerMetrics, err := metrics.ForPod(promPod, metricsPod, metallb.Namespace)
+					speakerMetrics, err := metrics.ForPod(cs, promPod, metricsPod, metallb.Namespace)
 					if err != nil {
 						return err
 					}
@@ -350,7 +350,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 			ginkgo.By("checking the metrics when a service is added")
 			Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(promPod, controllerPod, metallb.Namespace)
+				controllerMetrics, err := metrics.ForPod(cs, promPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -374,12 +374,12 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					bgpMetrics, err := metrics.ForPod(promPod, bgpMetricsPod, metallb.Namespace)
+					bgpMetrics, err := metrics.ForPod(cs, promPod, bgpMetricsPod, metallb.Namespace)
 					if err != nil {
 						return err
 					}
 
-					speakerMetrics, err := metrics.ForPod(promPod, speaker, metallb.Namespace)
+					speakerMetrics, err := metrics.ForPod(cs, promPod, speaker, metallb.Namespace)
 					if err != nil {
 						return err
 					}
@@ -473,7 +473,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					return err
 				}
 
-				speakerMetrics, err := metrics.ForPod(promPod, metricsPod, metallb.Namespace)
+				speakerMetrics, err := metrics.ForPod(cs, promPod, metricsPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -579,7 +579,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					return err
 				}
 
-				speakerMetrics, err := metrics.ForPod(promPod, metricsPod, metallb.Namespace)
+				speakerMetrics, err := metrics.ForPod(cs, promPod, metricsPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -689,7 +689,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		for _, pod := range speakers {
 			ginkgo.By(fmt.Sprintf("checking pod %s", pod.Name))
 			Eventually(func() error {
-				podMetrics, err := metrics.ForPod(promPod, pod, metallb.Namespace)
+				podMetrics, err := metrics.ForPod(cs, promPod, pod, metallb.Namespace)
 				Expect(err).NotTo(HaveOccurred())
 				err = metrics.ValidateGaugeValue(1, "metallb_k8s_client_config_stale_bool", map[string]string{}, podMetrics)
 				if err != nil {
@@ -709,7 +709,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		for _, pod := range allPods {
 			ginkgo.By(fmt.Sprintf("checking pod %s", pod.Name))
 			Eventually(func() error {
-				podMetrics, err := metrics.ForPod(promPod, pod, metallb.Namespace)
+				podMetrics, err := metrics.ForPod(cs, promPod, pod, metallb.Namespace)
 				Expect(err).NotTo(HaveOccurred())
 				err = metrics.ValidateGaugeValue(0, "metallb_k8s_client_config_stale_bool", map[string]string{}, podMetrics)
 				if err != nil {
