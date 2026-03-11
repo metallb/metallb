@@ -2296,7 +2296,7 @@ spec:
   template:
     metadata:
       annotations:
-        prometheus.io/port: "7472"
+        prometheus.io/port: "9120"
         prometheus.io/scrape: "true"
       labels:
         app: metallb
@@ -2304,32 +2304,8 @@ spec:
     spec:
       containers:
       - args:
-        - --secure-listen-address=0.0.0.0:9120
-        - --upstream=http://127.0.0.1:7472/
-        - --logtostderr=true
-        - --v=0
-        image: registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.12.0
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 9120
-          name: metricshttps
-          protocol: TCP
-        resources:
-          limits:
-            cpu: 500m
-            memory: 128Mi
-          requests:
-            cpu: 5m
-            memory: 64Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-      - args:
-        - --port=7472
+        - --port=9120
         - --log-level=info
-        - --tls-min-version=VersionTLS12
         env:
         - name: METALLB_BGP_TYPE
           value: frr
@@ -2341,24 +2317,26 @@ spec:
         livenessProbe:
           failureThreshold: 3
           httpGet:
-            path: /metrics
-            port: monitoring
+            host: 127.0.0.1
+            path: /healthz
+            port: 17472
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
         name: controller
         ports:
-        - containerPort: 7472
-          name: monitoring
+        - containerPort: 9120
+          name: metricshttps
         - containerPort: 9443
           name: webhook-server
           protocol: TCP
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            path: /metrics
-            port: monitoring
+            host: 127.0.0.1
+            path: /readyz
+            port: 17472
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1
@@ -2403,70 +2381,13 @@ spec:
   template:
     metadata:
       annotations:
-        prometheus.io/port: "7472"
+        prometheus.io/port: "9120"
         prometheus.io/scrape: "true"
       labels:
         app: metallb
         component: speaker
     spec:
       containers:
-      - args:
-        - --secure-listen-address=0.0.0.0:9120
-        - --upstream=http://$(METALLB_HOST):7472/
-        - --logtostderr=true
-        - --v=0
-        env:
-        - name: METALLB_HOST
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        image: registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.12.0
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 9120
-          name: metricshttps
-          protocol: TCP
-        resources:
-          limits:
-            cpu: 500m
-            memory: 128Mi
-          requests:
-            cpu: 5m
-            memory: 64Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-      - args:
-        - --secure-listen-address=0.0.0.0:9121
-        - --upstream=http://$(METALLB_HOST):7473/
-        - --logtostderr=true
-        - --v=0
-        env:
-        - name: METALLB_HOST
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        image: registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.12.0
-        name: kube-rbac-proxy-frr
-        ports:
-        - containerPort: 9121
-          name: metricshttps
-          protocol: TCP
-        resources:
-          limits:
-            cpu: 500m
-            memory: 128Mi
-          requests:
-            cpu: 5m
-            memory: 64Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
       - command:
         - /bin/sh
         - -c
@@ -2479,7 +2400,8 @@ spec:
           failureThreshold: 3
           httpGet:
             path: /livez
-            port: 7473
+            port: 9121
+            scheme: HTTPS
           periodSeconds: 5
         name: frr
         securityContext:
@@ -2495,7 +2417,8 @@ spec:
           failureThreshold: 30
           httpGet:
             path: /livez
-            port: 7473
+            port: 9121
+            scheme: HTTPS
           periodSeconds: 5
         volumeMounts:
         - mountPath: /var/run/frr
@@ -2519,7 +2442,8 @@ spec:
         - mountPath: /var/log/frr
           name: frr-log
       - args:
-        - --metrics-port=7473
+        - --metrics-port=9121
+        - --metrics-bind-address=0.0.0.0
         command:
         - /etc/frr_metrics/frr-metrics
         env:
@@ -2528,8 +2452,8 @@ spec:
         image: quay.io/frrouting/frr:10.4.1
         name: frr-metrics
         ports:
-        - containerPort: 7473
-          name: frrmetrics
+        - containerPort: 9121
+          name: frrmetricshttps
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -2541,7 +2465,7 @@ spec:
         - mountPath: /etc/frr_metrics
           name: metrics
       - args:
-        - --port=7472
+        - --port=9120
         - --log-level=info
         env:
         - name: FRR_CONFIG_FILE
@@ -2574,16 +2498,17 @@ spec:
         livenessProbe:
           failureThreshold: 3
           httpGet:
-            path: /metrics
-            port: monitoring
+            host: 127.0.0.1
+            path: /healthz
+            port: 17472
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
         name: speaker
         ports:
-        - containerPort: 7472
-          name: monitoring
+        - containerPort: 9120
+          name: metricshttps
         - containerPort: 7946
           name: memberlist-tcp
         - containerPort: 7946
@@ -2592,8 +2517,9 @@ spec:
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            path: /metrics
-            port: monitoring
+            host: 127.0.0.1
+            path: /readyz
+            port: 17472
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1

@@ -14,6 +14,20 @@ rbac:
   # create specifies whether to install and use RBAC rules.
   create: true
 
+tls:
+  # TLS cipher suites (comma-separated). Only valid with TLS 1.2.
+  # Empty = Go defaults.
+  cipherSuites: ""
+  # TLS curve preferences (comma-separated). Supported: x25519, secp256r1, secp384r1,
+  # secp521r1, X25519MLKEM768, CurveP256, CurveP384, CurveP521, X25519.
+  # Empty = Go defaults (includes X25519MLKEM768 in Go 1.25+).
+  curvePreferences: ""
+  # Minimum TLS version. Empty = TLS 1.3. Set to "VersionTLS12" for TLS 1.2.
+  minVersion: ""
+  # Secret name containing tls.crt and tls.key for metrics endpoints.
+  # If empty, self-signed certificates are auto-generated.
+  metricsTLSSecret: ""
+
 prometheus:
   # scrape annotations specifies whether to add Prometheus metric
   # auto-collection annotations to pods. See
@@ -25,22 +39,9 @@ prometheus:
   # can be left at false.
   scrapeAnnotations: false
 
-  # port both controller and speaker will listen on for metrics
-  metricsPort: 7472
-
-  # if set, enables rbac proxy on the controller and speaker to expose
-  # the metrics via tls.
-  # secureMetricsPort: 9120
-
-  # the name of the secret to be mounted in the speaker pod
-  # to expose the metrics securely. If not present, a self signed
-  # certificate to be used.
-  speakerMetricsTLSSecret: ""
-
-  # the name of the secret to be mounted in the controller pod
-  # to expose the metrics securely. If not present, a self signed
-  # certificate to be used.
-  controllerMetricsTLSSecret: ""
+  # port both controller and speaker will listen on for metrics (always HTTPS).
+  # Matches the port kube-rbac-proxy previously served on.
+  metricsPort: 9120
 
   # prometheus doesn't have the permission to scrape all namespaces so we give it permission to scrape metallb's one
   rbacPrometheus: true
@@ -52,12 +53,6 @@ prometheus:
   # the namespace where prometheus is deployed
   # required when " .Values.prometheus.rbacPrometheus == true " and " .Values.prometheus.podMonitor.enabled=true or prometheus.serviceMonitor.enabled=true "
   namespace: ""
-
-  # the image to be used for the kuberbacproxy container
-  rbacProxy:
-    repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
-    tag: v0.12.0
-    pullPolicy:
 
   # Prometheus Operator PodMonitors
   podMonitor:
@@ -252,8 +247,6 @@ controller:
     periodSeconds: 10
     successThreshold: 1
     timeoutSeconds: 1
-  tlsMinVersion: "VersionTLS12"
-  tlsCipherSuites: ""
 
   extraContainers: []
 
@@ -340,13 +333,8 @@ speaker:
       repository: quay.io/frrouting/frr
       tag: 10.4.1
       pullPolicy:
-    metricsPort: 7473
+    metricsPort: 9121
     resources: {}
-
-    # if set, enables a rbac proxy sidecar container on the speaker to
-    # expose the frr metrics via tls.
-    # secureMetricsPort: 9121
-
 
   reloader:
     resources: {}

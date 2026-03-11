@@ -2100,7 +2100,7 @@ spec:
   template:
     metadata:
       annotations:
-        prometheus.io/port: "7472"
+        prometheus.io/port: "9120"
         prometheus.io/scrape: "true"
       labels:
         app: metallb
@@ -2108,9 +2108,8 @@ spec:
     spec:
       containers:
       - args:
-        - --port=7472
+        - --port=9120
         - --log-level=info
-        - --tls-min-version=VersionTLS12
         env:
         - name: METALLB_ML_SECRET_NAME
           value: memberlist
@@ -2120,24 +2119,26 @@ spec:
         livenessProbe:
           failureThreshold: 3
           httpGet:
-            path: /metrics
-            port: monitoring
+            host: 127.0.0.1
+            path: /healthz
+            port: 17472
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
         name: controller
         ports:
-        - containerPort: 7472
-          name: monitoring
+        - containerPort: 9120
+          name: metricshttps
         - containerPort: 9443
           name: webhook-server
           protocol: TCP
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            path: /metrics
-            port: monitoring
+            host: 127.0.0.1
+            path: /readyz
+            port: 17472
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1
@@ -2182,7 +2183,7 @@ spec:
   template:
     metadata:
       annotations:
-        prometheus.io/port: "7472"
+        prometheus.io/port: "9120"
         prometheus.io/scrape: "true"
       labels:
         app: metallb
@@ -2190,7 +2191,7 @@ spec:
     spec:
       containers:
       - args:
-        - --port=7472
+        - --port=9120
         - --log-level=info
         env:
         - name: METALLB_NODE_NAME
@@ -2217,16 +2218,17 @@ spec:
         livenessProbe:
           failureThreshold: 3
           httpGet:
-            path: /metrics
-            port: monitoring
+            host: 127.0.0.1
+            path: /healthz
+            port: 17472
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
         name: speaker
         ports:
-        - containerPort: 7472
-          name: monitoring
+        - containerPort: 9120
+          name: metricshttps
         - containerPort: 7946
           name: memberlist-tcp
         - containerPort: 7946
@@ -2235,8 +2237,9 @@ spec:
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            path: /metrics
-            port: monitoring
+            host: 127.0.0.1
+            path: /readyz
+            port: 17472
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1
