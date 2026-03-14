@@ -1987,3 +1987,97 @@ func TestIPAdvertisementFor(t *testing.T) {
 		})
 	}
 }
+
+func TestSetConfigGratuitousARPInterval(t *testing.T) {
+	fakeSL := &fakeSpeakerList{
+		speakers: map[string]bool{
+			"iris1": true,
+		},
+	}
+
+	tests := []struct {
+		desc             string
+		config           *config.Config
+		l2Advertisements []*config.L2Advertisement
+	}{
+		{
+			desc:   "No L2 advertisements — interval stays zero",
+			config: &config.Config{Pools: &config.Pools{ByName: map[string]*config.Pool{}}},
+		},
+		{
+			desc: "Single advertisement with gratuitous ARP interval",
+			config: &config.Config{Pools: &config.Pools{ByName: map[string]*config.Pool{
+				"pool1": {
+					CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+					L2Advertisements: []*config.L2Advertisement{
+						{
+							Nodes:                 map[string]bool{"iris1": true},
+							GratuitousARPInterval: 5,
+						},
+					},
+				},
+			}}},
+		},
+		{
+			desc: "Multiple advertisements — minimum interval is selected",
+			config: &config.Config{Pools: &config.Pools{ByName: map[string]*config.Pool{
+				"pool1": {
+					CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+					L2Advertisements: []*config.L2Advertisement{
+						{
+							Nodes:                 map[string]bool{"iris1": true},
+							GratuitousARPInterval: 10,
+						},
+						{
+							Nodes:                 map[string]bool{"iris1": true},
+							GratuitousARPInterval: 3,
+						},
+					},
+				},
+			}}},
+		},
+		{
+			desc: "Mixed zero and non-zero intervals — zero is ignored",
+			config: &config.Config{Pools: &config.Pools{ByName: map[string]*config.Pool{
+				"pool1": {
+					CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+					L2Advertisements: []*config.L2Advertisement{
+						{
+							Nodes:                 map[string]bool{"iris1": true},
+							GratuitousARPInterval: 0,
+						},
+						{
+							Nodes:                 map[string]bool{"iris1": true},
+							GratuitousARPInterval: 7,
+						},
+					},
+				},
+			}}},
+		},
+		{
+			desc:   "Nil config — disables interval",
+			config: nil,
+		},
+	}
+
+	l := log.NewNopLogger()
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			c, err := newController(controllerConfig{
+				MyNode:  "iris1",
+				Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+				SList:   fakeSL,
+				bgpType: bgpNative,
+			})
+			if err != nil {
+				t.Fatalf("creating controller: %s", err)
+			}
+			c.client = &testK8S{t: t}
+
+			result := c.SetConfig(l, test.config)
+			if result == controllers.SyncStateError {
+				t.Errorf("SetConfig returned error for %q", test.desc)
+			}
+		})
+	}
+}
