@@ -31,10 +31,9 @@ type Announce struct {
 	spamCh        chan IPAdvertisement
 	excludeRegexp *regexp.Regexp
 
-	// gratuitousARPInterval is the interval for periodic gratuitous ARP/NDP announcements.
+	// garpIntervalCh delivers interval updates to the periodicGARPLoop goroutine.
 	// 0 means disabled (only failover announcements are sent).
-	gratuitousARPInterval time.Duration
-	garpIntervalCh        chan time.Duration
+	garpIntervalCh chan time.Duration
 }
 
 // New returns an initialized Announce.
@@ -210,15 +209,7 @@ func (a *Announce) doSpam(adv IPAdvertisement) {
 // SetGratuitousARPInterval configures the interval for periodic gratuitous ARP/NDP announcements.
 // A zero duration disables periodic announcements.
 func (a *Announce) SetGratuitousARPInterval(interval time.Duration) {
-	a.Lock()
-	a.gratuitousARPInterval = interval
-	a.Unlock()
-
-	// Non-blocking send to notify the periodic loop.
-	select {
-	case a.garpIntervalCh <- interval:
-	default:
-	}
+	a.garpIntervalCh <- interval
 }
 
 func (a *Announce) periodicGARPLoop() {
