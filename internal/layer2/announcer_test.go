@@ -72,11 +72,13 @@ func newTestAnnounce() *Announce {
 		ipRefcnt:       map[string]int{},
 		spamCh:         make(chan IPAdvertisement, 1024),
 		garpIntervalCh: make(chan time.Duration, 1),
+		stopGARPCh:     make(chan struct{}),
 	}
 }
 
 func Test_SetGratuitousARPInterval_EnablesPeriodicLoop(t *testing.T) {
 	announce := newTestAnnounce()
+	defer close(announce.stopGARPCh)
 	go announce.periodicGARPLoop()
 
 	// Register an IP so sendPeriodicGratuitous has something to iterate.
@@ -100,6 +102,7 @@ func Test_SetGratuitousARPInterval_EnablesPeriodicLoop(t *testing.T) {
 
 func Test_SetGratuitousARPInterval_ZeroDisables(t *testing.T) {
 	announce := newTestAnnounce()
+	defer close(announce.stopGARPCh)
 	go announce.periodicGARPLoop()
 
 	// Set interval to 0 — should not panic or block.

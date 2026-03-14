@@ -34,6 +34,10 @@ type Announce struct {
 	// garpIntervalCh delivers interval updates to the periodicGARPLoop goroutine.
 	// 0 means disabled (only failover announcements are sent).
 	garpIntervalCh chan time.Duration
+
+	// stopGARPCh signals periodicGARPLoop to exit. Closing this channel
+	// terminates the goroutine, preventing leaks in tests.
+	stopGARPCh chan struct{}
 }
 
 // New returns an initialized Announce.
@@ -48,6 +52,7 @@ func New(l log.Logger, excludeRegexp *regexp.Regexp) (*Announce, error) {
 		spamCh:         make(chan IPAdvertisement, 1024),
 		excludeRegexp:  excludeRegexp,
 		garpIntervalCh: make(chan time.Duration, 1),
+		stopGARPCh:     make(chan struct{}),
 	}
 
 	go ret.interfaceScan()
@@ -217,6 +222,9 @@ func (a *Announce) periodicGARPLoop() {
 	ticker.Stop()
 	for {
 		select {
+		case <-a.stopGARPCh:
+			ticker.Stop()
+			return
 		case interval := <-a.garpIntervalCh:
 			ticker.Stop()
 			if interval > 0 {
