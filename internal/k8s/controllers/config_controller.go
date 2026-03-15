@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -215,6 +216,8 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Secret{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.ConfigMap{}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.ConfigurationState{}, &handler.EnqueueRequestForObject{},
+			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName))).
 		WithEventFilter(p).
 		Complete(r)
 }
@@ -280,7 +283,7 @@ func (r *ConfigReconciler) reportCondition(ctx context.Context, conditionErr err
 	}
 
 	condition := metav1.Condition{
-		Type:    "configReconcilerValid",
+		Type:    ConditionTypeConfigReconcilerValid,
 		Status:  metav1.ConditionTrue,
 		Reason:  ErrorTypeNone,
 		Message: "",

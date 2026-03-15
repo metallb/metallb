@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -139,6 +140,8 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&metallbv1beta1.IPAddressPool{}).
 		Watches(&metallbv1beta1.Community{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.ConfigurationState{}, &handler.EnqueueRequestForObject{},
+			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName))).
 		WithEventFilter(p).
 		Complete(r)
 }
@@ -163,7 +166,7 @@ func (r *PoolReconciler) reportCondition(ctx context.Context, conditionErr error
 	}
 
 	condition := metav1.Condition{
-		Type:    "poolReconcilerValid",
+		Type:    ConditionTypePoolReconcilerValid,
 		Status:  metav1.ConditionTrue,
 		Reason:  ErrorTypeNone,
 		Message: "",

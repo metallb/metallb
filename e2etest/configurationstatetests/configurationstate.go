@@ -189,6 +189,25 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		}, 60*time.Second, 5*time.Second).Should(Succeed())
 	})
 
+	ginkgo.It("should self-heal after deletion", func() {
+		stateName := "speaker-" + allNodes.Items[0].Name
+
+		ginkgo.By("Deleting the ConfigurationState resource")
+		toDelete := &metallbv1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      stateName,
+				Namespace: metallb.Namespace,
+			},
+		}
+		err := ConfigUpdater.Client().Delete(context.Background(), toDelete)
+		Expect(err).NotTo(HaveOccurred())
+
+		ginkgo.By("Verifying the ConfigurationState is recreated and returns to valid")
+		Eventually(func() error {
+			return stateMatches(stateName, validStatus)
+		}, 60*time.Second, 5*time.Second).Should(Succeed())
+	})
+
 })
 
 func allStatesExist(allNodes *corev1.NodeList) error {
@@ -236,6 +255,29 @@ func allStatesExist(allNodes *corev1.NodeList) error {
 	}
 	if diff := cmp.Diff(want, got.Items, opts...); diff != "" {
 		return fmt.Errorf("ConfigurationState list mismatch (-want +got):\n%s", diff)
+	}
+
+	componentFieldOwners := map[string]string{
+		"controller": "poolReconciler",
+		"speaker":    "configReconciler",
+	}
+	for _, item := range got.Items {
+		componentType := item.Labels["metallb.io/component-type"]
+		wantManager, ok := componentFieldOwners[componentType]
+		if !ok {
+			return fmt.Errorf("ConfigurationState %q has unknown component-type label %q", item.Name, componentType)
+		}
+
+		found := false
+		for _, mf := range item.ManagedFields {
+			if mf.Subresource == "status" && mf.Manager == wantManager {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("ConfigurationState %q (component=%s) missing SSA field owner %q in status managed fields", item.Name, componentType, wantManager)
+		}
 	}
 
 	return nil

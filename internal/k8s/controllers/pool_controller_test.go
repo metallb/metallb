@@ -48,7 +48,7 @@ func TestPoolController(t *testing.T) {
 			expectForceReloadCalled: false,
 			wantConditions: []v1.Condition{
 				{
-					Type:   "poolReconcilerValid",
+					Type:   ConditionTypePoolReconcilerValid,
 					Status: v1.ConditionTrue,
 					Reason: ErrorTypeNone,
 				},
@@ -62,7 +62,7 @@ func TestPoolController(t *testing.T) {
 			expectForceReloadCalled: false,
 			wantConditions: []v1.Condition{
 				{
-					Type:    "poolReconcilerValid",
+					Type:    ConditionTypePoolReconcilerValid,
 					Status:  v1.ConditionFalse,
 					Reason:  ErrorTypeConfiguration,
 					Message: "configuration error: general handler sync state error",
@@ -77,7 +77,7 @@ func TestPoolController(t *testing.T) {
 			expectForceReloadCalled: false,
 			wantConditions: []v1.Condition{
 				{
-					Type:    "poolReconcilerValid",
+					Type:    ConditionTypePoolReconcilerValid,
 					Status:  v1.ConditionFalse,
 					Reason:  ErrorTypeConfiguration,
 					Message: "configuration error: general handler sync state error",
@@ -92,7 +92,7 @@ func TestPoolController(t *testing.T) {
 			expectForceReloadCalled: true,
 			wantConditions: []v1.Condition{
 				{
-					Type:    "poolReconcilerValid",
+					Type:    ConditionTypePoolReconcilerValid,
 					Status:  v1.ConditionTrue,
 					Reason:  ErrorTypeNone,
 					Message: "",
@@ -107,7 +107,7 @@ func TestPoolController(t *testing.T) {
 			expectForceReloadCalled: false,
 			wantConditions: []v1.Condition{
 				{
-					Type:    "poolReconcilerValid",
+					Type:    ConditionTypePoolReconcilerValid,
 					Status:  v1.ConditionFalse,
 					Reason:  ErrorTypeConfiguration,
 					Message: "configuration error: parsing address pool pool1: pool has no prefixes defined",
