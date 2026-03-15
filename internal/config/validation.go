@@ -10,6 +10,7 @@ import (
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/ipfamily"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -145,29 +146,39 @@ func DontValidate(c ClusterResources) error {
 // DiscardNativeOnly returns an error if the current configFile contains
 // any options that are available only in the native implementation.
 func DiscardNativeOnly(c ClusterResources) error {
-	if len(c.Peers) > 1 {
-		peerAddr := make(map[string]bool)
-		routerID := c.Peers[0].Spec.RouterID
-		peer0 := peerIdentifier(c.Peers[0].Spec)
-		peerAddr[peer0] = true
-		for _, p := range c.Peers[1:] {
-			if p.Spec.RouterID != routerID {
-				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
-			}
-			peerID := peerIdentifier(p.Spec)
-			if _, ok := peerAddr[peerID]; ok {
-				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", p.Spec.Address)
-			}
-			peerAddr[peerID] = true
+	// Multiple peers with the same address+VRF are allowed when their
+	// nodeSelectors are disjoint – each FRR instance only sees peers for its node.
+	peerAddr := make(map[string][]metallbv1beta2.BGPPeer)
+	// vrf2asn tracks the first-seen MyASN per VRF to enforce uniformity in O(n).
+	vrf2asn := make(map[string]struct {
+		asn    uint32
+		peerID string
+	})
+	for i, p := range c.Peers {
+		if i > 0 && p.Spec.RouterID != c.Peers[0].Spec.RouterID {
+			return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
 		}
-	}
-	for _, p := range c.Peers {
-		for _, p1 := range c.Peers[1:] {
-			if p.Spec.MyASN != p1.Spec.MyASN &&
-				p.Spec.VRFName == p1.Spec.VRFName {
-				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal for the same VRF", p.Spec.Address, p1.Spec.Address)
+		peerID := PeerIdentifier(p.Spec)
+		if entry, ok := vrf2asn[p.Spec.VRFName]; ok {
+			if entry.asn != p.Spec.MyASN {
+				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal for the same VRF", peerID, entry.peerID)
+			}
+		} else {
+			vrf2asn[p.Spec.VRFName] = struct {
+				asn    uint32
+				peerID string
+			}{p.Spec.MyASN, peerID}
+		}
+		for _, existing := range peerAddr[peerID] {
+			shares, err := peersShareNode(existing, p, c.Nodes)
+			if err != nil {
+				return fmt.Errorf("peer %s has invalid nodeSelector: %w", peerID, err)
+			}
+			if shares {
+				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", peerID)
 			}
 		}
+		peerAddr[peerID] = append(peerAddr[peerID], p)
 	}
 	return nil
 }
@@ -218,12 +229,72 @@ func hasBFDEcho(peer *Peer, bfdProfiles map[string]*BFDProfile) bool {
 	return false
 }
 
-func peerIdentifier(peer metallbv1beta2.BGPPeerSpec) string {
+// PeerIdentifier returns a stable string key for a peer: "address-vrf" or
+// "interface-vrf" for interface-based peers.
+func PeerIdentifier(peer metallbv1beta2.BGPPeerSpec) string {
 	id := peer.Address
 	if peer.Address == "" {
 		id = peer.Interface
 	}
+	if peer.VRFName == "" {
+		return id
+	}
 	return fmt.Sprintf("%s-%s", id, peer.VRFName)
+}
+
+// peersShareNode returns true if any node matches both peers' nodeSelectors,
+// meaning they would be configured on the same FRR instance.
+// Conservatively returns true when no nodes are known.
+func peersShareNode(p1, p2 metallbv1beta2.BGPPeer, nodes []corev1.Node) (bool, error) {
+	if len(nodes) == 0 {
+		return true, nil
+	}
+	compiled1, err := compileNodeSelectors(p1.Spec.NodeSelectors)
+	if err != nil {
+		return false, err
+	}
+	compiled2, err := compileNodeSelectors(p2.Spec.NodeSelectors)
+	if err != nil {
+		return false, err
+	}
+	for _, node := range nodes {
+		nodeLabels := labels.Set(node.Labels)
+		if compiled1.matches(nodeLabels) && compiled2.matches(nodeLabels) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// compiledNodeSelectors holds pre-parsed label selectors for a peer.
+// A nil value means "match all nodes" (empty selector list in the spec).
+type compiledNodeSelectors []labels.Selector
+
+func compileNodeSelectors(selectors []metav1.LabelSelector) (compiledNodeSelectors, error) {
+	if len(selectors) == 0 {
+		return nil, nil // nil == match all
+	}
+	compiled := make(compiledNodeSelectors, 0, len(selectors))
+	for i := range selectors {
+		sel, err := metav1.LabelSelectorAsSelector(&selectors[i])
+		if err != nil {
+			return nil, err
+		}
+		compiled = append(compiled, sel)
+	}
+	return compiled, nil
+}
+
+func (c compiledNodeSelectors) matches(nodeLabels labels.Labels) bool {
+	if c == nil {
+		return true // no selector = match all nodes
+	}
+	for _, sel := range c {
+		if sel.Matches(nodeLabels) {
+			return true
+		}
+	}
+	return false
 }
 
 type poolSelector struct {
