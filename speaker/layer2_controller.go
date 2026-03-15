@@ -20,6 +20,7 @@ import (
 	"maps"
 	"net"
 	"sort"
+	"time"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -44,7 +45,25 @@ type layer2Controller struct {
 	onStatusChange  func(types.NamespacedName)
 }
 
-func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
+func (c *layer2Controller) SetConfig(_ log.Logger, cfg *config.Config) error {
+	if cfg == nil || cfg.Pools == nil {
+		c.announcer.SetGratuitousARPInterval(0)
+		return nil
+	}
+
+	// Find the minimum non-zero gratuitous ARP interval across all L2 advertisements.
+	var minInterval uint32
+	for _, pool := range cfg.Pools.ByName {
+		for _, l2Adv := range pool.L2Advertisements {
+			if l2Adv.GratuitousARPInterval > 0 {
+				if minInterval == 0 || l2Adv.GratuitousARPInterval < minInterval {
+					minInterval = l2Adv.GratuitousARPInterval
+				}
+			}
+		}
+	}
+
+	c.announcer.SetGratuitousARPInterval(time.Duration(minInterval) * time.Second)
 	return nil
 }
 

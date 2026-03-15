@@ -55,6 +55,16 @@ spec:
           spec:
             description: L2AdvertisementSpec defines the desired state of L2Advertisement.
             properties:
+              gratuitousARPInterval:
+                description: |-
+                  GratuitousARPInterval specifies the interval in seconds between periodic gratuitous ARP
+                  announcements for allocated IPs. This helps prevent traffic blackholes caused by switch
+                  FDB entry aging when the FDB aging time is shorter than the gateway ARP timeout.
+                  When set to 0 or not specified, periodic gratuitous ARP is disabled (only failover
+                  announcements are sent).
+                format: int32
+                minimum: 0
+                type: integer
               interfaces:
                 description: |-
                   A list of interfaces to announce from. The LB IP will be announced only from these interfaces.

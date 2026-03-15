@@ -214,6 +214,9 @@ type L2Advertisement struct {
 	AllInterfaces bool
 	// Sorted list of service selectors to select services for which advertisement is applied.
 	ServiceSelectors []labels.Selector
+	// GratuitousARPInterval is the interval in seconds between periodic gratuitous ARP announcements.
+	// 0 means disabled.
+	GratuitousARPInterval uint32
 }
 
 // BFDProfile describes a BFD profile to be applied to a set of peers.
@@ -755,10 +758,15 @@ func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.
 	if err != nil {
 		return nil, errors.Join(err, fmt.Errorf("failed to parse service selector for %s", crdAd.Name))
 	}
+	var garpInterval uint32
+	if crdAd.Spec.GratuitousARPInterval != nil {
+		garpInterval = *crdAd.Spec.GratuitousARPInterval
+	}
 	l2 := &L2Advertisement{
-		Nodes:            selected,
-		Interfaces:       crdAd.Spec.Interfaces,
-		ServiceSelectors: serviceSelectors,
+		Nodes:                 selected,
+		Interfaces:            crdAd.Spec.Interfaces,
+		ServiceSelectors:      serviceSelectors,
+		GratuitousARPInterval: garpInterval,
 	}
 	if len(crdAd.Spec.Interfaces) == 0 {
 		l2.AllInterfaces = true

@@ -30,6 +30,14 @@ type Announce struct {
 	// to avoid deadlocking.
 	spamCh        chan IPAdvertisement
 	excludeRegexp *regexp.Regexp
+
+	// garpIntervalCh delivers interval updates to the periodicGARPLoop goroutine.
+	// 0 means disabled (only failover announcements are sent).
+	garpIntervalCh chan time.Duration
+
+	// stopGARPCh signals periodicGARPLoop to exit. Closing this channel
+	// terminates the goroutine, preventing leaks in tests.
+	stopGARPCh chan struct{}
 }
 
 // New returns an initialized Announce.
@@ -43,10 +51,13 @@ func New(l log.Logger, excludeRegexp *regexp.Regexp) (*Announce, error) {
 		ipRefcnt:       map[string]int{},
 		spamCh:         make(chan IPAdvertisement, 1024),
 		excludeRegexp:  excludeRegexp,
+		garpIntervalCh: make(chan time.Duration, 1),
+		stopGARPCh:     make(chan struct{}),
 	}
 
 	go ret.interfaceScan()
 	go ret.spamLoop()
+	go ret.periodicGARPLoop()
 
 	return ret, nil
 }
@@ -198,6 +209,56 @@ func (a *Announce) spamLoop() {
 
 func (a *Announce) doSpam(adv IPAdvertisement) {
 	a.spamCh <- adv
+}
+
+// SetGratuitousARPInterval configures the interval for periodic gratuitous ARP/NDP announcements.
+// A zero duration disables periodic announcements.
+func (a *Announce) SetGratuitousARPInterval(interval time.Duration) {
+	a.garpIntervalCh <- interval
+}
+
+func (a *Announce) periodicGARPLoop() {
+	ticker := time.NewTicker(time.Hour)
+	ticker.Stop()
+	for {
+		select {
+		case <-a.stopGARPCh:
+			ticker.Stop()
+			return
+		case interval := <-a.garpIntervalCh:
+			ticker.Stop()
+			if interval > 0 {
+				ticker.Reset(interval)
+				level.Info(a.logger).Log("op", "periodicGARP", "msg", "periodic gratuitous ARP enabled", "interval", interval)
+			} else {
+				level.Info(a.logger).Log("op", "periodicGARP", "msg", "periodic gratuitous ARP disabled")
+			}
+		case <-ticker.C:
+			a.sendPeriodicGratuitous()
+		}
+	}
+}
+
+func (a *Announce) sendPeriodicGratuitous() {
+	a.RLock()
+	// Collect unique advertisements to announce.
+	seen := map[string]bool{}
+	var advs []IPAdvertisement
+	for _, ipAdvs := range a.ips {
+		for _, adv := range ipAdvs {
+			ipStr := adv.ip.String()
+			if seen[ipStr] {
+				continue
+			}
+			seen[ipStr] = true
+			advs = append(advs, adv)
+		}
+	}
+	a.RUnlock()
+
+	for _, adv := range advs {
+		a.gratuitous(adv)
+	}
 }
 
 func (a *Announce) gratuitous(adv IPAdvertisement) {
