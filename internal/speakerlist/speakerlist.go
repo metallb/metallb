@@ -14,7 +14,9 @@ package speakerlist
 
 import (
 	"crypto/sha256"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,7 +53,7 @@ type SpeakerList struct {
 }
 
 // New creates a new SpeakerList and returns a pointer to it.
-func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, labels string, WANNetwork bool, stopCh chan struct{}) (*SpeakerList, error) {
+func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, labels string, WANNetwork bool, CustomConfig bool, stopCh chan struct{}) (*SpeakerList, error) {
 	sl := SpeakerList{
 		l:         logger,
 		stopCh:    stopCh,
@@ -69,6 +71,10 @@ func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, lab
 	mconfig := memberlist.DefaultLANConfig()
 	if WANNetwork {
 		mconfig = memberlist.DefaultWANConfig()
+	}
+
+	if CustomConfig {
+		ApplyEnvOverrides(mconfig, "MEMBERLIST_")
 	}
 
 	// mconfig.Name MUST be equal to the spec.nodeName field of the speaker pod as we match it
@@ -334,4 +340,104 @@ func (sl *SpeakerList) memberlistWatchEvents() {
 			return
 		}
 	}
+}
+
+// Helper for custom config.
+
+// ApplyEnvOverrides mutates cfg based on env vars with the given prefix ("MEMBERLIST_").
+// Only overrides fields if the env var is set and valid.
+// Example env vars:
+//   MEMBERLIST_TCP_TIMEOUT="5s"
+//   MEMBERLIST_GOSSIP_INTERVAL="150ms"
+func ApplyEnvOverrides(cfg *memberlist.Config, prefix string) {
+	// Ints
+	envInt(&cfg.IndirectChecks, prefix, "INDIRECT_CHECKS", 0, 1_000_000)
+	envInt(&cfg.RetransmitMult, prefix, "RETRANSMIT_MULT", 0, 1_000_000)
+	envInt(&cfg.SuspicionMult, prefix, "SUSPICION_MULT", 0, 1_000_000)
+	envInt(&cfg.SuspicionMaxTimeoutMult, prefix, "SUSPICION_MAX_TIMEOUT_MULT", 0, 1_000_000)
+	envInt(&cfg.GossipNodes, prefix, "GOSSIP_NODES", 0, 1_000_000)
+	envInt(&cfg.AwarenessMaxMultiplier, prefix, "AWARENESS_MAX_MULTIPLIER", 0, 1_000_000)
+	envInt(&cfg.HandoffQueueDepth, prefix, "HANDOFF_QUEUE_DEPTH", 0, 10_000_000)
+	envInt(&cfg.UDPBufferSize, prefix, "UDP_BUFFER_SIZE", 0, 10_000_000)
+
+	// Durations
+	envDuration(&cfg.TCPTimeout, prefix, "TCP_TIMEOUT", 0, 24*time.Hour)
+	envDuration(&cfg.PushPullInterval, prefix, "PUSH_PULL_INTERVAL", 0, 24*time.Hour)
+	envDuration(&cfg.ProbeTimeout, prefix, "PROBE_TIMEOUT", 0, 24*time.Hour)
+	envDuration(&cfg.ProbeInterval, prefix, "PROBE_INTERVAL", 0, 24*time.Hour)
+	envDuration(&cfg.GossipInterval, prefix, "GOSSIP_INTERVAL", 0, 24*time.Hour)
+	envDuration(&cfg.GossipToTheDeadTime, prefix, "GOSSIP_TO_THE_DEAD_TIME", 0, 24*time.Hour)
+	envDuration(&cfg.QueueCheckInterval, prefix, "QUEUE_CHECK_INTERVAL", 0, 24*time.Hour)
+
+	// Bools
+	envBool(&cfg.GossipVerifyIncoming, prefix, "GOSSIP_VERIFY_INCOMING")
+	envBool(&cfg.GossipVerifyOutgoing, prefix, "GOSSIP_VERIFY_OUTGOING")
+	envBool(&cfg.DisableTcpPings, prefix, "DISABLE_TCP_PINGS")
+	envBool(&cfg.EnableCompression, prefix, "ENABLE_COMPRESSION")
+}
+
+func env(prefix, key string) (string, bool) {
+	k := prefix + strings.ToUpper(key)
+	v, ok := os.LookupEnv(k)
+	return strings.TrimSpace(v), ok
+}
+
+func envInt(dst *int, prefix, key string, min, max int) {
+	val, ok := env(prefix, key)
+	if ok {
+		overrideInt(dst, val, ok, min, max)
+	}
+}
+
+func envDuration(dst *time.Duration, prefix, key string, min, max time.Duration) {
+	val, ok := env(prefix, key)
+	if ok {
+		overrideDuration(dst, val, ok, min, max)
+	}
+}
+
+func envBool(dst *bool, prefix, key string) {
+	val, ok := env(prefix, key)
+	if ok {
+		overrideBool(dst, val, ok)
+	}
+}
+
+func overrideInt(dst *int, val string, ok bool, min, max int) {
+	if !ok {
+		return
+	}
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return
+	}
+	if i < min || i > max {
+		return
+	}
+	*dst = i
+}
+
+func overrideBool(dst *bool, val string, ok bool) {
+	if !ok {
+		return
+	}
+	b, err := strconv.ParseBool(val)
+	if err != nil {
+		return
+	}
+	*dst = b
+}
+
+func overrideDuration(dst *time.Duration, val string, ok bool, min, max time.Duration) {
+	if !ok {
+		return
+	}
+	d, err := time.ParseDuration(val)
+	if err != nil {
+		return
+	}
+	if d < min || d > max {
+		return
+	}
+	*dst = d
 }
