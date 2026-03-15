@@ -1205,15 +1205,17 @@ func TestNodeSelectors(t *testing.T) {
 	}
 
 	tests := []struct {
-		desc            string
-		config          *config.Config
-		node            *v1.Node
-		wantAds         map[string][]*bgp.Advertisement
-		wantReturnState controllers.SyncState
+		desc                     string
+		config                   *config.Config
+		node                     *v1.Node
+		wantAds                  map[string][]*bgp.Advertisement
+		setConfigWantReturnState controllers.SyncState
+		setNodeWantReturnState   controllers.SyncState
 	}{
 		{
-			desc:    "No config, no advertisements",
-			wantAds: map[string][]*bgp.Advertisement{},
+			desc:                     "No config, no advertisements",
+			wantAds:                  map[string][]*bgp.Advertisement{},
+			setConfigWantReturnState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -1230,6 +1232,28 @@ func TestNodeSelectors(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": nil,
 			},
+			setConfigWantReturnState: controllers.SyncStateReprocessAll,
+		},
+
+		{
+			desc: "Duplicate peer, default node selector",
+			config: &config.Config{
+				Peers: map[string]*config.Peer{
+					"peer1": {
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					"peer2": {
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: &config.Pools{ByName: pools},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4": nil, // It matches one peer, so we still advertise it.
+			},
+			setConfigWantReturnState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -1252,6 +1276,7 @@ func TestNodeSelectors(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": nil,
 			},
+			setConfigWantReturnState: controllers.SyncStateReprocessAll,
 		},
 
 		{
@@ -1268,6 +1293,8 @@ func TestNodeSelectors(t *testing.T) {
 				"1.2.3.4": nil,
 				"2.3.4.5": nil,
 			},
+			setConfigWantReturnState: controllers.SyncStateReprocessAll,
+			setNodeWantReturnState:   controllers.SyncStateSuccess,
 		},
 
 		{
@@ -1283,6 +1310,8 @@ func TestNodeSelectors(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": nil,
 			},
+			setConfigWantReturnState: controllers.SyncStateReprocessAll,
+			setNodeWantReturnState:   controllers.SyncStateSuccess,
 		},
 
 		{
@@ -1306,6 +1335,8 @@ func TestNodeSelectors(t *testing.T) {
 				"1.2.3.4": nil,
 				"2.3.4.5": nil,
 			},
+			setConfigWantReturnState: controllers.SyncStateReprocessAll,
+			setNodeWantReturnState:   controllers.SyncStateSuccess,
 		},
 
 		{
@@ -1322,6 +1353,8 @@ func TestNodeSelectors(t *testing.T) {
 				"1.2.3.4": nil,
 				"2.3.4.5": nil,
 			},
+			setConfigWantReturnState: controllers.SyncStateReprocessAll,
+			setNodeWantReturnState:   controllers.SyncStateSuccess,
 		},
 
 		{
@@ -1346,6 +1379,8 @@ func TestNodeSelectors(t *testing.T) {
 				"1.2.3.4": nil,
 				"2.3.4.5": nil,
 			},
+			setConfigWantReturnState: controllers.SyncStateReprocessAll,
+			setNodeWantReturnState:   controllers.SyncStateSuccess,
 		},
 
 		{
@@ -1362,20 +1397,70 @@ func TestNodeSelectors(t *testing.T) {
 				"1.2.3.4": nil,
 				"2.3.4.5": nil,
 			},
+			setConfigWantReturnState: controllers.SyncStateReprocessAll,
+			setNodeWantReturnState:   controllers.SyncStateSuccess,
+		},
+
+		{
+			desc: "Duplicate peer, node selector matches",
+			config: &config.Config{
+				Peers: map[string]*config.Peer{
+					"peer1": {
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					"peer2": {
+						Addr: net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{
+							mustSelector("host=frontend"),
+						},
+					},
+				},
+				Pools: &config.Pools{ByName: pools},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4": nil, // It matches one peer, so we still advertise it.
+			},
+			setConfigWantReturnState: controllers.SyncStateErrorNoRetry,
+		},
+
+		{
+			desc: "Duplicate peer, node selector only matches one node",
+			config: &config.Config{
+				Peers: map[string]*config.Peer{
+					"peer1": {
+						Addr: net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{
+							mustSelector("host=frontend"),
+						},
+					},
+					"peer2": {
+						Addr: net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{
+							mustSelector("host!=frontend"),
+						},
+					},
+				},
+				Pools: &config.Pools{ByName: pools},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4": nil,
+			},
+			setConfigWantReturnState: controllers.SyncStateReprocessAll,
 		},
 	}
 
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if c.SetConfig(l, test.config) == controllers.SyncStateError {
-				t.Errorf("%q: SetConfig failed", test.desc)
+			if r := c.SetConfig(l, test.config); r != test.setConfigWantReturnState {
+				t.Errorf("%q: SetConfig failed, got: %+v, want: %+v", test.desc, r, test.setConfigWantReturnState)
 			}
 		}
 
 		if test.node != nil {
-			if r := c.SetNode(l, test.node); r != test.wantReturnState {
-				t.Fatalf("%q: SetNode returns wrong value, got: %+v, want: %+v", test.desc, test.wantReturnState, r)
+			if r := c.SetNode(l, test.node); r != test.setNodeWantReturnState {
+				t.Fatalf("%q: SetNode returns wrong value, got: %+v, want: %+v", test.desc, r, test.setNodeWantReturnState)
 			}
 		}
 
