@@ -596,16 +596,22 @@ func sortPools(pools []*config.Pool) {
 	// pools from higher to low priority. when no priority (0) set on
 	// the pool, then that is considered as lowest priority.
 	sort.Slice(pools, func(i, j int) bool {
-		if pools[i].ServiceAllocations.Priority > 0 &&
-			pools[j].ServiceAllocations.Priority > 0 {
-			return pools[i].ServiceAllocations.Priority <
-				pools[j].ServiceAllocations.Priority
+		iPrio := pools[i].ServiceAllocations.Priority
+		jPrio := pools[j].ServiceAllocations.Priority
+		// Both have explicit priority: sort by ascending priority value
+		if iPrio > 0 && jPrio > 0 {
+			return iPrio < jPrio
 		}
-		if pools[i].ServiceAllocations.Priority == 0 &&
-			pools[j].ServiceAllocations.Priority > 0 {
+		// Only i has priority: i comes first
+		if iPrio > 0 && jPrio == 0 {
+			return true
+		}
+		// Only j has priority: j comes first
+		if iPrio == 0 && jPrio > 0 {
 			return false
 		}
-		return true
+		// Both have no priority: they are equal, neither is less
+		return false
 	})
 }
 
