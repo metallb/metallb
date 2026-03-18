@@ -102,19 +102,22 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if err != nil {
 			level.Error(l).Log("event", "clearAssignment", "reason", "nolbIPsIPFamily", "msg", "Failed to retrieve lbIPs family")
 			c.client.Errorf(svc, "nolbIPsIPFamily", "Failed to retrieve LBIPs IPFamily for %q: %s", lbIPs, err)
-		}
-		clusterIPsIPFamily, err := ipfamily.ForService(svc)
-		if err != nil {
-			level.Error(l).Log("event", "clearAssignment", "reason", "noclusterIPsIPFamily", "msg", "Failed to retrieve clusterIPs family")
-			c.client.Errorf(svc, "noclusterIPsIPFamily", "Failed to retrieve ClusterIPs IPFamily for %q %s: %s", svc.Spec.ClusterIPs, svc.Spec.ClusterIP, err)
-			return ErrConverge
-		}
-
-		// if the lbIP family has changed from its supposed state, clear the lbIP.
-		// (this should not happen since the "ipFamily" of a service is immutable)
-		if serviceFamilyChanged(lbIPsIPFamily, clusterIPsIPFamily, familyPolicy) {
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
+		} else {
+			clusterIPsIPFamily, err := ipfamily.ForService(svc)
+			if err != nil {
+				level.Error(l).Log("event", "clearAssignment", "reason", "noclusterIPsIPFamily", "msg", "Failed to retrieve clusterIPs family")
+				c.client.Errorf(svc, "noclusterIPsIPFamily", "Failed to retrieve ClusterIPs IPFamily for %q %s: %s", svc.Spec.ClusterIPs, svc.Spec.ClusterIP, err)
+				return ErrConverge
+			}
+
+			// if the lbIP family has changed from its supposed state, clear the lbIP.
+			// (this should not happen since the "ipFamily" of a service is immutable)
+			if serviceFamilyChanged(lbIPsIPFamily, clusterIPsIPFamily, familyPolicy) {
+				c.clearServiceState(key, svc)
+				lbIPs = []net.IP{}
+			}
 		}
 	}
 
