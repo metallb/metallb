@@ -117,7 +117,7 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 	for k, n := range res {
 		ip := net.ParseIP(k)
 		if ip == nil {
-			return nil, fmt.Errorf("failed to parse %s as ip", ip)
+			return nil, fmt.Errorf("failed to parse %s as ip", k)
 		}
 		connected := true
 		if n.BgpState != bgpConnected {
@@ -154,7 +154,7 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 	for k, n := range toParse {
 		ip := net.ParseIP(k)
 		if ip == nil {
-			return nil, fmt.Errorf("failed to parse %s as ip", ip)
+			return nil, fmt.Errorf("failed to parse %s as ip", k)
 		}
 		connected := true
 		if n.BgpState != bgpConnected {
