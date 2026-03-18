@@ -592,9 +592,9 @@ func (a *Allocator) CountersForPool(name string) PoolCounters {
 }
 
 func sortPools(pools []*config.Pool) {
-	// A lower value for pool priority equals a higher priority and sort
-	// pools from higher to low priority. when no priority (0) set on
-	// the pool, then that is considered as lowest priority.
+	// A lower value for pool priority equals a higher priority. Sort
+	// pools from high to low priority. When no priority (0) is set on
+	// a pool, it is considered as lowest priority.
 	sort.Slice(pools, func(i, j int) bool {
 		iPrio := pools[i].ServiceAllocations.Priority
 		jPrio := pools[j].ServiceAllocations.Priority
