@@ -83,7 +83,7 @@ func (a *Announce) updateInterfaces() {
 		addrs, err := ifi.Addrs()
 		if err != nil {
 			level.Error(l).Log("op", "getAddresses", "error", err, "msg", "couldn't get addresses for interface")
-			return
+			continue
 		}
 
 		if ifi.Flags&net.FlagUp == 0 {
