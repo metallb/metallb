@@ -55,7 +55,7 @@ prometheus:
 
   # the image to be used for the kuberbacproxy container
   rbacProxy:
-    repository: gcr.io/kubebuilder/kube-rbac-proxy
+    repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
     tag: v0.12.0
     pullPolicy:
 
@@ -275,6 +275,8 @@ speaker:
     enabled: true
   # ignore the exclude-from-external-loadbalancer label
   ignoreExcludeLB: false
+  # --  BGP debounce timeout for FRR configuration reloads, in milliseconds. Only applies when BGP type is frr. Default (when unset) is 3000 ms. This feature is experimental
+  bgpDebounceTimeout: null
 
   image:
     repository: quay.io/metallb/speaker
@@ -336,7 +338,7 @@ speaker:
     enabled: true
     image:
       repository: quay.io/frrouting/frr
-      tag: 10.4.1
+      tag: 10.5.1
       pullPolicy:
     metricsPort: 7473
     resources: {}
@@ -376,6 +378,11 @@ frrk8s:
   enabled: false
   external: false
   namespace: ""
+
+frr-k8s:
+  prometheus:
+    rbacProxy:
+      repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
 
 # networkpolicies
 networkpolicies:

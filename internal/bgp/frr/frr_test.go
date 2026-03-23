@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/go-kit/log"
@@ -109,1144 +110,1204 @@ func validateAgainstFRR(t *testing.T) {
 }
 
 func TestSingleEBGPSessionMultiHop(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleEBGPSessionOneHop(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "127.0.0.2",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  false,
-			SessionName:   "test-peer"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "127.0.0.2",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  false,
+				SessionName:   "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleIPv6EBGPSessionOneHop(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "127:0:0::2",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10:1:1::254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  false,
-			SessionName:   "test-peer"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "127:0:0::2",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10:1:1::254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  false,
+				SessionName:   "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleIBGPSession(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       100,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  false,
-			SessionName:   "test-peer"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       100,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  false,
+				SessionName:   "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleIPv6IBGPSession(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10:2:2::254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10:1:1::254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       100,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			ConnectTime:   ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  false,
-			SessionName:   "test-peer"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10:2:2::254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10:1:1::254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       100,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				ConnectTime:   ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  false,
+				SessionName:   "test-peer"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleSessionClose(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
 
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
 
-	session.Close()
-	testCheckConfigFile(t)
+		session.Close()
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleSessionWithGracefulRestart(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:     "10.2.2.254",
-			PeerPort:        179,
-			SourceAddress:   net.ParseIP("10.1.1.254"),
-			MyASN:           102,
-			RouterID:        net.ParseIP("10.1.1.254"),
-			PeerASN:         100,
-			GracefulRestart: true,
-			SessionName:     "test-peer"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:     "10.2.2.254",
+				PeerPort:        179,
+				SourceAddress:   net.ParseIP("10.1.1.254"),
+				MyASN:           102,
+				RouterID:        net.ParseIP("10.1.1.254"),
+				PeerASN:         100,
+				GracefulRestart: true,
+				SessionName:     "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestTwoSessions(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session1, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			ConnectTime:   ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer1"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session1, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				ConnectTime:   ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer1"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session1.Close()
-	session2, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.4.4.255",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.3.3.254"),
-			MyASN:         300,
-			RouterID:      net.ParseIP("10.3.3.254"),
-			PeerASN:       400,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			ConnectTime:   ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer2"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session1.Close()
+		session2, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.4.4.255",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.3.3.254"),
+				MyASN:         300,
+				RouterID:      net.ParseIP("10.3.3.254"),
+				PeerASN:       400,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				ConnectTime:   ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer2"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session2.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session2.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestTwoIPv6Sessions(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
 
-	session1, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10:2:2::254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10:1:1::254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  false,
-			SessionName:   "test-peer1"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session1.Close()
-	session2, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10:4:4::255",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10:3:3::254"),
-			MyASN:         300,
-			RouterID:      net.ParseIP("10.3.3.254"),
-			PeerASN:       400,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  false,
-			SessionName:   "test-peer2"})
+		session1, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10:2:2::254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10:1:1::254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  false,
+				SessionName:   "test-peer1"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session1.Close()
+		session2, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10:4:4::255",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10:3:3::254"),
+				MyASN:         300,
+				RouterID:      net.ParseIP("10.3.3.254"),
+				PeerASN:       400,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  false,
+				SessionName:   "test-peer2"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session2.Close()
-	testCheckConfigFile(t)
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session2.Close()
+		testCheckConfigFile(t)
+	})
 }
 
 func TestIPv4AndIPv6SessionsDualStackFamily(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
 
-	session1, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:            "10:2:2::254",
-			PeerPort:               179,
-			SourceAddress:          net.ParseIP("10:1:1::254"),
-			MyASN:                  100,
-			RouterID:               net.ParseIP("10.1.1.254"),
-			PeerASN:                200,
-			HoldTime:               ptr.To(time.Second),
-			KeepAliveTime:          ptr.To(time.Second),
-			Password:               "password",
-			CurrentNode:            "hostname",
-			EBGPMultiHop:           false,
-			SessionName:            "test-peer1",
-			DualStackAddressFamily: true},
-	)
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session1.Close()
-	session2, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:            "10.4.4.255",
-			PeerPort:               179,
-			SourceAddress:          net.ParseIP("10.3.3.254"),
-			MyASN:                  300,
-			RouterID:               net.ParseIP("10.3.3.254"),
-			PeerASN:                400,
-			HoldTime:               ptr.To(time.Second),
-			KeepAliveTime:          ptr.To(time.Second),
-			Password:               "password",
-			CurrentNode:            "hostname",
-			EBGPMultiHop:           true,
-			SessionName:            "test-peer2",
-			DualStackAddressFamily: true})
+		session1, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:            "10:2:2::254",
+				PeerPort:               179,
+				SourceAddress:          net.ParseIP("10:1:1::254"),
+				MyASN:                  100,
+				RouterID:               net.ParseIP("10.1.1.254"),
+				PeerASN:                200,
+				HoldTime:               ptr.To(time.Second),
+				KeepAliveTime:          ptr.To(time.Second),
+				Password:               "password",
+				CurrentNode:            "hostname",
+				EBGPMultiHop:           false,
+				SessionName:            "test-peer1",
+				DualStackAddressFamily: true},
+		)
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session1.Close()
+		session2, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:            "10.4.4.255",
+				PeerPort:               179,
+				SourceAddress:          net.ParseIP("10.3.3.254"),
+				MyASN:                  300,
+				RouterID:               net.ParseIP("10.3.3.254"),
+				PeerASN:                400,
+				HoldTime:               ptr.To(time.Second),
+				KeepAliveTime:          ptr.To(time.Second),
+				Password:               "password",
+				CurrentNode:            "hostname",
+				EBGPMultiHop:           true,
+				SessionName:            "test-peer2",
+				DualStackAddressFamily: true})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session2.Close()
-	testCheckConfigFile(t)
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session2.Close()
+		testCheckConfigFile(t)
+	})
 }
 
 func TestTwoSessionsDuplicate(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session1, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer1"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session1, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer1"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session1.Close()
-	session2, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer2"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session2.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session1.Close()
+		session2, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer2"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session2.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestTwoSessionsDuplicateRouter(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
 
-	session1, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer1"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session1.Close()
-	session2, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.4.4.255",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       400,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer2"})
+		session1, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer1"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session1.Close()
+		session2, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.4.4.255",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       400,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer2"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session2.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session2.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleAdvertisement(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				ConnectTime:   ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			ConnectTime:   ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	prefix := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.10"),
-		Mask: classCMask,
-	}
-	communities := []community.BGPCommunity{}
-	community1, _ := community.New("1111:2222")
-	communities = append(communities, community1)
-	community2, _ := community.New("3333:4444")
-	communities = append(communities, community2)
-	adv := &bgp.Advertisement{
-		Prefix:      prefix,
-		Communities: communities,
-		LocalPref:   300,
-	}
-
-	err = session.Set(adv)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	testCheckConfigFile(t)
-}
-
-func TestSingleAdvertisementNoRouterID(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      nil,
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	prefix := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.10"),
-		Mask: classCMask,
-	}
-
-	adv := &bgp.Advertisement{
-		Prefix: prefix,
-	}
-
-	err = session.Set(adv)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	testCheckConfigFile(t)
-}
-
-func TestSingleAdvertisementStop(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	prefix := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.10"),
-		Mask: classCMask,
-	}
-
-	adv := &bgp.Advertisement{
-		Prefix: prefix,
-	}
-
-	err = session.Set(adv)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	err = session.Set()
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	testCheckConfigFile(t)
-}
-
-func TestSingleAdvertisementChange(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	prefix := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.10"),
-		Mask: classCMask,
-	}
-
-	adv := &bgp.Advertisement{
-		Prefix: prefix,
-	}
-
-	err = session.Set(adv)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	prefix = &net.IPNet{
-		IP:   net.ParseIP("172.16.1.11"),
-		Mask: classCMask,
-	}
-
-	adv = &bgp.Advertisement{
-		Prefix: prefix,
-	}
-
-	err = session.Set(adv)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	testCheckConfigFile(t)
-}
-
-func TestTwoAdvertisements(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	prefix1 := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.10"),
-		Mask: classCMask,
-	}
-	communities := []community.BGPCommunity{}
-	community, _ := community.New("1111:2222")
-	communities = append(communities, community)
-	adv1 := &bgp.Advertisement{
-		Prefix:      prefix1,
-		Communities: communities,
-	}
-
-	prefix2 := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.11"),
-		Mask: classCMask,
-	}
-
-	adv2 := &bgp.Advertisement{
-		Prefix: prefix2,
-	}
-
-	err = session.Set(adv1, adv2)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	testCheckConfigFile(t)
-}
-
-func TestTwoAdvertisementsDuplicate(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	prefix1 := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.10"),
-		Mask: classCMask,
-	}
-	adv1 := &bgp.Advertisement{
-		Prefix: prefix1,
-	}
-
-	adv2 := &bgp.Advertisement{
-		Prefix: prefix1,
-	}
-
-	err = session.Set(adv1, adv2)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	testCheckConfigFile(t)
-}
-
-func TestTwoAdvertisementsTwoSessions(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-
-	for i := 0; i < 100; i++ {
-		func() {
-			sessionsParameters := []bgp.SessionParameters{
-				{
-					PeerAddress:   "10.2.2.254",
-					PeerPort:      179,
-					SourceAddress: net.ParseIP("10.1.1.254"),
-					MyASN:         100,
-					RouterID:      net.ParseIP("10.1.1.254"),
-					PeerASN:       200,
-					HoldTime:      ptr.To(time.Second),
-					KeepAliveTime: ptr.To(time.Second),
-					ConnectTime:   ptr.To(time.Second),
-					Password:      "password",
-					CurrentNode:   "hostname",
-					EBGPMultiHop:  true,
-					SessionName:   "test-peer"},
-				{
-					PeerAddress:   "10.2.2.255",
-					PeerPort:      179,
-					SourceAddress: net.ParseIP("10.1.1.254"),
-					MyASN:         100,
-					RouterID:      net.ParseIP("10.1.1.254"),
-					PeerASN:       200,
-					HoldTime:      ptr.To(time.Second),
-					KeepAliveTime: ptr.To(time.Second),
-					ConnectTime:   ptr.To(time.Second),
-					Password:      "password",
-					CurrentNode:   "hostname",
-					EBGPMultiHop:  true,
-					SessionName:   "test-peer1"},
-			}
-			seed := time.Now().UnixNano()
-			rand.New(rand.NewSource(seed))
-
-			rand.Shuffle(len(sessionsParameters), func(i, j int) {
-				sessionsParameters[i], sessionsParameters[j] = sessionsParameters[j], sessionsParameters[i]
-			})
-
-			session, err := sessionManager.NewSession(l, sessionsParameters[0])
-			if err != nil {
-				t.Fatalf("Could not create session: %s", err)
-			}
-			defer session.Close()
-
-			session1, err := sessionManager.NewSession(l, sessionsParameters[1])
-			if err != nil {
-				t.Fatalf("Could not create session: %s", err)
-			}
-			defer session1.Close()
-
-			prefix1 := &net.IPNet{
-				IP:   net.ParseIP("172.16.1.10"),
-				Mask: classCMask,
-			}
-			communities := []community.BGPCommunity{}
-			community, _ := community.New("1111:2222")
-			communities = append(communities, community)
-			adv1 := &bgp.Advertisement{
-				Prefix:      prefix1,
-				Communities: communities,
-			}
-
-			prefix2 := &net.IPNet{
-				IP:   net.ParseIP("172.16.1.11"),
-				Mask: classCMask,
-			}
-
-			adv2 := &bgp.Advertisement{
-				Prefix:      prefix2,
-				Communities: communities,
-				LocalPref:   2,
-			}
-			advs := []*bgp.Advertisement{adv1, adv2}
-			rand.Shuffle(len(advs), func(i, j int) {
-				advs[i], advs[j] = advs[j], advs[i]
-			})
-			err = session.Set(advs[0], advs[1])
-			if err != nil {
-				t.Fatalf("Could not advertise prefix: %s", err)
-			}
-
-			rand.Shuffle(len(advs), func(i, j int) {
-				advs[i], advs[j] = advs[j], advs[i]
-			})
-			err = session1.Set(advs[0], advs[1])
-			if err != nil {
-				t.Fatalf("Could not advertise prefix: %s", err)
-			}
-
-			validateGoldenFile(t)
-		}()
-	}
-	validateAgainstFRR(t)
-}
-
-func TestSingleSessionExtras(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	err := sessionManager.SyncExtraInfo("# hello")
-	if err != nil {
-		t.Fatalf("Could not sync extra info")
-	}
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "127.0.0.2",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			ConnectTime:   ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  false,
-			SessionName:   "test-peer"})
-
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	testCheckConfigFile(t)
-}
-
-func TestLoggingConfiguration(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelWarn)
-	defer close(sessionManager.reloadConfig)
-
-	config, err := sessionManager.createConfig()
-	if err != nil {
-		t.Fatalf("Error while creating configuration: %s", err)
-	}
-
-	sessionManager.reloadConfig <- reloadEvent{config: config}
-	testCheckConfigFile(t)
-}
-
-func TestLoggingConfigurationDebug(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelDebug)
-	defer close(sessionManager.reloadConfig)
-
-	config, err := sessionManager.createConfig()
-	if err != nil {
-		t.Fatalf("Error while creating configuration: %s", err)
-	}
-
-	sessionManager.reloadConfig <- reloadEvent{config: config}
-	testCheckConfigFile(t)
-}
-
-func TestLoggingConfigurationOverrideByEnvironmentVar(t *testing.T) {
-	testSetup(t)
-
-	t.Setenv("FRR_LOGGING_LEVEL", "alerts")
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelDebug)
-	defer close(sessionManager.reloadConfig)
-
-	config, err := sessionManager.createConfig()
-	if err != nil {
-		t.Fatalf("Error while creating configuration: %s", err)
-	}
-
-	sessionManager.reloadConfig <- reloadEvent{config: config}
-	testCheckConfigFile(t)
-}
-
-func TestLargeCommunities(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	prefix := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.10"),
-		Mask: classCMask,
-	}
-	communities := []community.BGPCommunity{}
-	community1, _ := community.New("large:1111:2222:3333")
-	communities = append(communities, community1)
-	community2, _ := community.New("large:2222:3333:4444")
-	communities = append(communities, community2)
-	community3, _ := community.New("3333:4444")
-	communities = append(communities, community3)
-	adv := &bgp.Advertisement{
-		Prefix:      prefix,
-		Communities: communities,
-		LocalPref:   300,
-	}
-
-	err = session.Set(adv)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	testCheckConfigFile(t)
-}
-
-func TestManyAdvertisementsSameCommunity(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			ConnectTime:   ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	community1, _ := community.New("1111:2222")
-	communities := []community.BGPCommunity{community1}
-	advs := []*bgp.Advertisement{}
-	for i := 0; i < 10; i++ {
 		prefix := &net.IPNet{
-			IP:   net.ParseIP(fmt.Sprintf("172.16.1.%d", i)),
+			IP:   net.ParseIP("172.16.1.10"),
 			Mask: classCMask,
 		}
+		communities := []community.BGPCommunity{}
+		community1, _ := community.New("1111:2222")
+		communities = append(communities, community1)
+		community2, _ := community.New("3333:4444")
+		communities = append(communities, community2)
 		adv := &bgp.Advertisement{
 			Prefix:      prefix,
 			Communities: communities,
+			LocalPref:   300,
 		}
-		advs = append(advs, adv)
-	}
 
-	err = session.Set(advs...)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
+		err = session.Set(adv)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
+}
+
+func TestSingleAdvertisementNoRouterID(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      nil,
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
+
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
+
+		prefix := &net.IPNet{
+			IP:   net.ParseIP("172.16.1.10"),
+			Mask: classCMask,
+		}
+
+		adv := &bgp.Advertisement{
+			Prefix: prefix,
+		}
+
+		err = session.Set(adv)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
+
+		testCheckConfigFile(t)
+	})
+}
+
+func TestSingleAdvertisementStop(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
+
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
+
+		prefix := &net.IPNet{
+			IP:   net.ParseIP("172.16.1.10"),
+			Mask: classCMask,
+		}
+
+		adv := &bgp.Advertisement{
+			Prefix: prefix,
+		}
+
+		err = session.Set(adv)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
+
+		err = session.Set()
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
+
+		testCheckConfigFile(t)
+	})
+}
+
+func TestSingleAdvertisementChange(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
+
+		prefix := &net.IPNet{
+			IP:   net.ParseIP("172.16.1.10"),
+			Mask: classCMask,
+		}
+
+		adv := &bgp.Advertisement{
+			Prefix: prefix,
+		}
+
+		err = session.Set(adv)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
+
+		prefix = &net.IPNet{
+			IP:   net.ParseIP("172.16.1.11"),
+			Mask: classCMask,
+		}
+
+		adv = &bgp.Advertisement{
+			Prefix: prefix,
+		}
+
+		err = session.Set(adv)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
+
+		testCheckConfigFile(t)
+	})
+}
+
+func TestTwoAdvertisements(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
+
+		prefix1 := &net.IPNet{
+			IP:   net.ParseIP("172.16.1.10"),
+			Mask: classCMask,
+		}
+		communities := []community.BGPCommunity{}
+		community, _ := community.New("1111:2222")
+		communities = append(communities, community)
+		adv1 := &bgp.Advertisement{
+			Prefix:      prefix1,
+			Communities: communities,
+		}
+
+		prefix2 := &net.IPNet{
+			IP:   net.ParseIP("172.16.1.11"),
+			Mask: classCMask,
+		}
+
+		adv2 := &bgp.Advertisement{
+			Prefix: prefix2,
+		}
+
+		err = session.Set(adv1, adv2)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
+
+		testCheckConfigFile(t)
+	})
+}
+
+func TestTwoAdvertisementsDuplicate(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
+
+		prefix1 := &net.IPNet{
+			IP:   net.ParseIP("172.16.1.10"),
+			Mask: classCMask,
+		}
+		adv1 := &bgp.Advertisement{
+			Prefix: prefix1,
+		}
+
+		adv2 := &bgp.Advertisement{
+			Prefix: prefix1,
+		}
+
+		err = session.Set(adv1, adv2)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
+
+		testCheckConfigFile(t)
+	})
+}
+
+func TestTwoAdvertisementsTwoSessions(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+
+		for i := 0; i < 100; i++ {
+			func() {
+				sessionsParameters := []bgp.SessionParameters{
+					{
+						PeerAddress:   "10.2.2.254",
+						PeerPort:      179,
+						SourceAddress: net.ParseIP("10.1.1.254"),
+						MyASN:         100,
+						RouterID:      net.ParseIP("10.1.1.254"),
+						PeerASN:       200,
+						HoldTime:      ptr.To(time.Second),
+						KeepAliveTime: ptr.To(time.Second),
+						ConnectTime:   ptr.To(time.Second),
+						Password:      "password",
+						CurrentNode:   "hostname",
+						EBGPMultiHop:  true,
+						SessionName:   "test-peer"},
+					{
+						PeerAddress:   "10.2.2.255",
+						PeerPort:      179,
+						SourceAddress: net.ParseIP("10.1.1.254"),
+						MyASN:         100,
+						RouterID:      net.ParseIP("10.1.1.254"),
+						PeerASN:       200,
+						HoldTime:      ptr.To(time.Second),
+						KeepAliveTime: ptr.To(time.Second),
+						ConnectTime:   ptr.To(time.Second),
+						Password:      "password",
+						CurrentNode:   "hostname",
+						EBGPMultiHop:  true,
+						SessionName:   "test-peer1"},
+				}
+				seed := time.Now().UnixNano()
+				rand.New(rand.NewSource(seed))
+
+				rand.Shuffle(len(sessionsParameters), func(i, j int) {
+					sessionsParameters[i], sessionsParameters[j] = sessionsParameters[j], sessionsParameters[i]
+				})
+
+				session, err := sessionManager.NewSession(l, sessionsParameters[0])
+				if err != nil {
+					t.Fatalf("Could not create session: %s", err)
+				}
+				defer session.Close()
+
+				session1, err := sessionManager.NewSession(l, sessionsParameters[1])
+				if err != nil {
+					t.Fatalf("Could not create session: %s", err)
+				}
+				defer session1.Close()
+
+				prefix1 := &net.IPNet{
+					IP:   net.ParseIP("172.16.1.10"),
+					Mask: classCMask,
+				}
+				communities := []community.BGPCommunity{}
+				community, _ := community.New("1111:2222")
+				communities = append(communities, community)
+				adv1 := &bgp.Advertisement{
+					Prefix:      prefix1,
+					Communities: communities,
+				}
+
+				prefix2 := &net.IPNet{
+					IP:   net.ParseIP("172.16.1.11"),
+					Mask: classCMask,
+				}
+
+				adv2 := &bgp.Advertisement{
+					Prefix:      prefix2,
+					Communities: communities,
+					LocalPref:   2,
+				}
+				advs := []*bgp.Advertisement{adv1, adv2}
+				rand.Shuffle(len(advs), func(i, j int) {
+					advs[i], advs[j] = advs[j], advs[i]
+				})
+				err = session.Set(advs[0], advs[1])
+				if err != nil {
+					t.Fatalf("Could not advertise prefix: %s", err)
+				}
+
+				rand.Shuffle(len(advs), func(i, j int) {
+					advs[i], advs[j] = advs[j], advs[i]
+				})
+				err = session1.Set(advs[0], advs[1])
+				if err != nil {
+					t.Fatalf("Could not advertise prefix: %s", err)
+				}
+
+				validateGoldenFile(t)
+			}()
+		}
+		validateAgainstFRR(t)
+	})
+}
+
+func TestSingleSessionExtras(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		err := sessionManager.SyncExtraInfo("# hello")
+		if err != nil {
+			t.Fatalf("Could not sync extra info")
+		}
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "127.0.0.2",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				ConnectTime:   ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  false,
+				SessionName:   "test-peer"})
+
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
+
+		testCheckConfigFile(t)
+	})
+}
+
+func TestLoggingConfiguration(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelWarn)
+		defer close(sessionManager.reloadConfig)
+
+		config, err := sessionManager.createConfig()
+		if err != nil {
+			t.Fatalf("Error while creating configuration: %s", err)
+		}
+
+		sessionManager.reloadConfig <- reloadEvent{config: config}
+		testCheckConfigFile(t)
+	})
+}
+
+func TestLoggingConfigurationDebug(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelDebug)
+		defer close(sessionManager.reloadConfig)
+
+		config, err := sessionManager.createConfig()
+		if err != nil {
+			t.Fatalf("Error while creating configuration: %s", err)
+		}
+
+		sessionManager.reloadConfig <- reloadEvent{config: config}
+		testCheckConfigFile(t)
+	})
+}
+
+func TestLoggingConfigurationOverrideByEnvironmentVar(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		t.Setenv("FRR_LOGGING_LEVEL", "alerts")
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelDebug)
+		defer close(sessionManager.reloadConfig)
+
+		config, err := sessionManager.createConfig()
+		if err != nil {
+			t.Fatalf("Error while creating configuration: %s", err)
+		}
+
+		sessionManager.reloadConfig <- reloadEvent{config: config}
+		testCheckConfigFile(t)
+	})
+}
+
+func TestLargeCommunities(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
+
+		prefix := &net.IPNet{
+			IP:   net.ParseIP("172.16.1.10"),
+			Mask: classCMask,
+		}
+		communities := []community.BGPCommunity{}
+		community1, _ := community.New("large:1111:2222:3333")
+		communities = append(communities, community1)
+		community2, _ := community.New("large:2222:3333:4444")
+		communities = append(communities, community2)
+		community3, _ := community.New("3333:4444")
+		communities = append(communities, community3)
+		adv := &bgp.Advertisement{
+			Prefix:      prefix,
+			Communities: communities,
+			LocalPref:   300,
+		}
+
+		err = session.Set(adv)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
+
+		testCheckConfigFile(t)
+	})
+}
+
+func TestManyAdvertisementsSameCommunity(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
+
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				SourceAddress: net.ParseIP("10.1.1.254"),
+				MyASN:         100,
+				RouterID:      net.ParseIP("10.1.1.254"),
+				PeerASN:       200,
+				HoldTime:      ptr.To(time.Second),
+				KeepAliveTime: ptr.To(time.Second),
+				ConnectTime:   ptr.To(time.Second),
+				Password:      "password",
+				CurrentNode:   "hostname",
+				EBGPMultiHop:  true,
+				SessionName:   "test-peer"})
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
+
+		community1, _ := community.New("1111:2222")
+		communities := []community.BGPCommunity{community1}
+		advs := []*bgp.Advertisement{}
+		for i := 0; i < 10; i++ {
+			prefix := &net.IPNet{
+				IP:   net.ParseIP(fmt.Sprintf("172.16.1.%d", i)),
+				Mask: classCMask,
+			}
+			adv := &bgp.Advertisement{
+				Prefix:      prefix,
+				Communities: communities,
+			}
+			advs = append(advs, adv)
+		}
+
+		err = session.Set(advs...)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
+
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleSessionWithNoTimers(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress: "10.2.2.254",
-			PeerPort:    179,
-			MyASN:       102,
-			PeerASN:     100,
-			SessionName: "test-peer"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress: "10.2.2.254",
+				PeerPort:    179,
+				MyASN:       102,
+				PeerASN:     100,
+				SessionName: "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleSessionWithZeroTimers(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			PeerPort:      179,
-			MyASN:         102,
-			HoldTime:      ptr.To(0 * time.Second),
-			KeepAliveTime: ptr.To(0 * time.Second),
-			PeerASN:       100,
-			SessionName:   "test-peer"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:   "10.2.2.254",
+				PeerPort:      179,
+				MyASN:         102,
+				HoldTime:      ptr.To(0 * time.Second),
+				KeepAliveTime: ptr.To(0 * time.Second),
+				PeerASN:       100,
+				SessionName:   "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleSessionWithInternalASN(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:     "10.2.2.254",
-			PeerPort:        179,
-			SourceAddress:   net.ParseIP("10.1.1.254"),
-			MyASN:           102,
-			RouterID:        net.ParseIP("10.1.1.254"),
-			DynamicASN:      "internal",
-			GracefulRestart: true,
-			SessionName:     "test-peer"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:     "10.2.2.254",
+				PeerPort:        179,
+				SourceAddress:   net.ParseIP("10.1.1.254"),
+				MyASN:           102,
+				RouterID:        net.ParseIP("10.1.1.254"),
+				DynamicASN:      "internal",
+				GracefulRestart: true,
+				SessionName:     "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestSingleSessionWithExternalASN(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:     "10.2.2.254",
-			PeerPort:        179,
-			SourceAddress:   net.ParseIP("10.1.1.254"),
-			MyASN:           102,
-			RouterID:        net.ParseIP("10.1.1.254"),
-			DynamicASN:      "external",
-			GracefulRestart: true,
-			SessionName:     "test-peer"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerAddress:     "10.2.2.254",
+				PeerPort:        179,
+				SourceAddress:   net.ParseIP("10.1.1.254"),
+				MyASN:           102,
+				RouterID:        net.ParseIP("10.1.1.254"),
+				DynamicASN:      "external",
+				GracefulRestart: true,
+				SessionName:     "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }
 
 func TestUnnumberedSession(t *testing.T) {
-	testSetup(t)
+	synctest.Test(t, func(t *testing.T) {
+		testSetup(t)
 
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerInterface:   "net0",
-			PeerPort:        179,
-			SourceAddress:   net.ParseIP("10.1.1.254"),
-			MyASN:           102,
-			RouterID:        net.ParseIP("10.1.1.254"),
-			DynamicASN:      "external",
-			GracefulRestart: true,
-			SessionName:     "test-peer"})
+		l := log.NewNopLogger()
+		sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+		defer close(sessionManager.reloadConfig)
+		session, err := sessionManager.NewSession(l,
+			bgp.SessionParameters{
+				PeerInterface:   "net0",
+				PeerPort:        179,
+				SourceAddress:   net.ParseIP("10.1.1.254"),
+				MyASN:           102,
+				RouterID:        net.ParseIP("10.1.1.254"),
+				DynamicASN:      "external",
+				GracefulRestart: true,
+				SessionName:     "test-peer"})
 
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		defer session.Close()
 
-	testCheckConfigFile(t)
+		testCheckConfigFile(t)
+	})
 }

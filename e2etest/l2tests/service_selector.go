@@ -12,9 +12,10 @@ import (
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/service"
+	"go.universe.tf/e2etest/pkg/status"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
-	corev1 "k8s.io/api/core/v1"
+	pkgerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -22,7 +23,6 @@ import (
 var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 	var cs clientset.Interface
 	testNamespace := ""
-	var allNodes []corev1.Node
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
@@ -43,10 +43,6 @@ var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 
 		err = ConfigUpdater.Clean()
 		Expect(err).NotTo(HaveOccurred())
-
-		nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		allNodes = nodes.Items
 	})
 
 	ginkgo.Context("Pool and Service Selectors together", func() {
@@ -117,9 +113,9 @@ var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 			}()
 
 			Eventually(func() error {
-				_, err := nodeForService(svcPoolA, allNodes)
+				_, err := status.L2ForService(ConfigUpdater.Client(), svcPoolA)
 				return err
-			}, 30*time.Second, 1*time.Second).Should(BeNil(), "Service matching both selectors should be advertised")
+			}, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred(), "Service matching both selectors should be advertised")
 
 			ginkgo.By("Creating service with expose=true requesting pool-b - pool doesn't match advertisement")
 			svcPoolB, _ := service.CreateWithBackend(cs, testNamespace, "svc-pool-b", service.TrafficPolicyCluster,
@@ -131,10 +127,10 @@ var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 			}()
 
 			ginkgo.By("Checking that svc-pool-b is NOT advertised (pool selector mismatch)")
-			Consistently(func() error {
-				_, err := nodeForService(svcPoolB, allNodes)
-				return err
-			}, 5*time.Second, 1*time.Second).ShouldNot(BeNil(), "Service with pool selector mismatch should NOT be advertised")
+			Consistently(func() bool {
+				_, err := status.L2ForService(ConfigUpdater.Client(), svcPoolB)
+				return pkgerr.IsNotFound(err)
+			}, 5*time.Second, 1*time.Second).Should(BeTrue(), "Service with pool selector mismatch should NOT be advertised")
 
 			ginkgo.By("Updating svc-pool-a labels to expose=false - service selector no longer matches")
 			svcPoolA, err = cs.CoreV1().Services(svcPoolA.Namespace).Get(context.TODO(), svcPoolA.Name, metav1.GetOptions{})
@@ -144,15 +140,15 @@ var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Checking that svc-pool-a is no longer advertised (service selector mismatch)")
-			Eventually(func() error {
-				_, err := nodeForService(svcPoolA, allNodes)
-				return err
-			}, 30*time.Second, 1*time.Second).ShouldNot(BeNil(), "Service with service selector mismatch should stop being advertised")
+			Eventually(func() bool {
+				_, err := status.L2ForService(ConfigUpdater.Client(), svcPoolA)
+				return pkgerr.IsNotFound(err)
+			}, 30*time.Second, 1*time.Second).Should(BeTrue(), "Service with service selector mismatch should stop being advertised")
 
-			Consistently(func() error {
-				_, err := nodeForService(svcPoolA, allNodes)
-				return err
-			}, 5*time.Second, 1*time.Second).ShouldNot(BeNil(), "Service with service selector mismatch should remain not advertised")
+			Consistently(func() bool {
+				_, err := status.L2ForService(ConfigUpdater.Client(), svcPoolA)
+				return pkgerr.IsNotFound(err)
+			}, 5*time.Second, 1*time.Second).Should(BeTrue(), "Service with service selector mismatch should remain not advertised")
 
 			ginkgo.By("Updating svc-pool-b labels to expose=false - now both selectors don't match")
 			svcPoolB, err = cs.CoreV1().Services(svcPoolB.Namespace).Get(context.TODO(), svcPoolB.Name, metav1.GetOptions{})
@@ -162,10 +158,10 @@ var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Checking that svc-pool-b is still NOT advertised (both selectors mismatch)")
-			Consistently(func() error {
-				_, err := nodeForService(svcPoolB, allNodes)
-				return err
-			}, 5*time.Second, 1*time.Second).ShouldNot(BeNil(), "Service with both selectors mismatch should NOT be advertised")
+			Consistently(func() bool {
+				_, err := status.L2ForService(ConfigUpdater.Client(), svcPoolB)
+				return pkgerr.IsNotFound(err)
+			}, 5*time.Second, 1*time.Second).Should(BeTrue(), "Service with both selectors mismatch should NOT be advertised")
 
 			ginkgo.By("Updating svc-pool-a labels back to expose=true - should be advertised again")
 			svcPoolA, err = cs.CoreV1().Services(svcPoolA.Namespace).Get(context.TODO(), svcPoolA.Name, metav1.GetOptions{})
@@ -175,9 +171,9 @@ var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
-				_, err := nodeForService(svcPoolA, allNodes)
+				_, err := status.L2ForService(ConfigUpdater.Client(), svcPoolA)
 				return err
-			}, 30*time.Second, 1*time.Second).Should(BeNil(), "Service matching both selectors should be advertised again")
+			}, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred(), "Service matching both selectors should be advertised again")
 		})
 	})
 
@@ -235,9 +231,9 @@ var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 			}()
 
 			Eventually(func() error {
-				_, err := nodeForService(svc1, allNodes)
+				_, err := status.L2ForService(ConfigUpdater.Client(), svc1)
 				return err
-			}, 30*time.Second, 1*time.Second).Should(BeNil(), "Service matching first selector should be advertised")
+			}, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred(), "Service matching first selector should be advertised")
 
 			ginkgo.By("Creating a service matching the second selector")
 			svc2, _ := service.CreateWithBackend(cs, testNamespace, "apache-svc", service.TrafficPolicyCluster,
@@ -248,9 +244,9 @@ var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 			}()
 
 			Eventually(func() error {
-				_, err := nodeForService(svc2, allNodes)
+				_, err := status.L2ForService(ConfigUpdater.Client(), svc2)
 				return err
-			}, 30*time.Second, 1*time.Second).Should(BeNil(), "Service matching second selector should be advertised")
+			}, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred(), "Service matching second selector should be advertised")
 
 			ginkgo.By("Creating a service matching neither selector")
 			svc3, _ := service.CreateWithBackend(cs, testNamespace, "other-svc", service.TrafficPolicyCluster,
@@ -260,10 +256,10 @@ var _ = ginkgo.Describe("L2-ServiceSelector", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}()
 
-			Consistently(func() error {
-				_, err := nodeForService(svc3, allNodes)
-				return err
-			}, 5*time.Second, 1*time.Second).ShouldNot(BeNil(), "Service not matching any selector should not be advertised")
+			Consistently(func() bool {
+				_, err := status.L2ForService(ConfigUpdater.Client(), svc3)
+				return pkgerr.IsNotFound(err)
+			}, 5*time.Second, 1*time.Second).Should(BeTrue(), "Service not matching any selector should not be advertised")
 		})
 	})
 })

@@ -970,7 +970,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 					ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
 					for _, c := range FRRContainers {
-						validateService(svc, allNodes.Items, c)
+						validateService(services[j], allNodes.Items, c)
 					}
 				}
 			}

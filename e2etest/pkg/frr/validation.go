@@ -66,6 +66,8 @@ func RoutesMatchNodes(nodes []v1.Node, route Route, ipFamily ipfamily.Family, vr
 	return nil
 }
 
+// BFDPeersMatchNodes verifies that the BFD peers exactly match the node IPs for the given
+// IP family and VRF.
 func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]BFDPeer, ipFamily ipfamily.Family, vrfName string) error {
 	nodesIPs := map[string]struct{}{}
 	ips, err := k8s.NodeIPsForFamily(nodes, ipFamily, vrfName)
@@ -78,15 +80,10 @@ func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]BFDPeer, ipFamily ipfa
 			return fmt.Errorf("address %s not found in peers", ip)
 		}
 	}
-
 	for k := range peers {
-		if _, ok := nodesIPs[k]; !ok { // skipping neighbors that are not nodes
+		if _, ok := nodesIPs[k]; !ok {
 			return fmt.Errorf("%s not found in nodes ips %v", k, nodesIPs)
 		}
-		delete(nodesIPs, k)
-	}
-	if len(nodesIPs) != 0 { // some leftover, meaning more nodes than routes
-		return fmt.Errorf("IP %v found in nodes but not in bfd peers", nodesIPs)
 	}
 	return nil
 }

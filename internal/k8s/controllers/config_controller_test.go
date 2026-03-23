@@ -50,7 +50,7 @@ func TestConfigController(t *testing.T) {
 			expectForceReloadCalled: false,
 			wantConditions: []metav1.Condition{
 				{
-					Type:   "configReconcilerValid",
+					Type:   ConditionTypeConfigReconcilerValid,
 					Status: metav1.ConditionTrue,
 					Reason: ErrorTypeNone,
 				},
@@ -64,7 +64,7 @@ func TestConfigController(t *testing.T) {
 			expectForceReloadCalled: false,
 			wantConditions: []metav1.Condition{
 				{
-					Type:    "configReconcilerValid",
+					Type:    ConditionTypeConfigReconcilerValid,
 					Status:  metav1.ConditionFalse,
 					Reason:  ErrorTypeConfiguration,
 					Message: "configuration error: general handler sync state error",
@@ -79,7 +79,7 @@ func TestConfigController(t *testing.T) {
 			expectForceReloadCalled: false,
 			wantConditions: []metav1.Condition{
 				{
-					Type:    "configReconcilerValid",
+					Type:    ConditionTypeConfigReconcilerValid,
 					Status:  metav1.ConditionFalse,
 					Reason:  ErrorTypeConfiguration,
 					Message: "configuration error: general handler sync state error",
@@ -94,7 +94,7 @@ func TestConfigController(t *testing.T) {
 			expectForceReloadCalled: true,
 			wantConditions: []metav1.Condition{
 				{
-					Type:    "configReconcilerValid",
+					Type:    ConditionTypeConfigReconcilerValid,
 					Status:  metav1.ConditionTrue,
 					Reason:  ErrorTypeNone,
 					Message: "",
@@ -109,7 +109,7 @@ func TestConfigController(t *testing.T) {
 			expectForceReloadCalled: false,
 			wantConditions: []metav1.Condition{
 				{
-					Type:    "configReconcilerValid",
+					Type:    ConditionTypeConfigReconcilerValid,
 					Status:  metav1.ConditionFalse,
 					Reason:  ErrorTypeConfiguration,
 					Message: "configuration error: parsing peer peer1 missing local ASN",
