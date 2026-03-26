@@ -25,7 +25,9 @@ router bgp {{.ASNLocal}}
  neighbor MTLB passive
  neighbor MTLB remote-as {{.ASNRemote}}
  neighbor MTLB description LEAF-MTLB
+{{- if .BFD}}
  neighbor MTLB bfd
+{{- end}}
  neighbor {{.Interface}} interface peer-group MTLB
  neighbor {{.Interface}} description k8s-node
  address-family ipv4 unicast
@@ -50,6 +52,7 @@ type RouterConfigUnnumbered struct {
 	RouterID      string
 	ToAdvertiseV4 []string
 	ToAdvertiseV6 []string
+	BFD           bool
 }
 
 func (rc RouterConfigUnnumbered) Config() (string, error) {

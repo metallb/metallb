@@ -73,8 +73,11 @@ var _ = ginkgo.Describe("FRR Unnumbered BGP", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	ginkgo.DescribeTable("Session is established and route is advertised", func(prefixSendFromLocal []string, p2pInterface string, tweakService func(svc *corev1.Service)) {
-		rc := frrconfig.RouterConfigUnnumbered{
+	ginkgo.DescribeTable("Session is established and route is advertised", func(prefixSendFromLocal []string, p2pInterface string, tweakService func(svc *corev1.Service),
+		modifySetup func(*frrconfig.RouterConfigUnnumbered, *config.Resources),
+		validate func(*frrcontainer.FRR),
+	) {
+		rc := &frrconfig.RouterConfigUnnumbered{
 			ASNLocal:  metalLBASN,
 			ASNRemote: metalLBASN,
 			Hostname:  "tor1",
@@ -88,11 +91,6 @@ var _ = ginkgo.Describe("FRR Unnumbered BGP", func() {
 		Expect(err).NotTo(HaveOccurred())
 		ginkgo.By(fmt.Sprintf("updating frrconfig to %s", remoteP2PContainer.Name))
 
-		c, err := rc.Config()
-		Expect(err).NotTo(HaveOccurred())
-		err = remoteP2PContainer.UpdateBGPConfigFile(c)
-		Expect(err).NotTo(HaveOccurred())
-
 		resources := config.Resources{
 			Peers: []metallbv1beta2.BGPPeer{
 				{
@@ -101,18 +99,11 @@ var _ = ginkgo.Describe("FRR Unnumbered BGP", func() {
 						Namespace: metallb.Namespace,
 					},
 					Spec: metallbv1beta2.BGPPeerSpec{
-						Interface:  p2pInterface,
-						ASN:        rc.ASNRemote,
-						MyASN:      rc.ASNLocal,
-						BFDProfile: "simple",
+						Interface: p2pInterface,
+						ASN:       rc.ASNRemote,
+						MyASN:     rc.ASNLocal,
 					},
 				},
-			},
-			BFDProfiles: []metallbv1beta1.BFDProfile{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "simple",
-				},
-			},
 			},
 			Pools: []metallbv1beta1.IPAddressPool{
 				{
@@ -128,6 +119,12 @@ var _ = ginkgo.Describe("FRR Unnumbered BGP", func() {
 				{ObjectMeta: metav1.ObjectMeta{Name: "empty"}},
 			},
 		}
+		modifySetup(rc, &resources)
+
+		c, err := rc.Config()
+		Expect(err).NotTo(HaveOccurred())
+		err = remoteP2PContainer.UpdateBGPConfigFile(c)
+		Expect(err).NotTo(HaveOccurred())
 
 		err = ConfigUpdater.Update(resources)
 		Expect(err).NotTo(HaveOccurred(), "apply the CR in k8s api failed")
@@ -137,6 +134,7 @@ var _ = ginkgo.Describe("FRR Unnumbered BGP", func() {
 		Expect(err).NotTo(HaveOccurred())
 		ginkgo.By("validating the node and p2p container peered")
 		validateUnnumberedBGPPeering(remoteP2PContainer, nodeLLA)
+		validate(remoteP2PContainer)
 
 		svc, _ := testservice.CreateWithBackend(cs, testNamespace, "unnumbered-lb", tweakService)
 		ginkgo.By("checking the service gets an ip assigned")
@@ -150,10 +148,14 @@ var _ = ginkgo.Describe("FRR Unnumbered BGP", func() {
 		validatePeerRoutesViaDevice(remoteP2PContainer, p2pInterface, nodeLLA, prefixSendFromLocal)
 
 	},
-		ginkgo.Entry("IPV4", []string{"5.5.5.5/32"}, "net10", func(_ *corev1.Service) {}),
-		ginkgo.Entry("IPV6", []string{"5555::1/128"}, "net20", func(_ *corev1.Service) {}),
-		ginkgo.Entry("DUALSTACK", []string{"5.5.5.5/32", "5555::1/128"}, "net30",
-			func(svc *corev1.Service) { testservice.DualStack(svc) }),
+		ginkgo.Entry("IPV4 with BFD", []string{"5.5.5.5/32"}, "net10", func(_ *corev1.Service) {}, withBFD, expectBFDUp),
+		ginkgo.Entry("IPV6 with BFD", []string{"5555::1/128"}, "net20", func(_ *corev1.Service) {}, withBFD, expectBFDUp),
+		ginkgo.Entry("DUALSTACK with BFD", []string{"5.5.5.5/32", "5555::1/128"}, "net30",
+			func(svc *corev1.Service) { testservice.DualStack(svc) }, withBFD, expectBFDUp),
+		ginkgo.Entry("IPV4 without BFD", []string{"5.5.5.5/32"}, "net40", func(_ *corev1.Service) {}, withoutBFD, expectNoBFDPeers),
+		ginkgo.Entry("IPV6 without BFD", []string{"5555::1/128"}, "net50", func(_ *corev1.Service) {}, withoutBFD, expectNoBFDPeers),
+		ginkgo.Entry("DUALSTACK without BFD", []string{"5.5.5.5/32", "5555::1/128"}, "net60",
+			func(svc *corev1.Service) { testservice.DualStack(svc) }, withoutBFD, expectNoBFDPeers),
 	)
 })
 
@@ -165,7 +167,7 @@ func validateUnnumberedBGPPeering(peer *frrcontainer.FRR, nodeLLA string) {
 			return err
 		}
 		for _, n := range neighbors {
-			if n.BGPNeighborAddr == nodeLLA && n.Connected && n.BFDInfo.Status == "Up" {
+			if n.BGPNeighborAddr == nodeLLA && n.Connected {
 				return nil
 			}
 		}
@@ -196,4 +198,38 @@ func validatePeerRoutesViaDevice(peer executor.Executor, dev, nextHop string, pr
 		}
 		return nil
 	}, 30*time.Second, 5*time.Second).ShouldNot(HaveOccurred(), fmt.Sprintf("peer should have the routes %s", prefixes))
+}
+
+func withoutBFD(*frrconfig.RouterConfigUnnumbered, *config.Resources) {}
+
+func withBFD(rc *frrconfig.RouterConfigUnnumbered, resources *config.Resources) {
+	rc.BFD = true
+	resources.Peers[0].Spec.BFDProfile = "simple"
+	resources.BFDProfiles = []metallbv1beta1.BFDProfile{{
+		ObjectMeta: metav1.ObjectMeta{Name: "simple"},
+	}}
+}
+
+func expectBFDUp(peer *frrcontainer.FRR) {
+	Eventually(func() error {
+		bfdPeers, err := frr.BFDPeers(peer.Executor)
+		if err != nil {
+			return err
+		}
+		if len(bfdPeers) == 0 {
+			return fmt.Errorf("expected BFD peers but found none")
+		}
+		for _, p := range bfdPeers {
+			if p.Status != "up" {
+				return fmt.Errorf("BFD peer %s status is %q, want \"up\"", p.Peer, p.Status)
+			}
+		}
+		return nil
+	}, 2*time.Minute, 10*time.Second).ShouldNot(HaveOccurred())
+}
+
+func expectNoBFDPeers(peer *frrcontainer.FRR) {
+	bfdPeers, err := frr.BFDPeers(peer.Executor)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(bfdPeers).To(BeEmpty(), "expected no BFD peers when BFD is disabled")
 }
