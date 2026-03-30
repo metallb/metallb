@@ -6,7 +6,7 @@ toolchain go1.25.8
 
 require (
 	github.com/google/go-cmp v0.7.0
-	github.com/metallb/frr-k8s v0.0.22
+	github.com/metallb/frr-k8s v0.0.23
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
@@ -58,7 +58,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
