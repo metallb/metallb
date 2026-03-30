@@ -1842,6 +1842,116 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 		})
+		ginkgo.It("IPV4 BGP Timer Update", func() {
+			initialHoldTime := 180 * time.Second
+			initialKeepaliveTime := 60 * time.Second
+			updatedHoldTime := 30 * time.Second
+			updatedKeepaliveTime := 10 * time.Second
+
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "bgp-test",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{v4PoolAddresses},
+						},
+					},
+				},
+				Peers: metallb.PeersForContainers(FRRContainers, ipfamily.IPv4, func(p *metallbv1beta2.BGPPeer) {
+					p.Spec.HoldTime = &metav1.Duration{Duration: initialHoldTime}
+					p.Spec.KeepaliveTime = &metav1.Duration{Duration: initialKeepaliveTime}
+				}),
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
+			}
+
+			for _, c := range FRRContainers {
+				err := frrcontainer.PairWithNodes(cs, c, ipfamily.IPv4)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Verify initial BGP timers in speaker pods")
+			speakerPods, err := metallb.SpeakerPods(cs)
+			Expect(err).NotTo(HaveOccurred())
+
+			initialHoldMsecs := int(initialHoldTime.Milliseconds())
+			initialKeepaliveMsecs := int(initialKeepaliveTime.Milliseconds())
+			expectSpeakerConfiguredTimers := func(pods []*corev1.Pod, holdMs, keepaliveMs int) {
+				for _, pod := range pods {
+					podExecutor, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
+					Expect(err).NotTo(HaveOccurred())
+					Eventually(func() error {
+						neighbors, err := frr.NeighborsInfo(podExecutor)
+						if err != nil {
+							return err
+						}
+						if len(neighbors) == 0 {
+							return fmt.Errorf("expected at least 1 BGP neighbor on speaker, got 0")
+						}
+						for _, n := range neighbors {
+							if n.ConfiguredHoldTime != holdMs {
+								return fmt.Errorf("neighbor %s: expected configured hold time %d ms, got %d ms",
+									n.ID, holdMs, n.ConfiguredHoldTime)
+							}
+							if n.ConfiguredKeepAliveTime != keepaliveMs {
+								return fmt.Errorf("neighbor %s: expected configured keepalive %d ms, got %d ms",
+									n.ID, keepaliveMs, n.ConfiguredKeepAliveTime)
+							}
+						}
+						return nil
+					}, 2*time.Minute, time.Second).ShouldNot(HaveOccurred())
+				}
+			}
+			expectSpeakerConfiguredTimers(speakerPods, initialHoldMsecs, initialKeepaliveMsecs)
+
+			ginkgo.By("Update BGP timers")
+			resources.Peers = metallb.PeersForContainers(FRRContainers, ipfamily.IPv4, func(p *metallbv1beta2.BGPPeer) {
+				p.Spec.HoldTime = &metav1.Duration{Duration: updatedHoldTime}
+				p.Spec.KeepaliveTime = &metav1.Duration{Duration: updatedKeepaliveTime}
+			})
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Verify updated timers in speaker pods")
+			expectSpeakerConfiguredTimers(speakerPods, int(updatedHoldTime.Milliseconds()), int(updatedKeepaliveTime.Milliseconds()))
+
+			ginkgo.By("Reset BGP connection on FRR containers to re-establish with new timers")
+			for _, c := range FRRContainers {
+				_, err := c.Exec("vtysh", "-c", "clear bgp *")
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			ginkgo.By("Verify BGP timers on FRR containers after re-establishment")
+			expectedHoldTimeMsecs := int(updatedHoldTime.Milliseconds())
+			expectedKeepaliveMsecs := int(updatedKeepaliveTime.Milliseconds())
+
+			for _, c := range FRRContainers {
+				Eventually(func() error {
+					neighbors, err := frr.NeighborsInfo(c)
+					if err != nil {
+						return err
+					}
+					if len(neighbors) == 0 {
+						return fmt.Errorf("expected at least 1 neighbor, got 0")
+					}
+					for _, neighbor := range neighbors {
+						if neighbor.NegotiatedHoldTime != expectedHoldTimeMsecs {
+							return fmt.Errorf("neighbor %s: expected negotiated hold time %d ms, got %d ms",
+								neighbor.ID, expectedHoldTimeMsecs, neighbor.NegotiatedHoldTime)
+						}
+						if neighbor.NegotiatedKeepAliveInterval != expectedKeepaliveMsecs {
+							return fmt.Errorf("neighbor %s: expected negotiated keepalive %d ms, got %d ms",
+								neighbor.ID, expectedKeepaliveMsecs, neighbor.NegotiatedKeepAliveInterval)
+						}
+					}
+					return nil
+				}, 3*time.Minute, time.Second).ShouldNot(HaveOccurred())
+			}
+		})
 	})
 	ginkgo.DescribeTable("A service of protocol load balancer should work with two protocols", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
 		_, svc := setupBGPService(cs, testNamespace, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
