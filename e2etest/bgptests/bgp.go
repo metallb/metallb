@@ -183,7 +183,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			err = metallb.RestartSpeakerPods(cs)
 			Expect(err).NotTo(HaveOccurred())
 
-			if gracefulRestart == GracefulRestartDisabled {
+			if !gracefulRestart {
 				Eventually(func() error {
 					for _, c := range FRRContainers {
 						err := validateServiceNoWait(svc, allNodes.Items, c)
@@ -1564,7 +1564,6 @@ var _ = ginkgo.Describe("BGP", func() {
 
 				routers := map[string]frrk8sv1beta1.Router{}
 				for _, p := range resources.Peers {
-					p := p
 					r := routers[p.Spec.VRFName]
 					r.ASN = p.Spec.MyASN
 					r.VRF = p.Spec.VRFName
@@ -1833,7 +1832,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						neighborFamily := ipfamily.ForAddress(net.ParseIP(neighbor.ID))
 						for _, family := range neighbor.AddressFamilies {
 							if !strings.Contains(family, string(neighborFamily)) {
-								return fmt.Errorf("expected %s neigbour to contain only %s families but contains %s", neighbor.ID, neighborFamily, family)
+								return fmt.Errorf("expected %s neighbour to contain only %s families but contains %s", neighbor.ID, neighborFamily, family)
 							}
 						}
 					}
@@ -1951,6 +1950,118 @@ var _ = ginkgo.Describe("BGP", func() {
 					return nil
 				}, 3*time.Minute, time.Second).ShouldNot(HaveOccurred())
 			}
+		})
+		ginkgo.Context("IPV4 BGP connect time", func() {
+			expectConnectTimeOnSpeakers := func(speakerPods []*corev1.Pod, expectedSeconds int) {
+				for _, pod := range speakerPods {
+					podExec, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
+					Expect(err).NotTo(HaveOccurred())
+					Eventually(func() error {
+						neighbors, err := frr.NeighborsInfo(podExec)
+						if err != nil {
+							return err
+						}
+						if len(neighbors) == 0 {
+							return fmt.Errorf("expected at least 1 neighbor, got %d", len(neighbors))
+						}
+						for _, neighbor := range neighbors {
+							if neighbor.ConfiguredConnectTime != expectedSeconds {
+								return fmt.Errorf("expected connect time to be %d, got %d", expectedSeconds, neighbor.ConfiguredConnectTime)
+							}
+						}
+						return nil
+					}, 2*time.Minute, time.Second).ShouldNot(HaveOccurred())
+				}
+			}
+
+			ginkgo.It("IPV4 retry timer reconnects to neighbor within connect time after BGP reset", func() {
+				connectTime := 10 * time.Second
+				resources := config.Resources{
+					Peers: metallb.PeersForContainers(FRRContainers, ipfamily.IPv4, func(p *metallbv1beta2.BGPPeer) {
+						p.Spec.ConnectTime = ptr.To(metav1.Duration{Duration: connectTime})
+					}),
+				}
+				err := ConfigUpdater.Update(resources)
+				Expect(err).NotTo(HaveOccurred())
+
+				for _, c := range FRRContainers {
+					err := frrcontainer.PairWithNodes(cs, c, ipfamily.IPv4)
+					Expect(err).NotTo(HaveOccurred())
+				}
+				for _, c := range FRRContainers {
+					validateFRRPeeredWithAllNodes(cs, c, ipfamily.IPv4)
+				}
+
+				speakerPods, err := metallb.SpeakerPods(cs)
+				Expect(err).NotTo(HaveOccurred())
+				expectConnectTimeOnSpeakers(speakerPods, int(connectTime.Seconds()))
+
+				ginkgo.By("Resetting BGP session from external FRR container")
+				_, err = FRRContainers[0].Exec("vtysh", "-c", "clear bgp *")
+				Expect(err).NotTo(HaveOccurred())
+
+				ginkgo.By("Verifying BGP session re-establishes within connect time")
+				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				Eventually(func() error {
+					neighbors, err := frr.NeighborsInfo(FRRContainers[0])
+					if err != nil {
+						return err
+					}
+					return frr.NeighborsMatchNodes(allNodes.Items, neighbors, ipfamily.IPv4, FRRContainers[0].RouterConfig.VRF)
+				}, connectTime, time.Second).ShouldNot(HaveOccurred())
+			})
+
+			ginkgo.It("IPV4 update connect time to less than default on an existing BGP connection", func() {
+				resources := config.Resources{
+					Peers: metallb.PeersForContainers(FRRContainers, ipfamily.IPv4),
+				}
+				err := ConfigUpdater.Update(resources)
+				Expect(err).NotTo(HaveOccurred())
+
+				for _, c := range FRRContainers {
+					err := frrcontainer.PairWithNodes(cs, c, ipfamily.IPv4)
+					Expect(err).NotTo(HaveOccurred())
+				}
+				for _, c := range FRRContainers {
+					validateFRRPeeredWithAllNodes(cs, c, ipfamily.IPv4)
+				}
+
+				speakerPods, err := metallb.SpeakerPods(cs)
+				Expect(err).NotTo(HaveOccurred())
+
+				var baselineConnect int
+				Eventually(func() error {
+					podExec, err := FRRProvider.FRRExecutorFor(speakerPods[0].Namespace, speakerPods[0].Name)
+					if err != nil {
+						return err
+					}
+					neighbors, err := frr.NeighborsInfo(podExec)
+					if err != nil {
+						return err
+					}
+					if len(neighbors) == 0 {
+						return fmt.Errorf("expected at least 1 neighbor, got 0")
+					}
+					for _, n := range neighbors {
+						if n.ConfiguredConnectTime > 0 {
+							baselineConnect = n.ConfiguredConnectTime
+							return nil
+						}
+					}
+					return fmt.Errorf("connect retry timer not populated yet")
+				}, 2*time.Minute, time.Second).ShouldNot(HaveOccurred())
+				expectConnectTimeOnSpeakers(speakerPods, baselineConnect)
+
+				ginkgo.By("Updating BGP peer connect time to 10 seconds")
+				resources.Peers = metallb.PeersForContainers(FRRContainers, ipfamily.IPv4, func(p *metallbv1beta2.BGPPeer) {
+					p.Spec.ConnectTime = ptr.To(metav1.Duration{Duration: 10 * time.Second})
+				})
+				err = ConfigUpdater.Update(resources)
+				Expect(err).NotTo(HaveOccurred())
+
+				expectConnectTimeOnSpeakers(speakerPods, 10)
+			})
 		})
 	})
 	ginkgo.DescribeTable("A service of protocol load balancer should work with two protocols", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
