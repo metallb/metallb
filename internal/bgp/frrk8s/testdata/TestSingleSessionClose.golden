@@ -4,9 +4,7 @@
         "namespace": "testnamespace"
     },
     "spec": {
-        "bgp": {
-            "routers": []
-        },
+        "bgp": {},
         "raw": {},
         "nodeSelector": {
             "matchLabels": {
