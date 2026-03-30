@@ -64,6 +64,7 @@ const (
 	v6PoolAddresses       = "fc00:f853:0ccd:e799::/124"
 	CommunityNoAdv        = "65535:65282" // 0xFFFFFF02: NO_ADVERTISE
 	CommunityGracefulShut = "65535:0"     // GRACEFUL_SHUTDOWN
+	CustomCommunity       = "123:456"     // custom community for BGP advertisement update tests
 	SpeakerContainerName  = "speaker"
 
 	GracefulRestartEnabled  = true
@@ -1277,6 +1278,140 @@ var _ = ginkgo.Describe("BGP", func() {
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}))
 	})
+
+	ginkgo.DescribeTable("BGP advertisement updates of communities and localpref and aggregation length", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
+		bgpAdv := metallbv1beta1.BGPAdvertisement{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "adv-updates",
+				Namespace: ConfigUpdater.Namespace(),
+			},
+			Spec: metallbv1beta1.BGPAdvertisementSpec{
+				Communities:    []string{CommunityNoAdv},
+				LocalPref:      100,
+				IPAddressPools: []string{"bgp-test"},
+			},
+		}
+
+		resources := config.Resources{
+			Pools: []metallbv1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
+					Spec: metallbv1beta1.IPAddressPoolSpec{
+						Addresses: poolAddresses,
+					},
+				},
+			},
+			Peers:   metallb.PeersForContainers(FRRContainers, pairingIPFamily),
+			BGPAdvs: []metallbv1beta1.BGPAdvertisement{bgpAdv},
+		}
+
+		for _, c := range FRRContainers {
+			err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		err := ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, c := range FRRContainers {
+			validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
+		}
+
+		serviceIP, err := config.GetIPFromRangeByIndex(poolAddresses[0], 0)
+		Expect(err).NotTo(HaveOccurred())
+
+		svc, _ := testservice.CreateWithBackend(cs, testNamespace, "bgp-adv-updates-svc", func(svc *corev1.Service) {
+			svc.Spec.LoadBalancerIP = serviceIP
+		}, testservice.TrafficPolicyCluster)
+		defer testservice.Delete(cs, svc)
+
+		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		ginkgo.By("Validating BGP route prefix")
+		for _, c := range FRRContainers {
+			validateService(svc, allNodes.Items, c)
+		}
+
+		ginkgo.By("Validate BGP Community is received on the FRR containers")
+		for _, c := range FRRContainers {
+			Eventually(func() (map[string]frr.Route, error) {
+				return frr.RoutesForCommunity(c, CommunityNoAdv, pairingIPFamily)
+			}, time.Minute, time.Second).Should(
+				HaveKey(serviceIP),
+				"BGP routes should contain service IP for community %s",
+				CommunityNoAdv,
+			)
+		}
+
+		ginkgo.By("Validate BGP Local Preference received on FRR containers")
+		for _, c := range FRRContainers {
+			if strings.Contains(c.Name, "ibgp") {
+				Eventually(func() (uint32, error) {
+					return frr.LocalPrefForPrefix(c, serviceIP, pairingIPFamily)
+				}, time.Minute, time.Second).Should(Equal(uint32(100)))
+			}
+		}
+
+		ginkgo.By("Update BGP Advertisements")
+		err = ConfigUpdater.Client().Get(context.TODO(), types.NamespacedName{Namespace: bgpAdv.Namespace, Name: bgpAdv.Name}, &bgpAdv)
+		Expect(err).NotTo(HaveOccurred())
+
+		switch pairingIPFamily {
+		case ipfamily.IPv4:
+			bgpAdv.Spec.LocalPref = 200
+			bgpAdv.Spec.AggregationLength = ptr.To(int32(28))
+			bgpAdv.Spec.Communities = []string{CustomCommunity}
+		case ipfamily.IPv6:
+			bgpAdv.Spec.LocalPref = 200
+			bgpAdv.Spec.AggregationLengthV6 = ptr.To(int32(124))
+			bgpAdv.Spec.Communities = []string{CustomCommunity}
+		default:
+			ginkgo.Fail("unsupported family for BGP advertisement updates test")
+		}
+		err = ConfigUpdater.Client().Update(context.TODO(), &bgpAdv)
+		Expect(err).NotTo(HaveOccurred())
+
+		ginkgo.By("Validating updated BGP route prefix (aggregated)")
+		ip := net.ParseIP(serviceIP)
+		Expect(ip).NotTo(BeNil())
+		var subnet *net.IPNet
+		if pairingIPFamily == ipfamily.IPv4 {
+			subnet = &net.IPNet{IP: ip.Mask(net.CIDRMask(28, 32)), Mask: net.CIDRMask(28, 32)}
+		} else {
+			subnet = &net.IPNet{IP: ip.Mask(net.CIDRMask(124, 128)), Mask: net.CIDRMask(124, 128)}
+		}
+		// ParseRoutes indexes maps by destination IP string (see frr.ParseRoutes), not full CIDR.
+		aggregatedRouteKey := subnet.IP.String()
+
+		for _, c := range FRRContainers {
+			Eventually(func() (map[string]frr.Route, error) {
+				return frr.RoutesForFamily(c, pairingIPFamily)
+			}, time.Minute, time.Second).Should(HaveKey(aggregatedRouteKey))
+		}
+
+		ginkgo.By("Validate BGP Community received on FRR containers")
+		for _, c := range FRRContainers {
+			Eventually(func() (map[string]frr.Route, error) {
+				return frr.RoutesForCommunity(c, CustomCommunity, pairingIPFamily)
+			}, time.Minute, time.Second).Should(
+				HaveKey(aggregatedRouteKey),
+				"BGP routes should contain aggregated subnet for community %s",
+				CustomCommunity,
+			)
+		}
+
+		ginkgo.By("Validate BGP Local Preference on FRR containers")
+		for _, c := range FRRContainers {
+			if strings.Contains(c.Name, "ibgp") {
+				Eventually(func() (uint32, error) {
+					return frr.LocalPrefForPrefix(c, aggregatedRouteKey, pairingIPFamily)
+				}, time.Minute, time.Second).Should(Equal(uint32(200)))
+			}
+		}
+	},
+		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}),
+		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}))
 
 	ginkgo.Context("MetalLB FRR rejects", func() {
 		ginkgo.DescribeTable("any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family) {
