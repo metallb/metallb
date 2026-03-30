@@ -32,6 +32,7 @@ import (
 	"go.universe.tf/e2etest/configurationstatetests"
 	"go.universe.tf/e2etest/l2tests"
 	_ "go.universe.tf/e2etest/netpoltests"
+	"go.universe.tf/e2etest/servicetests"
 	testsconfig "go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
 	frrprovider "go.universe.tf/e2etest/pkg/frr/provider"
@@ -190,12 +191,14 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
+	servicetests.ConfigUpdater = updater
 	webhookstests.ConfigUpdater = updater
 	webhookstests.ConfigUpdaterOtherNS = updaterOtherNS
 	configurationstatetests.ConfigUpdater = updater
 	bgptests.Reporter = reporter
 	bgptests.ReportPath = reportPath
 	l2tests.Reporter = reporter
+	servicetests.Reporter = reporter
 	webhookstests.Reporter = reporter
 	configurationstatetests.Reporter = reporter
 	bgptests.PrometheusNamespace = prometheusNamespace
