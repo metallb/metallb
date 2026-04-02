@@ -339,6 +339,9 @@
             "tolerateMaster": {
               "type": "boolean"
             },
+            "hostNetwork": {
+              "type": "boolean"
+            },
             "memberlist": {
               "type": "object",
               "properties": {
