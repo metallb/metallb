@@ -168,7 +168,7 @@ spec:
       {{- end }}
       serviceAccountName: {{ template "metallb.speaker.serviceAccountName" . }}
       terminationGracePeriodSeconds: 0
-      hostNetwork: true
+      hostNetwork: {{ .Values.speaker.hostNetwork }}
       {{- if .Values.speaker.securityContext }}
       securityContext:
         {{- toYaml .Values.speaker.securityContext | nindent 8 }}
