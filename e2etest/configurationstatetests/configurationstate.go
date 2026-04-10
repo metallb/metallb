@@ -30,6 +30,7 @@ import (
 var (
 	ConfigUpdater config.Updater
 	Reporter      *k8sreporter.KubernetesReporter
+	BGPMode       string
 
 	validStatus = metallbv1beta1.ConfigurationStateStatus{
 		Result:       metallbv1beta1.ConfigurationResultValid,
@@ -426,6 +427,81 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		Eventually(func() error {
 			return allStatesExist(allNodes)
 		}, 30*time.Second, 5*time.Second).Should(Succeed())
+	})
+
+	ginkgo.It("should surface configState error when node relabeling causes BGPPeer conflict in FRR mode", func() {
+		if len(allNodes.Items) < 2 {
+			ginkgo.Skip("at least 2 nodes required for node-relabeling conflict test")
+		}
+
+		node0 := allNodes.Items[0]
+		node1 := allNodes.Items[1]
+		// Use distinct label keys per peer so that adding the conflict label to
+		// node1 mid-test does not overwrite (and thus remove) its existing label.
+		const labelKeyA = "metallb.io/test-peer-a"
+		const labelKeyB = "metallb.io/test-peer-b"
+
+		cs := k8sclient.New()
+		ginkgo.By("Adding disjoint custom labels to two nodes")
+		k8s.AddLabelToNode(node0.Name, labelKeyA, "true", cs)
+		k8s.AddLabelToNode(node1.Name, labelKeyB, "true", cs)
+		ginkgo.DeferCleanup(func() {
+			k8s.RemoveLabelFromNode(node0.Name, labelKeyA, cs)
+			k8s.RemoveLabelFromNode(node1.Name, labelKeyB, cs)
+			k8s.RemoveLabelFromNode(node1.Name, labelKeyA, cs)
+		})
+
+		ginkgo.By("Creating two BGPPeers with same address but disjoint nodeSelectors")
+		resources := config.Resources{
+			Peers: []metallbv1beta2.BGPPeer{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "peer-conflict-1"},
+					Spec: metallbv1beta2.BGPPeerSpec{
+						Address: "10.200.200.2",
+						ASN:     64500,
+						MyASN:   64500,
+						NodeSelectors: []metav1.LabelSelector{
+							{MatchLabels: map[string]string{labelKeyA: "true"}},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "peer-conflict-2"},
+					Spec: metallbv1beta2.BGPPeerSpec{
+						Address: "10.200.200.2",
+						ASN:     64500,
+						MyASN:   64500,
+						NodeSelectors: []metav1.LabelSelector{
+							{MatchLabels: map[string]string{labelKeyB: "true"}},
+						},
+					},
+				},
+			},
+		}
+		err := ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred(), "webhook should allow BGPPeers with disjoint nodeSelectors")
+
+		ginkgo.By("Adding labelKeyA to node1 so it matches both peers, causing a conflict")
+		k8s.AddLabelToNode(node1.Name, labelKeyA, "true", cs)
+
+		speakerStateName := "speaker-" + node1.Name
+		wantInvalidStatus := metallbv1beta1.ConfigurationStateStatus{
+			Result:       metallbv1beta1.ConfigurationResultInvalid,
+			ErrorSummary: "configuration error: peer 10.200.200.2 already exists, FRR mode doesn't support duplicate BGPPeers selecting the same node",
+		}
+
+		ginkgo.By("Verifying configState for node1's speaker surfaces a duplicate-peer conflict error")
+		Eventually(func() error {
+			return stateMatches(speakerStateName, wantInvalidStatus)
+		}, 30*time.Second, 5*time.Second).Should(Succeed())
+
+		ginkgo.By("Removing the conflicting label from node1 to restore disjoint state")
+		k8s.RemoveLabelFromNode(node1.Name, labelKeyA, cs)
+
+		ginkgo.By("Verifying configState for node1's speaker recovers to valid")
+		Eventually(func() error {
+			return stateMatches(speakerStateName, validStatus)
+		}, 60*time.Second, 5*time.Second).Should(Succeed())
 	})
 
 	ginkgo.It("FRR - should preserve invalid state after all ConfigurationStates are deleted and recreated", func() {

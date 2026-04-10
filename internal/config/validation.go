@@ -10,6 +10,7 @@ import (
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/ipfamily"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -145,29 +146,46 @@ func DontValidate(c ClusterResources) error {
 // DiscardNativeOnly returns an error if the current configFile contains
 // any options that are available only in the native implementation.
 func DiscardNativeOnly(c ClusterResources) error {
-	if len(c.Peers) > 1 {
-		peerAddr := make(map[string]bool)
-		routerID := c.Peers[0].Spec.RouterID
-		peer0 := peerIdentifier(c.Peers[0].Spec)
-		peerAddr[peer0] = true
-		for _, p := range c.Peers[1:] {
-			if p.Spec.RouterID != routerID {
-				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
+	if err := checkFRRPeersCompatible(c); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkFRRPeersCompatible validates that all BGPPeer combinations are valid for
+// FRR mode. Peers with disjoint nodeSelectors are exempt from constraints that
+// only apply when two peers share the same FRR instance (i.e. the same node).
+func checkFRRPeersCompatible(c ClusterResources) error {
+	for i, p := range c.Peers {
+		for j := 0; j < i; j++ {
+			q := c.Peers[j]
+			shares, err := peersShareNode(p, q, c.Nodes)
+			if err != nil {
+				return err
 			}
-			peerID := peerIdentifier(p.Spec)
-			if _, ok := peerAddr[peerID]; ok {
-				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", p.Spec.Address)
+			if !shares {
+				continue
 			}
-			peerAddr[peerID] = true
+			if err := peersCanRunOnSameNode(p, q); err != nil {
+				return err
+			}
 		}
 	}
-	for _, p := range c.Peers {
-		for _, p1 := range c.Peers[1:] {
-			if p.Spec.MyASN != p1.Spec.MyASN &&
-				p.Spec.VRFName == p1.Spec.VRFName {
-				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal for the same VRF", p.Spec.Address, p1.Spec.Address)
-			}
-		}
+	return nil
+}
+
+// peersCanRunOnSameNode returns an error if two peers that are scheduled on the
+// same node violate FRR-mode constraints (same RouterID, no duplicate address,
+// same myASN within a VRF).
+func peersCanRunOnSameNode(p, q metallbv1beta2.BGPPeer) error {
+	if p.Spec.RouterID != q.Spec.RouterID {
+		return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode peers selecting the same node must all have the same RouterID", p.Spec.RouterID, q.Spec.RouterID)
+	}
+	if PeerIdentifier(p.Spec) == PeerIdentifier(q.Spec) {
+		return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers selecting the same node", PeerIdentifier(p.Spec))
+	}
+	if p.Spec.MyASN != q.Spec.MyASN && p.Spec.VRFName == q.Spec.VRFName {
+		return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode peers selecting the same node must have the same myAsn within the same VRF", PeerIdentifier(p.Spec), PeerIdentifier(q.Spec))
 	}
 	return nil
 }
@@ -218,12 +236,41 @@ func hasBFDEcho(peer *Peer, bfdProfiles map[string]*BFDProfile) bool {
 	return false
 }
 
-func peerIdentifier(peer metallbv1beta2.BGPPeerSpec) string {
+// PeerIdentifier returns a stable string key for a peer. For peers in the
+// default VRF (VRFName == ""), the key is just the address or interface name.
+// For peers in a named VRF the key is "address-vrf" or "interface-vrf".
+func PeerIdentifier(peer metallbv1beta2.BGPPeerSpec) string {
 	id := peer.Address
 	if peer.Address == "" {
 		id = peer.Interface
 	}
+	if peer.VRFName == "" {
+		return id
+	}
 	return fmt.Sprintf("%s-%s", id, peer.VRFName)
+}
+
+// peersShareNode returns true if any cluster node matches both p1 and p2's
+// nodeSelectors, meaning the two peers would be configured on the same FRR
+// instance. Conservatively returns true when no nodes are known.
+func peersShareNode(p1, p2 metallbv1beta2.BGPPeer, nodes []corev1.Node) (bool, error) {
+	if len(nodes) == 0 {
+		return true, nil
+	}
+	nodes1, err := selectedNodes(nodes, p1.Spec.NodeSelectors)
+	if err != nil {
+		return false, err
+	}
+	nodes2, err := selectedNodes(nodes, p2.Spec.NodeSelectors)
+	if err != nil {
+		return false, err
+	}
+	for name := range nodes1 {
+		if nodes2[name] {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 type poolSelector struct {

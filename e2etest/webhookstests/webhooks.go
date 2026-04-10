@@ -32,6 +32,7 @@ import (
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,6 +42,7 @@ var (
 	ConfigUpdater        config.Updater
 	ConfigUpdaterOtherNS config.Updater
 	Reporter             *k8sreporter.KubernetesReporter
+	BGPMode              string
 )
 
 var _ = ginkgo.Describe("Webhooks", func() {
@@ -207,6 +209,88 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			err := ConfigUpdater.Update(resources)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid BGPPeer address"))
+		})
+
+		ginkgo.It("Should reject two BGPPeers with the same address and overlapping nodeSelectors in FRR mode", func() {
+			if BGPMode == "native" {
+				ginkgo.Skip("duplicate BGPPeer address check is FRR-mode only")
+			}
+
+			ginkgo.By("Listing cluster nodes")
+			nodeList := &corev1.NodeList{}
+			err := ConfigUpdater.Client().List(context.Background(), nodeList)
+			Expect(err).NotTo(HaveOccurred())
+			if len(nodeList.Items) == 0 {
+				ginkgo.Skip("no nodes available")
+			}
+
+			ginkgo.By("Creating two BGPPeers with the same address and overlapping nodeSelectors")
+			sharedNodeSelector := k8s.SelectorsForNodes(nodeList.Items[:1])
+			resources := config.Resources{
+				Peers: []metallbv1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "peer-dup-1"},
+						Spec: metallbv1beta2.BGPPeerSpec{
+							Address:       "10.200.200.1",
+							ASN:           64500,
+							MyASN:         64500,
+							NodeSelectors: sharedNodeSelector,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "peer-dup-2"},
+						Spec: metallbv1beta2.BGPPeerSpec{
+							Address:       "10.200.200.1",
+							ASN:           64500,
+							MyASN:         64500,
+							NodeSelectors: sharedNodeSelector,
+						},
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("already exists"))
+		})
+
+		ginkgo.It("Should allow two BGPPeers with the same address when nodeSelectors are disjoint", func() {
+			if BGPMode == "native" {
+				ginkgo.Skip("duplicate BGPPeer address check is FRR-mode only")
+			}
+
+			ginkgo.By("Listing cluster nodes")
+			nodeList := &corev1.NodeList{}
+			err := ConfigUpdater.Client().List(context.Background(), nodeList)
+			Expect(err).NotTo(HaveOccurred())
+			if len(nodeList.Items) < 2 {
+				ginkgo.Skip("at least 2 nodes are required for a disjoint nodeSelector test")
+			}
+
+			ginkgo.By("Creating two BGPPeers with the same address but disjoint nodeSelectors")
+			resources := config.Resources{
+				Peers: []metallbv1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "peer-disjoint-1"},
+						Spec: metallbv1beta2.BGPPeerSpec{
+							Address:       "10.200.200.1",
+							ASN:           64500,
+							MyASN:         64500,
+							NodeSelectors: k8s.SelectorsForNodes(nodeList.Items[:1]),
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "peer-disjoint-2"},
+						Spec: metallbv1beta2.BGPPeerSpec{
+							Address:       "10.200.200.1",
+							ASN:           64500,
+							MyASN:         64500,
+							NodeSelectors: k8s.SelectorsForNodes(nodeList.Items[1:2]),
+						},
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 

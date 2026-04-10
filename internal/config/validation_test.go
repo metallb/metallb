@@ -8,9 +8,27 @@ import (
 
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
+
+// peerOnNodes returns a BGPPeer for address "1.2.3.4" selecting nodes by hostname (OR semantics).
+func peerOnNodes(hostnames ...string) v1beta2.BGPPeer {
+	sels := make([]v1.LabelSelector, len(hostnames))
+	for i, h := range hostnames {
+		sels[i] = v1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/hostname": h}}
+	}
+	return v1beta2.BGPPeer{Spec: v1beta2.BGPPeerSpec{Address: "1.2.3.4", NodeSelectors: sels}}
+}
+
+// hostNode returns a Node with the given name and kubernetes.io/hostname label.
+func hostNode(hostname string) corev1.Node {
+	return corev1.Node{ObjectMeta: v1.ObjectMeta{
+		Name:   hostname,
+		Labels: map[string]string{"kubernetes.io/hostname": hostname},
+	}}
+}
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
@@ -598,6 +616,88 @@ func TestValidateFRR(t *testing.T) {
 						},
 					},
 				},
+			},
+			mustFail: true,
+		},
+		// Node-selector-aware duplicate detection: same address is only a real
+		// duplicate when both peers can be scheduled on the same node.
+		{
+			desc: "duplicate address, disjoint hostname selectors",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{peerOnNodes("node1"), peerOnNodes("node2")},
+				Nodes: []corev1.Node{hostNode("node1"), hostNode("node2")},
+			},
+		},
+		{
+			desc: "duplicate address, overlapping hostname selectors",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{peerOnNodes("node1"), peerOnNodes("node1")},
+				Nodes: []corev1.Node{hostNode("node1")},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "duplicate address, one peer without nodeSelector matches all nodes",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{Spec: v1beta2.BGPPeerSpec{Address: "1.2.3.4"}}, // no selector = all nodes
+					peerOnNodes("node1"),
+				},
+				Nodes: []corev1.Node{hostNode("node1")},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "duplicate address, disjoint selectors but no nodes known (conservative)",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{peerOnNodes("node1"), peerOnNodes("node2")},
+				// No Nodes: conservative fallback must reject.
+			},
+			mustFail: true,
+		},
+		{
+			desc: "three peers same address, all on distinct nodes",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					peerOnNodes("node1"),
+					peerOnNodes("node2"),
+					peerOnNodes("node3"),
+				},
+				Nodes: []corev1.Node{hostNode("node1"), hostNode("node2"), hostNode("node3")},
+			},
+		},
+		{
+			desc: "three peers same address, third overlaps with first",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					peerOnNodes("node1"),
+					peerOnNodes("node2"),
+					peerOnNodes("node1"), // collides with first peer
+				},
+				Nodes: []corev1.Node{hostNode("node1"), hostNode("node2")},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "duplicate address, multiple nodeSelectors (OR), disjoint",
+			// peer1: node1 OR node2; peer2: node3 OR node4 → no overlap
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					peerOnNodes("node1", "node2"),
+					peerOnNodes("node3", "node4"),
+				},
+				Nodes: []corev1.Node{hostNode("node1"), hostNode("node2"), hostNode("node3"), hostNode("node4")},
+			},
+		},
+		{
+			desc: "duplicate address, multiple nodeSelectors (OR), overlap via second selector",
+			// peer1: node1 OR node2; peer2: node3 OR node2 → node2 overlaps
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					peerOnNodes("node1", "node2"),
+					peerOnNodes("node3", "node2"),
+				},
+				Nodes: []corev1.Node{hostNode("node1"), hostNode("node2"), hostNode("node3")},
 			},
 			mustFail: true,
 		},
