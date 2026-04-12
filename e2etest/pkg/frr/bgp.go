@@ -3,10 +3,9 @@
 package frr
 
 import (
+	"errors"
 	"fmt"
 	"strings"
-
-	"errors"
 
 	"go.universe.tf/e2etest/pkg/executor"
 

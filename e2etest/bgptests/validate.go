@@ -125,12 +125,12 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 		var serr error
 		for k, v := range frrRoutesV4 {
 			if v.Stale {
-				serr = errors.Join(serr, errors.New(fmt.Sprintf("%s -%v", k, v)))
+				serr = errors.Join(serr, fmt.Errorf("%s -%v", k, v))
 			}
 		}
 		for k, v := range frrRoutesV6 {
 			if v.Stale {
-				serr = errors.Join(serr, errors.New(fmt.Sprintf("%s -%v", k, v)))
+				serr = errors.Join(serr, fmt.Errorf("%s -%v", k, v))
 			}
 		}
 		if serr != nil {
