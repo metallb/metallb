@@ -8,6 +8,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"go.universe.tf/metallb/api/v1beta2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,8 +34,14 @@ func TestValidateBGPPeer(t *testing.T) {
 		}, nil
 	}
 
+	toRestoreNodes := GetExistingNodes
+	GetExistingNodes = func() (*corev1.NodeList, error) {
+		return &corev1.NodeList{}, nil
+	}
+
 	defer func() {
 		GetExistingBGPPeers = toRestore
+		GetExistingNodes = toRestoreNodes
 	}()
 
 	tests := []struct {

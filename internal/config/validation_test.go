@@ -8,6 +8,7 @@ import (
 
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -496,6 +497,112 @@ func TestValidateFRR(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			desc: "myAsn different, same VRF, peers on disjoint nodes via nodeSelectors",
+			config: ClusterResources{
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "node-a",
+							Labels: map[string]string{"role": "worker"},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "node-b",
+							Labels: map[string]string{"role": "infra"},
+						},
+					},
+				},
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							MyASN:   100,
+							NodeSelectors: []v1.LabelSelector{
+								{MatchLabels: map[string]string{"role": "worker"}},
+							},
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.5",
+							MyASN:   200,
+							NodeSelectors: []v1.LabelSelector{
+								{MatchLabels: map[string]string{"role": "infra"}},
+							},
+						},
+					},
+				},
+			},
+			mustFail: false,
+		},
+		{
+			desc: "myAsn different, same VRF, peers overlap on shared node via nodeSelectors",
+			config: ClusterResources{
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "node-a",
+							Labels: map[string]string{"role": "worker"},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "node-b",
+							Labels: map[string]string{"role": "worker"},
+						},
+					},
+				},
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							MyASN:   100,
+							NodeSelectors: []v1.LabelSelector{
+								{MatchLabels: map[string]string{"role": "worker"}},
+							},
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.5",
+							MyASN:   200,
+							NodeSelectors: []v1.LabelSelector{
+								{MatchLabels: map[string]string{"role": "worker"}},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "myAsn different, same VRF, no nodes available (conservative: fail)",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							MyASN:   100,
+							NodeSelectors: []v1.LabelSelector{
+								{MatchLabels: map[string]string{"role": "worker"}},
+							},
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.5",
+							MyASN:   200,
+							NodeSelectors: []v1.LabelSelector{
+								{MatchLabels: map[string]string{"role": "infra"}},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
 		},
 		{
 			desc: "duplicate bgp address",

@@ -10,6 +10,7 @@ import (
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/ipfamily"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -161,15 +162,46 @@ func DiscardNativeOnly(c ClusterResources) error {
 			peerAddr[peerID] = true
 		}
 	}
-	for _, p := range c.Peers {
-		for _, p1 := range c.Peers[1:] {
+	for i := 0; i < len(c.Peers); i++ {
+		for j := i + 1; j < len(c.Peers); j++ {
+			p, p1 := c.Peers[i], c.Peers[j]
 			if p.Spec.MyASN != p1.Spec.MyASN &&
 				p.Spec.VRFName == p1.Spec.VRFName {
-				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal for the same VRF", p.Spec.Address, p1.Spec.Address)
+				shares, err := peersMayShareNode(p, p1, c.Nodes)
+				if err != nil {
+					return err
+				}
+				if shares {
+					return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal for the same VRF",
+						p.Spec.Address, p1.Spec.Address)
+				}
 			}
 		}
 	}
 	return nil
+}
+
+// peersMayShareNode returns true if the two peers could be scheduled on the
+// same node. When no nodes are available the check is conservative and returns
+// true. Empty NodeSelectors mean the peer targets every node.
+func peersMayShareNode(p, p1 metallbv1beta2.BGPPeer, nodes []corev1.Node) (bool, error) {
+	if len(nodes) == 0 {
+		return true, nil
+	}
+	nodesForP, err := selectedNodes(nodes, p.Spec.NodeSelectors)
+	if err != nil {
+		return false, err
+	}
+	nodesForP1, err := selectedNodes(nodes, p1.Spec.NodeSelectors)
+	if err != nil {
+		return false, err
+	}
+	for nodeName := range nodesForP {
+		if nodesForP1[nodeName] {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // validateConfig is meant to validate all the inter-dependencies of a parsed configuration.
