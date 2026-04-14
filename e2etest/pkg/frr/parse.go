@@ -15,23 +15,25 @@ import (
 type Neighbor struct {
 	// ID is the key that vtysh returns for the neighbor,
 	// it can be either IP or interface name if unnumbered.
-	ID                      string
-	VRF                     string
-	Connected               bool
-	LocalAS                 string
-	RemoteAS                string
-	PrefixSent              int
-	Port                    int
-	RemoteRouterID          string
-	GRInfo                  GracefulRestartInfo
-	BFDInfo                 PeerBFDInfo
-	MsgStats                MessageStats
-	ConfiguredHoldTime      int
-	ConfiguredKeepAliveTime int
-	ConfiguredConnectTime   int
-	AddressFamilies         []string
-	ConnectionsDropped      int
-	BGPNeighborAddr         string
+	ID                          string
+	VRF                         string
+	Connected                   bool
+	LocalAS                     string
+	RemoteAS                    string
+	PrefixSent                  int
+	Port                        int
+	RemoteRouterID              string
+	GRInfo                      GracefulRestartInfo
+	BFDInfo                     PeerBFDInfo
+	MsgStats                    MessageStats
+	ConfiguredHoldTime          int
+	ConfiguredKeepAliveTime     int
+	ConfiguredConnectTime       int
+	AddressFamilies             []string
+	ConnectionsDropped          int
+	BGPNeighborAddr             string
+	NegotiatedHoldTime          int
+	NegotiatedKeepAliveInterval int
 }
 
 type Route struct {
@@ -62,7 +64,9 @@ type FRRNeighbor struct {
 	AddressFamilyInfo            map[string]struct {
 		SentPrefixCounter int `json:"sentPrefixCounter"`
 	} `json:"addressFamilyInfo"`
-	ConnectionsDropped int `json:"connectionsDropped"`
+	ConnectionsDropped             int `json:"connectionsDropped"`
+	BgpTimerHoldTimeMsecs          int `json:"bgpTimerHoldTimeMsecs"`
+	BgpTimerKeepAliveIntervalMsecs int `json:"bgpTimerKeepAliveIntervalMsecs"`
 }
 
 type PeerBFDInfo struct {
@@ -180,18 +184,20 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 			prefixSent += s.SentPrefixCounter
 		}
 		return &Neighbor{
-			ID:                      k,
-			Connected:               connected,
-			LocalAS:                 strconv.Itoa(n.LocalAs),
-			RemoteAS:                strconv.Itoa(n.RemoteAs),
-			PrefixSent:              prefixSent,
-			Port:                    n.PortForeign,
-			RemoteRouterID:          n.RemoteRouterID,
-			MsgStats:                n.MsgStats,
-			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
-			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
-			ConnectionsDropped:      n.ConnectionsDropped,
-			BGPNeighborAddr:         n.BGPNeighborAddr,
+			ID:                          k,
+			Connected:                   connected,
+			LocalAS:                     strconv.Itoa(n.LocalAs),
+			RemoteAS:                    strconv.Itoa(n.RemoteAs),
+			PrefixSent:                  prefixSent,
+			Port:                        n.PortForeign,
+			RemoteRouterID:              n.RemoteRouterID,
+			MsgStats:                    n.MsgStats,
+			ConfiguredKeepAliveTime:     n.ConfiguredKeepAliveTimeMSecs,
+			ConfiguredHoldTime:          n.ConfiguredHoldTimeMSecs,
+			ConnectionsDropped:          n.ConnectionsDropped,
+			BGPNeighborAddr:             n.BGPNeighborAddr,
+			NegotiatedHoldTime:          n.BgpTimerHoldTimeMsecs,
+			NegotiatedKeepAliveInterval: n.BgpTimerKeepAliveIntervalMsecs,
 		}, nil
 	}
 	return nil, errors.New("no peers were returned")
@@ -219,22 +225,24 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			addressFamilies = append(addressFamilies, family)
 		}
 		res = append(res, &Neighbor{
-			ID:                      k,
-			Connected:               connected,
-			LocalAS:                 strconv.Itoa(n.LocalAs),
-			RemoteAS:                strconv.Itoa(n.RemoteAs),
-			PrefixSent:              prefixSent,
-			Port:                    n.PortForeign,
-			RemoteRouterID:          n.RemoteRouterID,
-			MsgStats:                n.MsgStats,
-			GRInfo:                  n.GRInfo,
-			BFDInfo:                 n.PeerBFDInfo,
-			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
-			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
-			ConfiguredConnectTime:   n.ConnectRetryTimer,
-			AddressFamilies:         addressFamilies,
-			ConnectionsDropped:      n.ConnectionsDropped,
-			BGPNeighborAddr:         n.BGPNeighborAddr,
+			ID:                          k,
+			Connected:                   connected,
+			LocalAS:                     strconv.Itoa(n.LocalAs),
+			RemoteAS:                    strconv.Itoa(n.RemoteAs),
+			PrefixSent:                  prefixSent,
+			Port:                        n.PortForeign,
+			RemoteRouterID:              n.RemoteRouterID,
+			MsgStats:                    n.MsgStats,
+			GRInfo:                      n.GRInfo,
+			BFDInfo:                     n.PeerBFDInfo,
+			ConfiguredKeepAliveTime:     n.ConfiguredKeepAliveTimeMSecs,
+			ConfiguredHoldTime:          n.ConfiguredHoldTimeMSecs,
+			ConfiguredConnectTime:       n.ConnectRetryTimer,
+			AddressFamilies:             addressFamilies,
+			ConnectionsDropped:          n.ConnectionsDropped,
+			BGPNeighborAddr:             n.BGPNeighborAddr,
+			NegotiatedHoldTime:          n.BgpTimerHoldTimeMsecs,
+			NegotiatedKeepAliveInterval: n.BgpTimerKeepAliveIntervalMsecs,
 		})
 	}
 	return res, nil
