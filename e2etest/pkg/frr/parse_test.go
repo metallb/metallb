@@ -110,6 +110,8 @@ func TestNeighbour(t *testing.T) {
 		ipv4PrefixSent int
 		ipv6PrefixSent int
 		port           int
+		holdTimer      int
+		keepaliveTimer int
 		expectedError  string
 	}{
 		{
@@ -121,6 +123,8 @@ func TestNeighbour(t *testing.T) {
 			1,
 			0,
 			179,
+			180000,
+			60000,
 			"",
 		},
 		{
@@ -132,6 +136,8 @@ func TestNeighbour(t *testing.T) {
 			0,
 			0,
 			180,
+			180000,
+			60000,
 			"",
 		},
 		{
@@ -143,6 +149,8 @@ func TestNeighbour(t *testing.T) {
 			2,
 			1,
 			181,
+			180000,
+			60000,
 			"",
 		},
 	}
@@ -188,6 +196,12 @@ func TestNeighbour(t *testing.T) {
 			}
 			if n.ConnectionsDropped != 2 {
 				t.Fatal("unexpected connections dropped", n.ConnectionsDropped)
+			}
+			if n.NegotiatedHoldTime != tt.holdTimer {
+				t.Fatal("unexpected negotiated hold timer", n.NegotiatedHoldTime)
+			}
+			if n.NegotiatedKeepAliveInterval != tt.keepaliveTimer {
+				t.Fatal("unexpected negotiated keepalive timer", n.NegotiatedKeepAliveInterval)
 			}
 		})
 	}
@@ -526,6 +540,29 @@ func TestNeighbours(t *testing.T) {
 	for i, n := range nn {
 		if !cmp.Equal(expectedStats, n.MsgStats) {
 			t.Fatal("unexpected BGP messages stats for neightbor", i, "(-want +got)\n", cmp.Diff(expectedStats, n.MsgStats))
+		}
+	}
+
+	expectedTimersByNeighbor := map[string]struct {
+		holdTime  int
+		keepalive int
+	}{
+		"172.18.0.2":           {holdTime: 180000, keepalive: 60000},
+		"172.18.0.3":           {holdTime: 180000, keepalive: 60000},
+		"172.18.0.4":           {holdTime: 180000, keepalive: 60000},
+		"fc00:f853:ccd:e793::4": {holdTime: 90000, keepalive: 30000},
+	}
+
+	for _, n := range nn {
+		expectedTimers, ok := expectedTimersByNeighbor[n.ID]
+		if !ok {
+			t.Fatalf("missing expected timers for %s", n.ID)
+		}
+		if n.NegotiatedHoldTime != expectedTimers.holdTime {
+			t.Fatalf("unexpected negotiated hold timer for %s, got %d", n.ID, n.NegotiatedHoldTime)
+		}
+		if n.NegotiatedKeepAliveInterval != expectedTimers.keepalive {
+			t.Fatalf("unexpected negotiated keepalive timer for %s, got %d", n.ID, n.NegotiatedKeepAliveInterval)
 		}
 	}
 }
