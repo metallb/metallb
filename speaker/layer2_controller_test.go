@@ -1358,7 +1358,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 				"10.20.30.1": "",
 			},
 			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
+				"10.20.30.1": "noMatchingAdvertisement",
 			},
 		},
 		{
@@ -1397,7 +1397,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 				"10.20.30.1": "",
 			},
 			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
+				"10.20.30.1": "noMatchingAdvertisement",
 			},
 		},
 		{
@@ -1407,7 +1407,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			L2Advertisements: advertisementOnIris2,
 			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeLocal,
 			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
+				"10.20.30.1": "noMatchingAdvertisement",
 			},
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
@@ -1860,42 +1860,36 @@ func TestL2AdsForService(t *testing.T) {
 	tests := []struct {
 		desc     string
 		ads      []*config.L2Advertisement
-		node     string
 		svc      *v1.Service
 		expected []*config.L2Advertisement
 	}{
 		{
 			desc:     "Empty selectors match all",
 			ads:      []*config.L2Advertisement{ad1},
-			node:     "nodeA",
 			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
 			expected: []*config.L2Advertisement{ad1},
 		},
 		{
 			desc:     "Matching selector",
 			ads:      []*config.L2Advertisement{ad2},
-			node:     "nodeA",
 			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
 			expected: []*config.L2Advertisement{ad2},
 		},
 		{
 			desc:     "Non-matching selector",
 			ads:      []*config.L2Advertisement{ad3},
-			node:     "nodeA",
 			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
 			expected: []*config.L2Advertisement{},
 		},
 		{
-			desc:     "Wrong node",
+			desc:     "Ad with no matching selector is still returned (node filtering is separate)",
 			ads:      []*config.L2Advertisement{ad4},
-			node:     "nodeA",
 			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
-			expected: []*config.L2Advertisement{},
+			expected: []*config.L2Advertisement{ad4},
 		},
 		{
-			desc:     "Multiple ads - some match",
+			desc:     "Multiple ads - some match by service selector",
 			ads:      []*config.L2Advertisement{ad3, ad2, ad1}, // apache selector, nginx selector, empty (matches all)
-			node:     "nodeA",
 			svc:      &v1.Service{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "nginx"}}},
 			expected: []*config.L2Advertisement{ad2, ad1}, // nginx match + empty match
 		},
@@ -1903,7 +1897,7 @@ func TestL2AdsForService(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			result := l2AdsForService(test.ads, test.node, test.svc)
+			result := l2AdsForService(test.ads, test.svc)
 			if len(result) != len(test.expected) {
 				t.Errorf("expected %d ads, got %d", len(test.expected), len(result))
 				return
@@ -1923,6 +1917,364 @@ func selector(s string) labels.Selector {
 		panic(err)
 	}
 	return ret
+}
+
+func TestL2ElectionConsistentButAdsPerNode(t *testing.T) {
+	// Two ads target the same service but different nodes with different
+	// interfaces. The election must be identical on both nodes (same candidate
+	// set), but each node must announce using only its own interface.
+	fakeSL := &fakeSpeakerList{
+		speakers: map[string]bool{
+			"iris1": true,
+			"iris2": true,
+		},
+	}
+
+	l2Advertisements := []*config.L2Advertisement{
+		{
+			Nodes:            map[string]bool{"iris1": true},
+			Interfaces:       []string{"eth0"},
+			ServiceSelectors: []labels.Selector{selector("app=web")},
+		},
+		{
+			Nodes:            map[string]bool{"iris2": true},
+			Interfaces:       []string{"eth1"},
+			ServiceSelectors: []labels.Selector{selector("app=web")},
+		},
+	}
+
+	cfg := &config.Config{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
+			"default": {
+				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				L2Advertisements: l2Advertisements,
+			},
+		}},
+	}
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "svc-web",
+			Labels: map[string]string{"app": "web"},
+		},
+		Spec: v1.ServiceSpec{
+			Type:                  v1.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+		},
+		Status: statusAssigned("10.20.30.1"),
+	}
+
+	eps := []discovery.EndpointSlice{
+		{
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses:  []string{"2.3.4.5"},
+					NodeName:   ptr.To("iris1"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				},
+				{
+					Addresses:  []string{"2.3.4.15"},
+					NodeName:   ptr.To("iris2"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				},
+			},
+		},
+	}
+
+	l := log.NewNopLogger()
+	lbIP := net.ParseIP("10.20.30.1")
+	pool := cfg.Pools.ByName["default"]
+
+	c1, err := newController(controllerConfig{
+		MyNode:  "iris1",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c1.client = &testK8S{t: t}
+
+	c2, err := newController(controllerConfig{
+		MyNode:  "iris2",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c2.client = &testK8S{t: t}
+
+	if c1.SetConfig(l, cfg) == controllers.SyncStateError {
+		t.Fatal("c1 SetConfig failed")
+	}
+	if c2.SetConfig(l, cfg) == controllers.SyncStateError {
+		t.Fatal("c2 SetConfig failed")
+	}
+
+	// Exactly one node must win the election.
+	r1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, pool, svc, eps, nil)
+	r2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, pool, svc, eps, nil)
+
+	if (r1 == "") == (r2 == "") {
+		t.Fatalf("expected exactly one winner, got c1=%q c2=%q", r1, r2)
+	}
+
+	// Each node's IPAdvertisement must use only its own interface.
+	adsForSvc := l2AdsForService(pool.L2Advertisements, svc)
+	ipAdv1 := ipAdvertisementFor(lbIP, l2AdsForNode(adsForSvc, "iris1"))
+	ipAdv2 := ipAdvertisementFor(lbIP, l2AdsForNode(adsForSvc, "iris2"))
+
+	expected1 := layer2.NewIPAdvertisement(lbIP, false, sets.New("eth0"))
+	expected2 := layer2.NewIPAdvertisement(lbIP, false, sets.New("eth1"))
+
+	if !ipAdv1.Equal(&expected1) {
+		t.Errorf("iris1 should use eth0, got %v", ipAdv1)
+	}
+	if !ipAdv2.Equal(&expected2) {
+		t.Errorf("iris2 should use eth1, got %v", ipAdv2)
+	}
+}
+
+func TestL2NoMatchingAdForServiceAndNode(t *testing.T) {
+	// One ad matches all nodes but targets a different service.
+	// Another ad matches our service but targets a non-existing node.
+	// No node should announce.
+	fakeSL := &fakeSpeakerList{
+		speakers: map[string]bool{
+			"iris1": true,
+			"iris2": true,
+		},
+	}
+
+	l2Advertisements := []*config.L2Advertisement{
+		{
+			Nodes:            map[string]bool{"iris1": true, "iris2": true},
+			AllInterfaces:    true,
+			ServiceSelectors: []labels.Selector{selector("app=other")},
+		},
+		{
+			Nodes:            map[string]bool{"ghost": true},
+			AllInterfaces:    true,
+			ServiceSelectors: []labels.Selector{selector("app=web")},
+		},
+	}
+
+	cfg := &config.Config{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
+			"default": {
+				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				L2Advertisements: l2Advertisements,
+			},
+		}},
+	}
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "svc-web",
+			Labels: map[string]string{"app": "web"},
+		},
+		Spec: v1.ServiceSpec{
+			Type:                  v1.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+		},
+		Status: statusAssigned("10.20.30.1"),
+	}
+
+	eps := []discovery.EndpointSlice{
+		{
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses:  []string{"2.3.4.5"},
+					NodeName:   ptr.To("iris1"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				},
+				{
+					Addresses:  []string{"2.3.4.15"},
+					NodeName:   ptr.To("iris2"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				},
+			},
+		},
+	}
+
+	l := log.NewNopLogger()
+	lbIP := net.ParseIP("10.20.30.1")
+	pool := cfg.Pools.ByName["default"]
+
+	for _, node := range []string{"iris1", "iris2"} {
+		c, err := newController(controllerConfig{
+			MyNode:  node,
+			Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+			SList:   fakeSL,
+			bgpType: bgpNative,
+		})
+		if err != nil {
+			t.Fatalf("creating controller for %s: %s", node, err)
+		}
+		c.client = &testK8S{t: t}
+
+		if c.SetConfig(l, cfg) == controllers.SyncStateError {
+			t.Fatalf("%s SetConfig failed", node)
+		}
+
+		r := c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, pool, svc, eps, nil)
+		if r != "noMatchingAdvertisement" {
+			t.Errorf("%s: expected %q, got %q", node, "noMatchingAdvertisement", r)
+		}
+	}
+}
+
+func TestL2ServiceSelectorFiltersCandidateNodes(t *testing.T) {
+	// when two L2 advertisements target different nodes with
+	// different service selectors, the election set must only include nodes whose
+	// advertisement actually matches the service. Otherwise a node that wins the
+	// election but has no matching advertisement causes the service to go unannounced.
+	fakeSL := &fakeSpeakerList{
+		speakers: map[string]bool{
+			"iris1": true,
+			"iris2": true,
+		},
+	}
+
+	l2Advertisements := []*config.L2Advertisement{
+		{
+			Nodes:            map[string]bool{"iris1": true},
+			AllInterfaces:    true,
+			ServiceSelectors: []labels.Selector{selector("app=foo")},
+		},
+		{
+			Nodes:            map[string]bool{"iris2": true},
+			AllInterfaces:    true,
+			ServiceSelectors: []labels.Selector{selector("app=bar")},
+		},
+	}
+
+	cfg := &config.Config{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
+			"default": {
+				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				L2Advertisements: l2Advertisements,
+			},
+		}},
+	}
+
+	l := log.NewNopLogger()
+
+	svcFoo := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "svc-foo",
+			Labels: map[string]string{"app": "foo"},
+		},
+		Spec: v1.ServiceSpec{
+			Type:                  v1.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+		},
+		Status: statusAssigned("10.20.30.1"),
+	}
+
+	svcBar := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "svc-bar",
+			Labels: map[string]string{"app": "bar"},
+		},
+		Spec: v1.ServiceSpec{
+			Type:                  v1.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+		},
+		Status: statusAssigned("10.20.30.1"),
+	}
+
+	eps := []discovery.EndpointSlice{
+		{
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses:  []string{"2.3.4.5"},
+					NodeName:   ptr.To("iris1"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				},
+				{
+					Addresses:  []string{"2.3.4.15"},
+					NodeName:   ptr.To("iris2"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				},
+			},
+		},
+	}
+
+	lbIP := net.ParseIP("10.20.30.1")
+
+	tests := []struct {
+		desc             string
+		svc              *v1.Service
+		c1ExpectedResult string
+		c2ExpectedResult string
+	}{
+		{
+			desc:             "svc-foo matches only iris1's adv, iris1 must announce",
+			svc:              svcFoo,
+			c1ExpectedResult: "",
+			c2ExpectedResult: "noMatchingAdvertisement",
+		},
+		{
+			desc:             "svc-bar matches only iris2's adv, iris2 must announce",
+			svc:              svcBar,
+			c1ExpectedResult: "noMatchingAdvertisement",
+			c2ExpectedResult: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			c1, err := newController(controllerConfig{
+				MyNode:  "iris1",
+				Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+				SList:   fakeSL,
+				bgpType: bgpNative,
+			})
+			if err != nil {
+				t.Fatalf("creating controller: %s", err)
+			}
+			c1.client = &testK8S{t: t}
+
+			c2, err := newController(controllerConfig{
+				MyNode:  "iris2",
+				Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+				SList:   fakeSL,
+				bgpType: bgpNative,
+			})
+			if err != nil {
+				t.Fatalf("creating controller: %s", err)
+			}
+			c2.client = &testK8S{t: t}
+
+			if c1.SetConfig(l, cfg) == controllers.SyncStateError {
+				t.Fatal("c1 SetConfig failed")
+			}
+			if c2.SetConfig(l, cfg) == controllers.SyncStateError {
+				t.Fatal("c2 SetConfig failed")
+			}
+
+			r1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
+			r2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
+
+			if r1 != test.c1ExpectedResult {
+				t.Errorf("c1 (iris1): expected %q, got %q", test.c1ExpectedResult, r1)
+			}
+			if r2 != test.c2ExpectedResult {
+				t.Errorf("c2 (iris2): expected %q, got %q", test.c2ExpectedResult, r2)
+			}
+
+			// Regardless of which node wins the election, exactly one controller
+			// must announce when the service matches an advertisement.
+			announced := (r1 == "") || (r2 == "")
+			if !announced {
+				t.Errorf("neither controller announced the service (c1=%q, c2=%q)", r1, r2)
+			}
+		})
+	}
 }
 
 func TestIPAdvertisementFor(t *testing.T) {
