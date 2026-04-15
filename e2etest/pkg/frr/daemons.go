@@ -15,7 +15,7 @@ import (
 func Daemons(exec executor.Executor) ([]string, error) {
 	res, err := exec.Exec("vtysh", "-c", "show daemons")
 	if err != nil {
-		return nil, errors.Join(err, errors.New("Failed to query neighbours"))
+		return nil, errors.Join(err, errors.New("failed to query FRR daemons (vtysh show daemons)"))
 	}
 	res = strings.TrimSuffix(res, "\n")
 	daemons := strings.Split(res, " ")
