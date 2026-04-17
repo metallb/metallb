@@ -84,6 +84,7 @@ type SessionParameters struct {
 	SessionName            string
 	DualStackAddressFamily bool
 	DisableMP              bool
+	LocalASN               uint32
 }
 type SessionManager interface {
 	NewSession(logger log.Logger, args SessionParameters) (Session, error)

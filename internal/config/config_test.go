@@ -3667,6 +3667,38 @@ func TestParse(t *testing.T) {
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
+		{
+			desc: "peer with localASN field",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:    100,
+							ASN:      200,
+							Address:  "1.2.3.4",
+							LocalASN: 65410,
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: map[string]*Peer{
+					"peer1": {
+						Name:          "peer1",
+						MyASN:         100,
+						ASN:           200,
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						LocalASN:      65410,
+					},
+				},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
 	}
 
 	for _, test := range tests {

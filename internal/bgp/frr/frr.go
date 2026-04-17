@@ -290,6 +290,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				BFDProfile:               s.BFDProfile,
 				GracefulRestart:          s.GracefulRestart,
 				EBGPMultiHop:             s.EBGPMultiHop,
+				LocalASN:                 s.LocalASN,
 				VRFName:                  s.VRFName,
 				PrefixesV4:               []string{},
 				PrefixesV6:               []string{},
