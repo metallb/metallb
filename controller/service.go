@@ -213,6 +213,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		svc.Annotations = make(map[string]string)
 	}
 	svc.Annotations[AnnotationIPAllocateFromPool] = pool
+	delete(svc.Annotations, DeprecatedAnnotationIPAllocateFromPool)
 
 	return nil
 }
@@ -246,6 +247,7 @@ func serviceFamilyChanged(
 func (c *controller) clearServiceState(key string, svc *v1.Service) {
 	c.ips.Unassign(key)
 	delete(svc.Annotations, AnnotationIPAllocateFromPool)
+	delete(svc.Annotations, DeprecatedAnnotationIPAllocateFromPool)
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
 }
 
