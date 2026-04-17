@@ -485,6 +485,7 @@ _Appears in:_
 | `vrf` _string_ | To set if we want to peer with the BGPPeer using an interface belonging to<br />a host vrf |
 | `disableMP` _boolean_ | To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.<br />Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily. |
 | `dualStackAddressFamily` _boolean_ | To set if we want to enable the neighbor not only for the ipfamily related to its session,<br />but also the other one. This allows to advertise/receive IPv4 prefixes over IPv6 sessions and vice versa. |
+| `localASN` _integer_ | LocalASN allows advertising a different AS number to the peer using BGP's<br />local-as feature. When set, MetalLB will advertise this ASN to the peer<br />via "neighbor <peer> local-as <ASN> no-prepend replace-as", overriding<br />the router-level MyASN for this specific session. Supported for FRR mode only. |
 
 
 
