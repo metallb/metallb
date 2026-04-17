@@ -11,6 +11,10 @@ hash-based election algorithm.
 Related: [#2797](https://github.com/metallb/metallb/issues/2797) (feature request for this design doc),
 [PR #1804](https://github.com/metallb/metallb/pull/1804) (rejected predecessor, annotation-based, single node).
 
+Depends on: [PR #3014](https://github.com/metallb/metallb/pull/3014), which refactors L2
+election so `serviceSelectors` drives the candidate node set. The scoring step added here
+slots into the post-#3014 `ShouldAnnounce` flow.
+
 ## Motivation
 
 MetalLB L2 mode elects the announcing node for each LoadBalancer IP using
@@ -98,8 +102,10 @@ to today's behavior.
 Safe upgrade order:
 
 1. Update CRDs (adds the new field to the schema).
-2. Roll all speaker pods to the new version.
-3. Only then create or update L2Advertisements with `preferredNodeSelectors`.
+2. Roll the controller and webhook to a version that understands and preserves
+   `preferredNodeSelectors`. Without this, older components can drop the field on write.
+3. Roll all speaker pods to the new version.
+4. Only then create or update L2Advertisements with `preferredNodeSelectors`.
 
 ### Example CRs
 
@@ -124,7 +130,7 @@ spec:
           node-role: edge
 ```
 
-All nodes are eligible. Prefer edge nodes; any node can announce as fallback:
+All nodes are eligible. Prefer edge nodes. Any node can announce as fallback:
 
 ```yaml
 apiVersion: metallb.io/v1beta1
@@ -161,81 +167,96 @@ spec:
 
 `nodeSelectors` is the hard eligibility filter and determines which nodes can announce.
 `preferredNodeSelectors` orders nodes within that eligible set. A node must pass
-`nodeSelectors` before preference scores apply.
+`nodeSelectors` (via some ad in the pool) before preference scores apply.
 
 ```
 all cluster nodes
-  --> intersected with active speakers             = reachable nodes
-    --> filtered by nodeSelectors (hard)            = eligible nodes
-      --> filtered by ETP:Local / healthy endpoints = available nodes
-      --> scored by preferredNodeSelectors (soft)     = ordered available nodes
-        --> tie-broken by sha256 hash                  = final election order
+  --> per ad at config-parse time:
+      selectedNodes(ad.nodeSelectors)                            = ad.Nodes (per ad)
+    --> for each service, filter by serviceSelectors only:
+        l2AdsForService(pool.L2Advertisements, svc)              = adsForService
+      --> speakers from memberlist UsableSpeakers
+        --> speakersForAds via adsMatchNodeL2(adsForService, s):
+            node covered by at least one service-matching ad     = candidate nodes
+          --> filtered by ETP:Local / healthy endpoints          = available nodes
+            --> sum ad.PreferredNodes across adsForService       = scored available nodes
+              --> sort: score DESC, sha256(node+"#"+ipString) ASC  = election order
+                --> availableNodes[0] == myNode ? announce
 ```
+
+The local participation guard is the same `adsForService`: if no ad in that set covers
+`myNode` (`adsMatchNodeL2(adsForService, myNode)` is false), the speaker returns
+`noMatchingAdvertisement` and sits out. Every speaker reaches this guard with the same
+`adsForService` (no node argument on the filter), so all speakers that pass the guard see the
+same candidate set and the same score map.
 
 ### Score Calculation
 
-Weights are additive. A node matching multiple `PreferredNodeSelector` entries accumulates
-their weights. For example, if a node matches both a weight-60 and a weight-50 selector, its
-total score is 110.
+Scoring is ad-scoped. Within a single `L2Advertisement`, preferences apply only to nodes
+matching that ad's own `nodeSelectors`. An ad with no `nodeSelectors` scores every node. An ad
+never raises the score of a node outside its own eligible set.
 
-Nodes that match no preference selector receive a score of 0.
+Weights within one ad add up. A node matching both a weight-60 and a weight-50 selector in the
+same ad scores 110 from that ad.
+
+For a given service, the final score sums per-ad scores across every L2Advertisement that
+targets the service's pool and matches the service via `serviceSelectors`. Ads that don't match
+the service (by pool or by `serviceSelectors`) contribute nothing. Nodes matching no preference
+in any applicable ad score 0.
 
 ### Sort Algorithm
 
+The scoring step slots in between `availableNodes` and the existing `sort.Slice`
+call in `ShouldAnnounce`, reusing the `adsForService` slice already computed
+earlier in the same function:
+
 ```
-ad = the single preference-bearing L2Advertisement for this pool (if any)
-scores = map[nodeName]int32
-if ad != nil:
-    for each preferredNodeSelector in ad:
-        for each eligible node matching preferredNodeSelector.Preference:
-            scores[node] += preferredNodeSelector.Weight
+adsForService = l2AdsForService(pool.L2Advertisements, svc)   // already computed in ShouldAnnounce
+scores = map[nodeName]int64
+for each ad in adsForService:
+    for node, weight in ad.PreferredNodes:
+        scores[node] += weight
 
 sort availableNodes by:
-    1. scores[node] descending       (higher weight wins)
-    2. sha256(node + "#" + ip) ascending  (deterministic tie-break)
+    1. scores[node] descending                       (higher weight wins)
+    2. sha256(node + "#" + ipString) ascending       (deterministic tie-break)
 ```
 
-Within the same score tier, the hash breaks ties, so all speakers pick the same winner.
+### Multiple L2Advertisements Per Pool
 
-### Multi-L2Advertisement Restriction
+A pool can have multiple `L2Advertisement` objects, and MetalLB already aggregates fields
+across them. `adsMatchNodeL2` ORs node eligibility across the service-matching ads at
+election time, and `ipAdvertisementFor` unions advertised interfaces per service at
+announcement time. `preferredNodeSelectors` aggregates per ad. Each ad scores only its own
+eligible nodes, and a service's final score is the sum across the ads matching that service.
 
-A pool can have multiple `L2Advertisement` objects. MetalLB already combines fields across
-advertisements: node eligibility is OR'd (`poolMatchesNodeL2`), interfaces are UNION'd
-(`ipAdvertisementFor`).
-
-Preference scores are not aggregated across advertisements. At most one `L2Advertisement`
-with non-empty `preferredNodeSelectors` may target a given pool. This is enforced by the
-validating webhook, described in [Validation Rules](#validation-rules).
-
-This keeps all preference math in a single policy object per pool. If weights were summed across multiple L2Advertisements, a new overlapping
-advertisement could silently change the effective priority of nodes established by another
-team's policy, and the resulting totals would not be visible in any single object.
-
-This restriction only applies to `preferredNodeSelectors`. Multiple L2Advertisements can
-still target the same pool to combine `nodeSelectors` or `interfaces` as they do today.
-Note that preferences apply to the combined eligible set from all
-advertisements:
+Example - preferences bound to the ad's own eligible set:
 
 ```
-Ad1:  nodeSelectors: [{role: lb}]              → nodes A, B eligible
-Ad2:  nodeSelectors: [{role: edge}]            → nodes C, D eligible
-Ad3:  nodeSelectors: [{role: gpu}]
+Ad1:  nodeSelectors: [{role: lb}]              → nodes A, B eligible for Ad1
+Ad2:  nodeSelectors: [{role: edge}]            → nodes C, D eligible for Ad2
+Ad3:  nodeSelectors: [{role: gpu}]             → node E eligible for Ad3
       preferredNodeSelectors: [{weight: 100, preference: {zone: primary}}]
-                                               → node E eligible
 
 Combined eligible set: A, B, C, D, E  (OR across all three ads)
-If node C matches zone=primary → C gets score 100 (even though Ad1/Ad2 made C eligible, not Ad3)
+If node C matches zone=primary → C still scores 0. Ad3's preference only applies to Ad3's
+own eligible nodes (just E), so C is not lifted by a preference from an ad that does not
+target it.
 ```
 
-Note: if Ad3 omitted `nodeSelectors` entirely, it would make all cluster nodes eligible
-(not just A-D), since an L2Advertisement with no `nodeSelectors` matches every node.
-This would silently expand the eligible set beyond what Ad1 and Ad2 intended.
-Administrators adding a preference-only L2Advertisement should be aware of this and scope
-its `nodeSelectors` to match the intended eligible set.
+Example - two ads both targeting the pool with overlapping eligible sets, both contributing
+preferences to the shared nodes:
 
-See also
-[Interaction with serviceSelectors](#interaction-with-serviceselectors) for additional
-considerations on why cross-advertisement preference aggregation was avoided.
+```
+Ad1:  nodeSelectors: [{role: lb}]
+      preferredNodeSelectors: [{weight: 70, preference: {zone: primary}}]
+Ad2:  nodeSelectors: [{role: lb}]
+      preferredNodeSelectors: [{weight: 30, preference: {gpu: "true"}}]
+
+Node X (role=lb, zone=primary, gpu=true)  → 70 (Ad1) + 30 (Ad2) = 100
+Node Y (role=lb, zone=primary)            → 70 (Ad1) + 0         = 70
+Node Z (role=lb)                          → 0       + 0          = 0
+```
 
 ### Validation Rules
 
@@ -248,30 +269,29 @@ New validation rules:
   webhook code needed.
 - Each `preference` label selector must be valid. Enforced by `metav1.LabelSelectorAsSelector()`
   during config parsing.
-- An L2Advertisement cannot set both `serviceSelectors` and `preferredNodeSelectors`. Rejected
-  during config parsing.
-- At most one L2Advertisement with non-empty `preferredNodeSelectors` may target a given pool.
-  Rejected during config parsing via cross-object comparison of all L2Advertisements and their
-  target pools.
+
+No cross-object validation is needed. You can combine `preferredNodeSelectors` with
+`serviceSelectors` and with other L2Advertisements targeting the same pool. See
+[Sort Algorithm](#sort-algorithm) and
+[Multiple L2Advertisements Per Pool](#multiple-l2advertisements-per-pool).
 
 ### Config-Time Resolution
 
-The speaker resolves preference scores at config-parse time. `nodeSelectors` are already
-resolved this way via `selectedNodes()` to `Nodes map[string]bool`. A new
-`PreferredNodes map[string]int32` field on the internal `L2Advertisement` config struct stores
-the resolved scores.
+A new `PreferredNodes map[string]int64` field on the internal `L2Advertisement` config struct
+holds per-ad scores. `l2AdvertisementFromCR` fills it alongside the existing `selectedNodes`
+call.
 
 ```go
 type L2Advertisement struct {
 	Nodes          map[string]bool
 	Interfaces     []string
 	AllInterfaces  bool
-	PreferredNodes map[string]int32  // new: node name -> aggregated weight
+	PreferredNodes map[string]int64  // new: node name -> aggregated weight, ad-scoped
 }
 ```
 
-When a node's labels change, the speaker re-parses the config (existing behavior) and
-recomputes `PreferredNodes`.
+`PreferredNodes` keys are a subset of `Nodes`. A missing key means the node scored 0 under
+this ad, not that it is ineligible. `Nodes` remains the eligibility map.
 
 ### Backward Compatibility
 
@@ -367,7 +387,10 @@ is preferred over a node scoring 100 from a single high-weight selector.
 ### Empty Preference Selector
 
 A `PreferredNodeSelector` with an empty `preference` (no `matchLabels` or `matchExpressions`)
-matches all nodes, adding the same weight to each. All scores increase equally, so the election order does not change.
+matches every node in the ad's own `ad.Nodes` set. If the ad has no `nodeSelectors`, every
+cluster node gets the same weight bump and election order is unchanged relative to pure hash
+order. If the ad has `nodeSelectors`, only nodes inside that eligible set get the bump, which
+does lift them above nodes eligible only via other ads in the pool.
 
 ### Flapping Considerations
 
@@ -382,17 +405,41 @@ Mitigations:
 
 ### Interaction with serviceSelectors
 
-The validating webhook rejects an L2Advertisement that sets both `serviceSelectors` and
-`preferredNodeSelectors`.
+You can combine `preferredNodeSelectors` with `serviceSelectors`. Election runs per-service and
+considers only ads that both target the service's pool and match the service via
+`serviceSelectors` (see [#3014](https://github.com/metallb/metallb/pull/3014)). Scoring runs on
+that filtered set, so a service-scoped ad's preferences only influence election for services it
+matches.
 
-All speakers must agree on the winner for a given IP, and election is computed pool-wide
-(`poolMatchesNodeL2` evaluates all advertisements targeting the pool). A service-scoped
-advertisement carrying preference scores would influence election for every service in the
-pool, not just the ones matching the selector.
+Per-service preference maps to a single CR:
 
-For per-service preference, isolate the service onto its own `IPAddressPool` using
-`serviceAllocation.serviceSelectors`, then attach a dedicated `L2Advertisement` with
-`preferredNodeSelectors` to that pool.
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: zone-preference-for-frontend
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - shared-pool
+  serviceSelectors:
+    - matchLabels:
+        app: frontend
+  preferredNodeSelectors:
+    - weight: 100
+      preference:
+        matchLabels:
+          zone: primary
+```
+
+Services not matching `app: frontend` ignore this advertisement.
+
+Caveat: `ShouldAnnounce` runs per-service, so two services sharing an IP via
+`allow-shared-ip` that match different preference-bearing ads compute different
+score maps and can elect different nodes. The hash tie-break only fires on score
+ties, so divergent scores bypass it. Shared-IP siblings should match the same
+set of preference-bearing ads — the simplest way is to keep preferences on ads
+without `serviceSelectors`.
 
 ## Drawbacks
 
@@ -410,7 +457,7 @@ preferredNodeSelectors:
 ```
 
 A simpler version where preferred nodes are just a label selector with no weight. Matching nodes
-are preferred; non-matching nodes are fallback.
+are preferred. Non-matching nodes are fallback.
 
 Cannot express multi-tier prioritization (primary zone > secondary zone > everything else).
 
@@ -432,20 +479,47 @@ An explicit priority number (lower wins) similar to `IPAddressPool.serviceAlloca
 
 Consistent with pool priority, but invents new naming rather than following the Kubernetes `PreferredSchedulingTerm` pattern.
 
+### Option C: Single "Prioritized" Selector Replacing nodeSelectors
+
+```yaml
+prioritizedNodeSelectors:
+  - weight: 100
+    preference:
+      matchLabels:
+        node-role: edge
+  - weight: 0  # sentinel: eligible only as fallback
+    preference:
+      matchLabels:
+        role: lb
+```
+
+A single field replaces `nodeSelectors` and folds eligibility and preference into one list.
+Any positive weight marks a preferred node. Zero marks a fallback-only eligible node.
+Operators reason about one field instead of two.
+
+This shape diverges from the Kubernetes `required` / `preferred` scheduling split that MetalLB
+already follows via `nodeSelectors`, overloads one field with two distinct semantics, and
+forces an API break or a compatibility shim on `nodeSelectors`. A sibling
+`preferredNodeSelectors` field keeps the current shape and avoids a migration.
+
 ## Test Plan
 
 ### Unit Tests
 
 Scenarios to cover:
 
-- Preference scoring: single selector, multiple selectors, cumulative weights, equal-weight
-  tie-breaking via hash
+- Preference scoring: single selector, multiple selectors within one ad, cumulative weights,
+  equal-weight tie-breaking via hash
+- Ad-scoped scoring: an ad's preferences only apply to nodes matching its own `nodeSelectors`.
+  A preference-only ad (no `nodeSelectors`) scores every node
+- Multi-ad aggregation: per-service scores sum across all ads matching the service
+- `serviceSelectors` + `preferredNodeSelectors`: preference applies only to services matching
+  the ad
 - Failover: preferred node removed, preferred node returns, all preferred nodes unavailable
 - Interaction with existing features: `nodeSelectors` filtering, `externalTrafficPolicy: Local`
-- Backward compatibility: nil/empty `preferredNodeSelectors` produces identical behavior to today
+- Backward compatibility: nil/empty `preferredNodeSelectors` produces identical behavior to
+  today
 - Config parsing: correct `PreferredNodes` map population, invalid label selectors
-- Validation: `serviceSelectors` + `preferredNodeSelectors` rejected, two preference-bearing
-  ads targeting the same pool rejected
 
 ### E2E Tests
 
@@ -454,7 +528,9 @@ Scenarios to cover:
 - Preferred node announces the service
 - Preferred node failover and reclaim
 - Runtime label and preference configuration changes
-- Combined with `nodeSelectors`
+- Combined with `nodeSelectors` (required + preferred)
+- Multiple L2Advertisements targeting the same pool, each contributing preferences
+- `serviceSelectors` + `preferredNodeSelectors` scoped to a subset of services
 - No nodes match preference (fallback to hash)
 - No preferred selectors configured (regression)
 
