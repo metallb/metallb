@@ -497,3 +497,42 @@ According to the [RFC-5881/BFD Shares Fate with the Control
 Plane](https://datatracker.ietf.org/doc/html/rfc5882#section-4.3.2), BFD and
 Graceful Restart can work together, but is implementation specific. It is up to
 vendor's recommendation and needs to be tested.
+
+### Local AS override
+
+FRR supports presenting a different ASN to a specific peer without needing a
+separate `router bgp` instance, via `neighbor <peer> local-as <ASN>
+no-prepend replace-as`. MetalLB exposes this as the optional `localASN` field
+on `BGPPeer`.
+
+When `localASN` is set, MetalLB will advertise that ASN to the peer instead of
+`myASN`, while the router instance itself continues to use `myASN`. This is
+useful in multi-tenant or migration scenarios where peers on the same node need
+to see different ASNs and VRF separation is not desired or available.
+
+{{% notice note %}}
+`localASN` is supported in FRR mode only. Setting it in native BGP mode will
+be rejected by validation.
+{{% /notice %}}
+
+```yaml
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: example
+  namespace: metallb-system
+spec:
+  myASN: 64512
+  peerASN: 64520
+  peerAddress: 172.30.0.3
+  localASN: 65410
+```
+
+This generates the following in `frr.conf`:
+
+```
+neighbor 172.30.0.3 remote-as 64520
+neighbor 172.30.0.3 local-as 65410 no-prepend replace-as
+```
+
+The peer at `172.30.0.3` will see MetalLB's ASN as `65410` rather than `64512`.
