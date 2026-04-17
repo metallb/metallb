@@ -83,6 +83,7 @@ type neighborConfig struct {
 	BFDProfile               string
 	GracefulRestart          bool
 	EBGPMultiHop             bool
+	LocalASN                 uint32
 	VRFName                  string
 	PrefixesV4               []string
 	PrefixesV6               []string
