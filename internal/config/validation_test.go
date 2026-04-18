@@ -548,7 +548,7 @@ func TestValidateFRR(t *testing.T) {
 			mustFail: true,
 		},
 		{
-			desc: "duplicate bgp address, with nodeSelectors, might overlap - compatible peers",
+			desc: "duplicate bgp address, with nodeSelectors, might overlap - same config peers",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
 					{
@@ -567,7 +567,7 @@ func TestValidateFRR(t *testing.T) {
 					{
 						Spec: v1beta2.BGPPeerSpec{
 							MyASN:   64500,
-							ASN:     64501, // Same config - compatible
+							ASN:     64501, // Same config
 							Address: "1.2.3.4",
 							Port:    179,
 							NodeSelectors: []v1.LabelSelector{
@@ -579,7 +579,7 @@ func TestValidateFRR(t *testing.T) {
 					},
 				},
 			},
-			mustFail: false,
+			mustFail: true,
 		},
 		{
 			desc: "duplicate bgp address, with obviously disjoint nodeSelectors - incompatible allowed",

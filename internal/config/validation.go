@@ -5,7 +5,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"reflect"
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
@@ -235,7 +234,7 @@ func peerIdentifier(peer metallbv1beta2.BGPPeerSpec) string {
 }
 
 // validateDuplicatePeers validates that duplicate peers (same address/interface + VRF)
-// either have non-overlapping node selectors, or are compatible if they might overlap.
+// have non-overlapping node selectors.
 func validateDuplicatePeers(peerID string, peers []metallbv1beta2.BGPPeer) error {
 	// Check if all duplicate peers have node selectors
 	for _, p := range peers {
@@ -250,35 +249,13 @@ func validateDuplicatePeers(peerID string, peers []metallbv1beta2.BGPPeer) error
 			peer1 := peers[i].Spec
 			peer2 := peers[j].Spec
 
-			// Check if the node selectors might overlap
-			// Note: We can't definitively determine overlap without knowing all node labels,
-			// so we check if selectors are obviously disjoint. If uncertain, we require compatibility.
-			canOverlap := nodeSelectorsCanOverlap(peer1.NodeSelectors, peer2.NodeSelectors)
-
-			if canOverlap {
-				// Selectors might overlap, so peers must be compatible
-				if !arePeersCompatible(peer1, peer2) {
-					return fmt.Errorf("duplicate peers with address/interface %s might select the same nodes but have incompatible configurations (different ASN, ports, timers, BFD profiles, etc.)", peerID)
-				}
+			if nodeSelectorsCanOverlap(peer1.NodeSelectors, peer2.NodeSelectors) {
+				return fmt.Errorf("duplicate peers with address/interface %s have overlapping node selectors and might select the same nodes", peerID)
 			}
 		}
 	}
 
 	return nil
-}
-
-// arePeersCompatible returns true if two peer configurations are compatible
-// (i.e., it would be safe for them to run on the same node).
-// Two peers are compatible if they would create the exact same BGP session configuration.
-// This means all fields must match except NodeSelectors (which determine node eligibility).
-func arePeersCompatible(p1, p2 metallbv1beta2.BGPPeerSpec) bool {
-	// Create copies and clear the NodeSelectors since those don't affect session compatibility
-	p1Copy := p1
-	p2Copy := p2
-	p1Copy.NodeSelectors = nil
-	p2Copy.NodeSelectors = nil
-
-	return reflect.DeepEqual(p1Copy, p2Copy)
 }
 
 // nodeSelectorsCanOverlap returns true if two sets of node selectors might select
