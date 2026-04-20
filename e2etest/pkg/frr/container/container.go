@@ -80,7 +80,7 @@ func Create(configs map[string]Config) ([]*FRR, error) {
 				err = wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
 					daemons, err := frr.Daemons(c)
 					if err != nil {
-						return false, err
+						return false, nil
 					}
 					for _, d := range daemons {
 						delete(toFind, d)
