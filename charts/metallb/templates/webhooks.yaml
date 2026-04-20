@@ -13,7 +13,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta2-bgppeer
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
-  timeout: {{ .Values.crds.validationTimeout }}
+  timeoutSeconds: {{ .Values.crds.validationTimeoutSeconds }}
   name: bgppeervalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -34,7 +34,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-ipaddresspool
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
-  timeout: {{ .Values.crds.validationTimeout }}
+  timeoutSeconds: {{ .Values.crds.validationTimeoutSeconds }}
   name: ipaddresspoolvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -55,7 +55,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-bgpadvertisement
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
-  timeout: {{ .Values.crds.validationTimeout }}
+  timeoutSeconds: {{ .Values.crds.validationTimeoutSeconds }}
   name: bgpadvertisementvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -76,7 +76,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-community
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
-  timeout: {{ .Values.crds.validationTimeout }}
+  timeoutSeconds: {{ .Values.crds.validationTimeoutSeconds }}
   name: communityvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -97,7 +97,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-bfdprofile
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
-  timeout: {{ .Values.crds.validationTimeout }}
+  timeoutSeconds: {{ .Values.crds.validationTimeoutSeconds }}
   name: bfdprofilevalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -118,7 +118,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-l2advertisement
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
-  timeout: {{ .Values.crds.validationTimeout }}
+  timeoutSeconds: {{ .Values.crds.validationTimeoutSeconds }}
   name: l2advertisementvalidationwebhook.metallb.io
   rules:
   - apiGroups:
