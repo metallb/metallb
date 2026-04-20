@@ -13,6 +13,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta2-bgppeer
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
+  timeout: {{ .Values.crds.validationTimeout }}
   name: bgppeervalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -33,6 +34,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-ipaddresspool
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
+  timeout: {{ .Values.crds.validationTimeout }}
   name: ipaddresspoolvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -53,6 +55,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-bgpadvertisement
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
+  timeout: {{ .Values.crds.validationTimeout }}
   name: bgpadvertisementvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -73,6 +76,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-community
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
+  timeout: {{ .Values.crds.validationTimeout }}
   name: communityvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -93,6 +97,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-bfdprofile
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
+  timeout: {{ .Values.crds.validationTimeout }}
   name: bfdprofilevalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -113,6 +118,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-l2advertisement
   failurePolicy: {{ .Values.crds.validationFailurePolicy }}
+  timeout: {{ .Values.crds.validationTimeout }}
   name: l2advertisementvalidationwebhook.metallb.io
   rules:
   - apiGroups:
