@@ -37,6 +37,10 @@ func TestConfigurationStateReconciler(t *testing.T) {
 			before: nil,
 			want: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: configStateObjectMeta,
+				Status: metallbv1beta1.ConfigurationStateStatus{
+					Result:       metallbv1beta1.ConfigurationResultUnknown,
+					ErrorSummary: "",
+				},
 			},
 		},
 		"no conditions reported": {
