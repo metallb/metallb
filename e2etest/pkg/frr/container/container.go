@@ -80,7 +80,9 @@ func Create(configs map[string]Config) ([]*FRR, error) {
 				err = wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
 					daemons, err := frr.Daemons(c)
 					if err != nil {
-						return false, err
+						// vtysh can fail while watchfrr is still bringing daemons up; keep polling
+						// instead of aborting the whole wait on the first exec error.
+						return false, nil
 					}
 					for _, d := range daemons {
 						delete(toFind, d)

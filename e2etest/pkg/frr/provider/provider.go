@@ -82,7 +82,8 @@ func (f frrModeProvider) FRRK8sBased() bool {
 }
 
 type frrk8sModeProvider struct {
-	frrk8sPodForSpeakerPod map[string]*corev1.Pod
+	cl              *clientset.Clientset
+	frrk8sNamespace string
 }
 
 // NewFRRK8SMode returns a provider for a deployment using "frr-k8s" as its BGP mode.
@@ -93,50 +94,54 @@ func NewFRRK8SMode(r *rest.Config, namespace string) (Provider, error) {
 		return nil, err
 	}
 
-	speakerPods, err := metallb.SpeakerPods(cl)
+	return frrk8sModeProvider{cl: cl, frrk8sNamespace: namespace}, nil
+}
+
+// frrK8SPodForSpeaker resolves the frr-k8s pod that shares a node with the named speaker pod.
+func (f frrk8sModeProvider) frrK8SPodForSpeaker(speakerNS, speakerName string) (*corev1.Pod, error) {
+	speakerPods, err := metallb.SpeakerPods(f.cl)
 	if err != nil {
 		return nil, err
 	}
 
-	frrk8sPods, err := metallb.FRRK8SPods(cl, namespace)
+	var speaker *corev1.Pod
+	for _, p := range speakerPods {
+		if p.Namespace == speakerNS && p.Name == speakerName {
+			speaker = p
+			break
+		}
+	}
+	if speaker == nil {
+		return nil, fmt.Errorf("speaker %s/%s not found", speakerNS, speakerName)
+	}
+
+	frrk8sPods, err := metallb.FRRK8SPods(f.cl, f.frrk8sNamespace)
 	if err != nil {
 		return nil, err
 	}
 
-	frrK8SForSpeaker := map[string]*corev1.Pod{}
-	for _, s := range speakerPods {
-		found := false
-		for _, f := range frrk8sPods {
-			if s.Spec.NodeName == f.Spec.NodeName {
-				frrK8SForSpeaker[s.Name] = f
-				found = true
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("speaker %s/%s on node %s does not have a matching frr-k8s", s.Namespace, s.Name, s.Spec.NodeName)
+	for _, fp := range frrk8sPods {
+		if fp.Spec.NodeName == speaker.Spec.NodeName {
+			return fp, nil
 		}
 	}
 
-	res := frrk8sModeProvider{
-		frrk8sPodForSpeakerPod: frrK8SForSpeaker,
-	}
-
-	return res, nil
+	return nil, fmt.Errorf("speaker %s/%s on node %s does not have a matching frr-k8s", speaker.Namespace, speaker.Name, speaker.Spec.NodeName)
 }
 
 func (f frrk8sModeProvider) FRRExecutorFor(ns, name string) (executor.Executor, error) {
-	frrk8s, ok := f.frrk8sPodForSpeakerPod[name]
-	if !ok {
-		return nil, fmt.Errorf("speaker %s/%s does not have a matching frr-k8s", ns, name)
+	frrk8s, err := f.frrK8SPodForSpeaker(ns, name)
+	if err != nil {
+		return nil, err
 	}
 
 	return executor.ForPod(frrk8s.Namespace, frrk8s.Name, "frr"), nil
 }
 
 func (f frrk8sModeProvider) BGPMetricsPodFor(ns, name string) (*corev1.Pod, string, error) {
-	p, ok := f.frrk8sPodForSpeakerPod[name]
-	if !ok {
-		return nil, "", fmt.Errorf("speakers %s/%s not found in map %v", ns, name, f.frrk8sPodForSpeakerPod)
+	p, err := f.frrK8SPodForSpeaker(ns, name)
+	if err != nil {
+		return nil, "", err
 	}
 
 	return p, "frrk8s", nil

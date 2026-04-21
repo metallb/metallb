@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	. "github.com/onsi/gomega"
@@ -106,6 +107,22 @@ func SpeakerPodInNode(cs clientset.Interface, node string) (*corev1.Pod, error) 
 		}
 	}
 	return nil, fmt.Errorf("no speaker pod run in the node %s", node)
+}
+
+// HasSpeakerInNode reports whether the node has a running, ready MetalLB speaker pod.
+// When there is no speaker on the node, or the pod is not running or not ready, it returns (false, nil).
+func HasSpeakerInNode(cs clientset.Interface, node string) (bool, error) {
+	p, err := SpeakerPodInNode(cs, node)
+	if err != nil {
+		if strings.Contains(err.Error(), "no speaker pod run in the node") {
+			return false, nil
+		}
+		return false, err
+	}
+	if p.Status.Phase != corev1.PodRunning || !k8s.PodIsReady(p) {
+		return false, nil
+	}
+	return true, nil
 }
 
 // RestartController restarts metallb's controller pod and waits for it to be running and ready.
