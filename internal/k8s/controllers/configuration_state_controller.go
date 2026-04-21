@@ -9,6 +9,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,6 +28,7 @@ type ConfigurationStateReconciler struct {
 	Namespace         string
 	ConfigStateName   string
 	ConfigStateLabels map[string]string
+	OwnerPod          *v1.Pod
 }
 
 func (r *ConfigurationStateReconciler) String() string {
@@ -46,6 +48,9 @@ func (r *ConfigurationStateReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, configState, func() error {
 		configState.Labels = r.ConfigStateLabels
+		if err := controllerutil.SetOwnerReference(r.OwnerPod, configState, r.Scheme); err != nil {
+			return err
+		}
 
 		result := metallbv1beta1.ConfigurationResultUnknown
 		if len(configState.Status.Conditions) > 0 {
