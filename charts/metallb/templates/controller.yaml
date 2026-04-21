@@ -84,6 +84,10 @@ spec:
         - --metrics-cert-dir=/etc/metrics
         {{- end }}
         env:
+        - name: METALLB_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         {{- if and .Values.speaker.enabled .Values.speaker.memberlist.enabled }}
         - name: METALLB_ML_SECRET_NAME
           value: {{ include "metallb.secretName" . }}

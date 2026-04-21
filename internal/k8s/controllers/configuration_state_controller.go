@@ -4,11 +4,13 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,6 +29,7 @@ type ConfigurationStateReconciler struct {
 	Namespace         string
 	ConfigStateName   string
 	ConfigStateLabels map[string]string
+	OwnerPod          *v1.Pod
 }
 
 func (r *ConfigurationStateReconciler) String() string {
@@ -46,6 +49,9 @@ func (r *ConfigurationStateReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, configState, func() error {
 		configState.Labels = r.ConfigStateLabels
+		if err := controllerutil.SetOwnerReference(r.OwnerPod, configState, r.Scheme); err != nil {
+			return err
+		}
 
 		result := metallbv1beta1.ConfigurationResultUnknown
 		if len(configState.Status.Conditions) > 0 {
@@ -68,14 +74,7 @@ func (r *ConfigurationStateReconciler) Reconcile(ctx context.Context, req ctrl.R
 		level.Error(r.Logger).Log("controller", r, "error", "failed to create or patch ConfigurationState", "error", err)
 		return ctrl.Result{}, err
 	}
-	if opResult == controllerutil.OperationResultCreated {
-		// According to https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/controller/controllerutil#CreateOrPatch
-		// If the object is created, we have to patch it again to ensure the status is created.
-		// This will happen when we reconcile the creation event.
-		level.Info(r.Logger).Log("controller", r, "event", "ConfigurationState created", "name", r.ConfigStateName)
-		return ctrl.Result{}, nil
-	}
-	level.Info(r.Logger).Log("controller", r, "event", "ConfigurationState updated", "name", r.ConfigStateName)
+	level.Info(r.Logger).Log("controller", r, "event", fmt.Sprintf("ConfigurationState %s", opResult), "name", r.ConfigStateName)
 
 	return ctrl.Result{}, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -24,9 +25,30 @@ func TestConfigurationStateReconciler(t *testing.T) {
 		configStateNamespace = "metallb-system"
 	)
 
+	ownerPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "metallb-speaker-abc123",
+			Namespace: configStateNamespace,
+			UID:       "pod-uid-12345",
+		},
+	}
+
 	configStateObjectMeta := metav1.ObjectMeta{
 		Name:      configStateName,
 		Namespace: configStateNamespace,
+	}
+
+	wantObjectMeta := metav1.ObjectMeta{
+		Name:      configStateName,
+		Namespace: configStateNamespace,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       ownerPod.Name,
+				UID:        ownerPod.UID,
+			},
+		},
 	}
 
 	tests := map[string]struct {
@@ -36,7 +58,7 @@ func TestConfigurationStateReconciler(t *testing.T) {
 		"create resource if not found": {
 			before: nil,
 			want: &metallbv1beta1.ConfigurationState{
-				ObjectMeta: configStateObjectMeta,
+				ObjectMeta: wantObjectMeta,
 				Status: metallbv1beta1.ConfigurationStateStatus{
 					Result:       metallbv1beta1.ConfigurationResultUnknown,
 					ErrorSummary: "",
@@ -48,7 +70,7 @@ func TestConfigurationStateReconciler(t *testing.T) {
 				ObjectMeta: configStateObjectMeta,
 			},
 			want: &metallbv1beta1.ConfigurationState{
-				ObjectMeta: configStateObjectMeta,
+				ObjectMeta: wantObjectMeta,
 				Status: metallbv1beta1.ConfigurationStateStatus{
 					Result:       metallbv1beta1.ConfigurationResultUnknown,
 					ErrorSummary: "",
@@ -76,7 +98,7 @@ func TestConfigurationStateReconciler(t *testing.T) {
 				},
 			},
 			want: &metallbv1beta1.ConfigurationState{
-				ObjectMeta: configStateObjectMeta,
+				ObjectMeta: wantObjectMeta,
 				Status: metallbv1beta1.ConfigurationStateStatus{
 					Result:       metallbv1beta1.ConfigurationResultValid,
 					ErrorSummary: "",
@@ -104,7 +126,7 @@ func TestConfigurationStateReconciler(t *testing.T) {
 				},
 			},
 			want: &metallbv1beta1.ConfigurationState{
-				ObjectMeta: configStateObjectMeta,
+				ObjectMeta: wantObjectMeta,
 				Status: metallbv1beta1.ConfigurationStateStatus{
 					Result:       metallbv1beta1.ConfigurationResultInvalid,
 					ErrorSummary: "peer peer1 referencing non existing bfd profile",
@@ -117,6 +139,9 @@ func TestConfigurationStateReconciler(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			scheme := runtime.NewScheme()
 			if err := metallbv1beta1.AddToScheme(scheme); err != nil {
+				t.Fatalf("failed to add scheme: %v", err)
+			}
+			if err := corev1.AddToScheme(scheme); err != nil {
 				t.Fatalf("failed to add scheme: %v", err)
 			}
 
@@ -132,6 +157,7 @@ func TestConfigurationStateReconciler(t *testing.T) {
 				Scheme:          scheme,
 				Namespace:       configStateNamespace,
 				ConfigStateName: configStateName,
+				OwnerPod:        ownerPod,
 			}
 
 			req := reconcile.Request{
