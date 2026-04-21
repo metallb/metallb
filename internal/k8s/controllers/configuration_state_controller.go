@@ -9,11 +9,11 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -37,48 +37,45 @@ func (r *ConfigurationStateReconciler) Reconcile(ctx context.Context, req ctrl.R
 	level.Info(r.Logger).Log("controller", r, "start reconcile", req.String())
 	defer level.Info(r.Logger).Log("controller", r, "end reconcile", req.String())
 
-	var configStatus metallbv1beta1.ConfigurationState
-	err := r.Get(ctx, req.NamespacedName, &configStatus)
-	if apierrors.IsNotFound(err) {
-		configState := &metallbv1beta1.ConfigurationState{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      r.ConfigStateName,
-				Namespace: r.Namespace,
-				Labels:    r.ConfigStateLabels,
-			},
-		}
-		if err := r.Create(ctx, configState); err != nil {
-			level.Error(r.Logger).Log("controller", r, "error", "failed to create ConfigurationState", "error", err)
-			return ctrl.Result{}, err
+	configState := &metallbv1beta1.ConfigurationState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.ConfigStateName,
+			Namespace: r.Namespace,
+		},
+	}
+
+	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, configState, func() error {
+		configState.Labels = r.ConfigStateLabels
+
+		result := metallbv1beta1.ConfigurationResultUnknown
+		if len(configState.Status.Conditions) > 0 {
+			result = metallbv1beta1.ConfigurationResultValid
 		}
 
+		var errorMessages []string
+		for _, cond := range configState.Status.Conditions {
+			if cond.Status == metav1.ConditionFalse && cond.Reason == ErrorTypeConfiguration {
+				result = metallbv1beta1.ConfigurationResultInvalid
+				errorMessages = append(errorMessages, cond.Message)
+			}
+		}
+
+		configState.Status.Result = result
+		configState.Status.ErrorSummary = strings.Join(errorMessages, "\n")
+		return nil
+	})
+	if err != nil {
+		level.Error(r.Logger).Log("controller", r, "error", "failed to create or patch ConfigurationState", "error", err)
+		return ctrl.Result{}, err
+	}
+	if opResult == controllerutil.OperationResultCreated {
+		// According to https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/controller/controllerutil#CreateOrPatch
+		// If the object is created, we have to patch it again to ensure the status is created.
+		// This will happen when we reconcile the creation event.
 		level.Info(r.Logger).Log("controller", r, "event", "ConfigurationState created", "name", r.ConfigStateName)
 		return ctrl.Result{}, nil
 	}
-	if err != nil {
-		level.Error(r.Logger).Log("controller", r, "error", "failed to get ConfigurationState", "error", err)
-		return ctrl.Result{}, err
-	}
-
-	result := metallbv1beta1.ConfigurationResultUnknown
-	if len(configStatus.Status.Conditions) > 0 {
-		result = metallbv1beta1.ConfigurationResultValid
-	}
-
-	var errorMessages []string
-	for _, cond := range configStatus.Status.Conditions {
-		if cond.Status == metav1.ConditionFalse && cond.Reason == ErrorTypeConfiguration {
-			result = metallbv1beta1.ConfigurationResultInvalid
-			errorMessages = append(errorMessages, cond.Message)
-		}
-	}
-
-	configStatus.Status.Result = result
-	configStatus.Status.ErrorSummary = strings.Join(errorMessages, "\n")
-	if err := r.Client.Status().Update(ctx, &configStatus); err != nil {
-		level.Error(r.Logger).Log("controller", r, "error", "failed to update status", "result", result, "error", err)
-		return ctrl.Result{}, err
-	}
+	level.Info(r.Logger).Log("controller", r, "event", "ConfigurationState updated", "name", r.ConfigStateName)
 
 	return ctrl.Result{}, nil
 }
