@@ -51,9 +51,9 @@ To specify a single IP address in a pool, use `/32` in the CIDR notation
 ### Reduce scope of address allocation to specific Namespace and Service
 
 This option can be used to reduce the scope of particular IPAddressPool
-to set of namespaces and services, by adding an optional namespace
+to a set of namespaces and services, by adding an optional namespace
 and/or service selectors.
-This is useful for mutitenant context in which there is a need for pinning
+This is useful for multitenant context in which there is a need for pinning
 IPAddressPool to specific namespace/service.
 
 ```yaml
@@ -97,12 +97,12 @@ random.
 {{% notice note %}}
 When a service explicitly chooses an IPAddressPool via `metallb.io/address-pool`
 annotation or an IP address via `spec.loadBalancerIP` or `metallb.io/loadBalancerIPs`
-annotation which doesn't match the service will stay in pending.
+annotation which doesn't match the service will stay in a pending state.
 {{% /notice %}}
 
 ### Handling buggy networks
 
-Some old consumer network equipment mistakenly blocks IP addresses
+Some old consumer network equipment mistakenly block IP addresses
 ending in `.0` and `.255`, because of
 misguided
 [smurf protection](https://en.wikipedia.org/wiki/Smurf_attack).
@@ -120,7 +120,7 @@ contains IPs currently assigned to services.
 If that happens, instead of reallocating (if possible) a new IP to the service, the configuration change
 is marked as stale and MetalLB keeps running with the last valid configuration.
 
-In order to re-assign a new IP to the services, there are two options:
+To assign a new IP to the services, there are two options:
 
 - restarting the MetalLB's `controller` pod
 - deleting and re-creating the service
@@ -151,7 +151,7 @@ spec:
   - ipv4
 ```
 
-Suppose that the advertisement is as followed:
+Suppose that the advertisement is as follows:
 
 ```yaml
 apiVersion: metallb.io/v1beta1
