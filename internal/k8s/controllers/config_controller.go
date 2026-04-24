@@ -222,48 +222,6 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func filterNodeEvent(e event.UpdateEvent) bool {
-	newNodeObj, ok := e.ObjectNew.(*corev1.Node)
-	if !ok {
-		return true
-	}
-	oldNodeObj, ok := e.ObjectOld.(*corev1.Node)
-	if !ok {
-		return true
-	}
-	if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
-		return false
-	}
-	return true
-}
-
-func filterNamespaceEvent(e event.UpdateEvent) bool {
-	newNamespaceObj, ok := e.ObjectNew.(*corev1.Namespace)
-	if !ok {
-		return true
-	}
-	oldNamespaceObj, ok := e.ObjectOld.(*corev1.Namespace)
-	if !ok {
-		return true
-	}
-	// If there is no changes in namespace labels, ignore event.
-	if labels.Equals(labels.Set(oldNamespaceObj.Labels), labels.Set(newNamespaceObj.Labels)) {
-		return false
-	}
-	return true
-}
-
-func filterConfigmapEvent(e event.UpdateEvent) bool {
-	cm, ok := e.ObjectNew.(*corev1.ConfigMap)
-	if !ok {
-		return true
-	}
-	if cm.Name != bgpExtrasConfigName {
-		return false
-	}
-	return true
-}
-
 func (r *ConfigReconciler) getSecrets(ctx context.Context) (map[string]corev1.Secret, error) {
 	var secrets corev1.SecretList
 	if err := r.List(ctx, &secrets, client.InNamespace(r.Namespace)); err != nil {
@@ -321,4 +279,46 @@ func (r *ConfigReconciler) reportCondition(ctx context.Context, conditionErr err
 	}
 
 	return nil
+}
+
+func filterNodeEvent(e event.UpdateEvent) bool {
+	newNodeObj, ok := e.ObjectNew.(*corev1.Node)
+	if !ok {
+		return true
+	}
+	oldNodeObj, ok := e.ObjectOld.(*corev1.Node)
+	if !ok {
+		return true
+	}
+	if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
+		return false
+	}
+	return true
+}
+
+func filterNamespaceEvent(e event.UpdateEvent) bool {
+	newNamespaceObj, ok := e.ObjectNew.(*corev1.Namespace)
+	if !ok {
+		return true
+	}
+	oldNamespaceObj, ok := e.ObjectOld.(*corev1.Namespace)
+	if !ok {
+		return true
+	}
+	// If there is no changes in namespace labels, ignore event.
+	if labels.Equals(labels.Set(oldNamespaceObj.Labels), labels.Set(newNamespaceObj.Labels)) {
+		return false
+	}
+	return true
+}
+
+func filterConfigmapEvent(e event.UpdateEvent) bool {
+	cm, ok := e.ObjectNew.(*corev1.ConfigMap)
+	if !ok {
+		return true
+	}
+	if cm.Name != bgpExtrasConfigName {
+		return false
+	}
+	return true
 }
