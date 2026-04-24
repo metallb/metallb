@@ -212,6 +212,7 @@ func New(cfg *Config) (*Client, error) {
 			ValidateConfig:  cfg.ValidateConfig,
 			Handler:         cfg.ConfigHandler,
 			ForceReload:     reload,
+			NodeName:        cfg.NodeName,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
 			return nil, errors.Join(err, errors.New("unable to create controller for config"))
