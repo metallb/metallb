@@ -168,6 +168,7 @@ func TestConfigController(t *testing.T) {
 				Handler:         mockHandler,
 				ForceReload:     mockForceReload,
 				ConfigStateName: configStateRef.Name,
+				NodeName:        resources.Nodes[0].Name,
 			}
 			req := reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -223,6 +224,7 @@ func TestSecretShouldntTrigger(t *testing.T) {
 		ValidateConfig: config.DontValidate,
 		Handler:        mockHandler,
 		ForceReload:    func() {},
+		NodeName:       configControllerValidResources.Nodes[0].Name,
 	}
 	req := reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -357,6 +359,13 @@ var (
 				},
 			},
 		},
+		Nodes: []corev1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker01",
+				},
+			},
+		},
 	}
 	configControllerInvalidResources = config.ClusterResources{
 		Peers: []v1beta2.BGPPeer{
@@ -364,6 +373,13 @@ var (
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "peer1",
 					Namespace: testNamespace,
+				},
+			},
+		},
+		Nodes: []corev1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "worker01",
 				},
 			},
 		},
