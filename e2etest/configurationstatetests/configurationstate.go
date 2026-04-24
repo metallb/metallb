@@ -5,6 +5,7 @@ package configurationstatetests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -25,6 +26,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	hostnameLabel = "kubernetes.io/hostname"
 )
 
 var (
@@ -49,7 +54,7 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		cs := k8sclient.New()
 		allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(allNodes.Items)).To(BeNumerically(">", 0))
+		Expect(len(allNodes.Items)).To(BeNumerically(">", 1))
 
 		ginkgo.By("Verifying all ConfigurationStates exist and are valid")
 		Eventually(func() error {
@@ -61,10 +66,20 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
+		ginkgo.By("Clearing any configuration")
+		err := ConfigUpdater.Clean()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	ginkgo.It("speaker should have invalid result when BGPPeer references secret with wrong type", func() {
-		stateName := "speaker-" + allNodes.Items[0].Name
+	ginkgo.It("a single speaker should have invalid result when BGPPeer with nodeSelector references secret with wrong type", func() {
+		invalidNode := allNodes.Items[0]
+		invalidStateName := "speaker-" + invalidNode.Name
+		invalidNodeLabel := invalidNode.Labels[hostnameLabel]
+
+		validStateNames := make([]string, 0, len(allNodes.Items)-1)
+		for _, node := range allNodes.Items[1:] {
+			validStateNames = append(validStateNames, "speaker-"+node.Name)
+		}
 		wantStatus := metallbv1beta1.ConfigurationStateStatus{
 			Result:       metallbv1beta1.ConfigurationResultInvalid,
 			ErrorSummary: "configuration error: parsing peer peer1 secret type mismatch on \"metallb-system\"/\"bgp-password\", type \"kubernetes.io/basic-auth\" is expected \nfailed to parse peer peer1 password secret",
@@ -100,17 +115,28 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 						PasswordSecret: corev1.SecretReference{
 							Name: "bgp-password",
 						},
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									hostnameLabel: invalidNodeLabel,
+								},
+							},
+						},
 					},
 				},
 			},
 		}
-
 		err = ConfigUpdater.Update(resources)
 		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("Verifying status has invalid result with error message")
+		ginkgo.By("Verifying status has invalid result with error message on invalid node, and valid on others")
 		Eventually(func() error {
-			return stateMatches(stateName, wantStatus)
+			var errs []error
+			errs = append(errs, stateMatches(invalidStateName, wantStatus))
+			for _, stateName := range validStateNames {
+				errs = append(errs, stateMatches(stateName, validStatus))
+			}
+			return errors.Join(errs...)
 		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
 		ginkgo.By("Recreating secret with correct type")
@@ -133,9 +159,14 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		err = ConfigUpdater.Client().Create(context.Background(), secret)
 		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("Verifying status has valid result")
+		ginkgo.By("Verifying status for all nodes has valid result")
 		Eventually(func() error {
-			return stateMatches(stateName, validStatus)
+			var errs []error
+			errs = append(errs, stateMatches(invalidStateName, validStatus))
+			for _, stateName := range validStateNames {
+				errs = append(errs, stateMatches(stateName, validStatus))
+			}
+			return errors.Join(errs...)
 		}, 60*time.Second, 5*time.Second).Should(Succeed())
 	})
 
