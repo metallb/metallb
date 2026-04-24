@@ -661,6 +661,10 @@ func bfdProfileFromCR(p metallbv1beta1.BFDProfile) (*BFDProfile, error) {
 	return res, nil
 }
 
+// setL2AdvertisementsToPools populates the L2Advertisements field of each pool
+// in ipPoolMap. It converts each L2Advertisement CR into an internal representation
+// (resolving node selectors) and assigns it to every matching pool.
+// The function is called for its side effects: the goal is to modify ipPoolMap in place.
 func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs []metallbv1beta1.L2Advertisement,
 	nodes []corev1.Node, ipPoolMap map[string]*Pool) error {
 	for _, l2Adv := range l2Advs {
@@ -692,6 +696,10 @@ func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs [
 	return nil
 }
 
+// setBGPAdvertisementsToPools populates the BGPAdvertisements field of each pool
+// in ipPoolMap. It converts each BGPAdvertisement CR into an internal representation
+// (resolving node selectors) and assigns it to every matching pool.
+// The function is called for its side effects: the goal is to modify ipPoolMap in place.
 func setBGPAdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, bgpAdvs []metallbv1beta1.BGPAdvertisement,
 	nodes []corev1.Node, ipPoolMap map[string]*Pool, communities map[string]community.BGPCommunity) error {
 	for _, bgpAdv := range bgpAdvs {
