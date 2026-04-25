@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"os/signal"
@@ -64,6 +65,10 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 const (
 	excludeL2ConfigPath    = "/etc/metallb/excludel2.yaml"
 	defaultDebounceTimeout = 3 * time.Second
+	// Cap the gratuitous ARP interval well below the time.Duration overflow
+	// point (max ~9.2e9 seconds for an int64 ns duration) while still
+	// allowing any sensible value.
+	maxGratuitousARPInterval = math.MaxInt32
 )
 
 // Service offers methods to mutate a Kubernetes service object.
@@ -76,25 +81,39 @@ type service interface {
 func main() {
 	prometheus.MustRegister(announcing)
 
+	// Resolve env-var default for gratuitous ARP interval before flag.Parse
+	// so an explicit --gratuitous-arp-interval=0 can override a non-zero env.
+	gratuitousARPDefault := 0
+	if envVal := os.Getenv("METALLB_GRATUITOUS_ARP_INTERVAL"); envVal != "" {
+		parsed, err := strconv.Atoi(envVal)
+		if err != nil || parsed < 0 || parsed > maxGratuitousARPInterval {
+			fmt.Fprintf(os.Stderr, "invalid METALLB_GRATUITOUS_ARP_INTERVAL value %q, must be a non-negative integer number of seconds <= %d\n", envVal, maxGratuitousARPInterval)
+			os.Exit(1)
+		}
+		gratuitousARPDefault = parsed
+	}
+
 	var (
 		bgpDebounceTimeoutMs = flag.String("bgp-debounce-timeout", os.Getenv("METALLB_BGP_DEBOUNCE_TIMEOUT"),
 			"BGP debounce timeout for FRR configuration reloads, in milliseconds. Only applies when METALLB_BGP_TYPE=frr. "+
 				"Can also be set via METALLB_BGP_DEBOUNCE_TIMEOUT. Default is 3000 ms. This feature is experimental.")
-		namespace         = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
-		host              = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
-		mlBindAddr        = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
-		mlBindPort        = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
-		mlLabels          = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
-		mlSecretKeyPath   = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
-		mlWANConfig       = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
-		myNode            = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
-		myPod             = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
-		port              = flag.Int("port", 7472, "HTTP listening port")
-		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
-		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
-		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
-		frrK8sNamespace   = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
+		namespace             = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
+		host                  = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
+		mlBindAddr            = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlBindPort            = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
+		mlLabels              = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
+		mlSecretKeyPath       = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
+		mlWANConfig           = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
+		myNode                = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		myPod                 = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
+		port                  = flag.Int("port", 7472, "HTTP listening port")
+		logLevel              = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
+		enablePprof           = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+		loadBalancerClass     = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		ignoreLBExclude       = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
+		frrK8sNamespace       = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
+		gratuitousARPInterval = flag.Int("gratuitous-arp-interval", gratuitousARPDefault, "Interval in seconds for periodic gratuitous ARP/NDP announcements. "+
+			"0 disables periodic announcements. Can also be set via METALLB_GRATUITOUS_ARP_INTERVAL.")
 	)
 
 	flag.Parse()
@@ -126,6 +145,12 @@ func main() {
 		bgpDebounceTimeout = time.Duration(parsed) * time.Millisecond
 	}
 	level.Debug(logger).Log("msg", "using BGP debounce timeout", "milliseconds", bgpDebounceTimeout.Milliseconds())
+
+	if *gratuitousARPInterval < 0 || *gratuitousARPInterval > maxGratuitousARPInterval {
+		level.Error(logger).Log("msg", "invalid --gratuitous-arp-interval value, must be a non-negative integer number of seconds within bound", "provided", *gratuitousARPInterval, "max", maxGratuitousARPInterval)
+		os.Exit(1)
+	}
+	garpInterval := time.Duration(*gratuitousARPInterval) * time.Second
 
 	if bgpType == "frr" {
 		level.Warn(logger).Log("op", "startup", "msg", "The FRR mode is deprecated and will be removed in a future release. Please migrate to the frr-k8s mode, which is now the default BGP backend. See https://metallb.io/concepts/bgp/#frr-k8s-mode for details.")
@@ -198,6 +223,7 @@ func main() {
 		InterfaceExcludeRegexp: interfacesToExclude,
 		IgnoreExcludeLB:        *ignoreLBExclude,
 		BGPDebounceTimeout:     bgpDebounceTimeout,
+		GratuitousARPInterval:  garpInterval,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
 			l2StatusChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
 		},
@@ -302,6 +328,7 @@ type controllerConfig struct {
 	InterfaceExcludeRegexp       *regexp.Regexp
 	IgnoreExcludeLB              bool
 	BGPDebounceTimeout           time.Duration
+	GratuitousARPInterval        time.Duration
 	Layer2StatusChange           func(types.NamespacedName)
 	BGPAdsChangedCallback        func(string)
 }
@@ -334,7 +361,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 
 	layer2StatusFetcher := func(types.NamespacedName) []layer2.IPAdvertisement { return nil }
 	if !cfg.DisableLayer2 {
-		a, err := layer2.New(cfg.Logger, cfg.InterfaceExcludeRegexp)
+		a, err := layer2.New(cfg.Logger, cfg.InterfaceExcludeRegexp, cfg.GratuitousARPInterval)
 		layer2StatusFetcher = a.GetStatus
 		if err != nil {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)

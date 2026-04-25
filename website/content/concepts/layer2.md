@@ -67,6 +67,24 @@ about 10s), please [file a bug](https://github.com/metallb/metallb/issues/new)!
 We can help you investigate and determine if the issue is with the client, or a
 bug in MetalLB.
 
+## Periodic gratuitous announcements
+
+By default MetalLB only sends gratuitous ARP/NDP packets on failover. In some
+environments — for example, switches that age FDB entries faster than upstream
+gateways age their ARP cache — this can result in periodic packet loss for
+service IPs even without a leadership change. To work around this, the speaker
+can be configured to re-emit gratuitous ARP/NDP packets for every announced IP
+on a fixed interval, via the `--gratuitous-arp-interval` flag (or the
+`METALLB_GRATUITOUS_ARP_INTERVAL` environment variable). The value is in
+seconds; `0` (the default) keeps the original failover-only behaviour.
+
+The interval applies speaker-wide to every L2-announced IP on the node. Each
+tick emits one packet per (IP, matching interface) pair, so very short
+intervals on speakers announcing many IPs across many interfaces can produce a
+noticeable amount of broadcast traffic and slow down the speaker's handling of
+service updates. As a rule of thumb, pick the largest interval that is still
+shorter than your switch's FDB aging time.
+
 ## How the L2 leader election works
 
 The election of the "leader" (the node which is going to advertise the IP) of a

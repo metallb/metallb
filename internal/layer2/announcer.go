@@ -32,8 +32,10 @@ type Announce struct {
 	excludeRegexp *regexp.Regexp
 }
 
-// New returns an initialized Announce.
-func New(l log.Logger, excludeRegexp *regexp.Regexp) (*Announce, error) {
+// New returns an initialized Announce. If gratuitousARPInterval is positive,
+// a background goroutine periodically sends gratuitous ARP/NDP for all
+// announced IPs at that interval.
+func New(l log.Logger, excludeRegexp *regexp.Regexp, gratuitousARPInterval time.Duration) (*Announce, error) {
 	ret := &Announce{
 		logger:         l,
 		nodeInterfaces: []string{},
@@ -47,6 +49,10 @@ func New(l log.Logger, excludeRegexp *regexp.Regexp) (*Announce, error) {
 
 	go ret.interfaceScan()
 	go ret.spamLoop()
+	if gratuitousARPInterval > 0 {
+		level.Info(l).Log("op", "periodicGARP", "msg", "periodic gratuitous ARP enabled", "interval", gratuitousARPInterval)
+		go ret.periodicGARPLoop(gratuitousARPInterval)
+	}
 
 	return ret, nil
 }
@@ -198,6 +204,62 @@ func (a *Announce) spamLoop() {
 
 func (a *Announce) doSpam(adv IPAdvertisement) {
 	a.spamCh <- adv
+}
+
+func (a *Announce) periodicGARPLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		a.sendPeriodicGratuitous()
+	}
+}
+
+func (a *Announce) sendPeriodicGratuitous() {
+	for _, adv := range a.mergedAdvertisementsPerIP() {
+		a.gratuitous(adv)
+	}
+}
+
+// mergedAdvertisementsPerIP returns one IPAdvertisement per unique IP,
+// merging interface constraints across all advertisements for that IP:
+// allInterfaces=true if any source advertisement has it, otherwise the
+// union of interface sets. This ensures periodic gratuitous announcements
+// reach every interface where the IP is being advertised.
+func (a *Announce) mergedAdvertisementsPerIP() []IPAdvertisement {
+	a.RLock()
+	defer a.RUnlock()
+
+	merged := map[string]IPAdvertisement{}
+	for _, ipAdvs := range a.ips {
+		for _, adv := range ipAdvs {
+			ipStr := adv.ip.String()
+			existing, ok := merged[ipStr]
+			if !ok {
+				m := adv
+				if !m.allInterfaces {
+					m.interfaces = m.interfaces.Clone()
+				}
+				merged[ipStr] = m
+				continue
+			}
+			if existing.allInterfaces {
+				continue
+			}
+			if adv.allInterfaces {
+				existing.allInterfaces = true
+				existing.interfaces = nil
+			} else {
+				existing.interfaces = existing.interfaces.Union(adv.interfaces)
+			}
+			merged[ipStr] = existing
+		}
+	}
+
+	advs := make([]IPAdvertisement, 0, len(merged))
+	for _, adv := range merged {
+		advs = append(advs, adv)
+	}
+	return advs
 }
 
 func (a *Announce) gratuitous(adv IPAdvertisement) {
