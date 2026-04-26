@@ -16,6 +16,3 @@ patchesJson6902:
       kind: ClusterRole
       name: metallb-system:speaker
     path: clusterrole-patch.yaml
-images:
-  - name: gcr.io/kubebuilder/kube-rbac-proxy
-    newName: registry.k8s.io/kubebuilder/kube-rbac-proxy

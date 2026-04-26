@@ -24,6 +24,3 @@ patches:
       kind: ServiceMonitor
       name: frr-k8s-metrics-monitor
 namespace: metallb-system
-images:
-  - name: gcr.io/kubebuilder/kube-rbac-proxy
-    newName: registry.k8s.io/kubebuilder/kube-rbac-proxy
