@@ -44,7 +44,7 @@ type layer2Controller struct {
 	onStatusChange  func(types.NamespacedName)
 }
 
-func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
+func (c *layer2Controller) SetConfig(_ log.Logger, _ *config.Config) error {
 	return nil
 }
 
