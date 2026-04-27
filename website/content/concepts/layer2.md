@@ -78,12 +78,11 @@ on a fixed interval, via the `--gratuitous-arp-interval` flag (or the
 `METALLB_GRATUITOUS_ARP_INTERVAL` environment variable). The value is in
 seconds; `0` (the default) keeps the original failover-only behaviour.
 
-The interval applies speaker-wide to every L2-announced IP on the node. Each
-tick emits one packet per (IP, matching interface) pair, so very short
-intervals on speakers announcing many IPs across many interfaces can produce a
-noticeable amount of broadcast traffic and slow down the speaker's handling of
-service updates. As a rule of thumb, pick the largest interval that is still
-shorter than your switch's FDB aging time.
+The interval applies speaker-wide to every L2-announced IP on the node, so
+very short intervals on speakers announcing many IPs across many interfaces
+can produce a noticeable amount of broadcast traffic and slow down the
+speaker's handling of service updates. As a rule of thumb, pick the largest
+interval that is still shorter than your switch's FDB aging time.
 
 ## How the L2 leader election works
 
