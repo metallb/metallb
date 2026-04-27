@@ -36,6 +36,11 @@ import (
 	"go.universe.tf/metallb/internal/layer2"
 )
 
+const (
+	annotationAllowSharedIP           = "metallb.io/allow-shared-ip"
+	deprecatedAnnotationAllowSharedIP = "metallb.universe.tf/allow-shared-ip"
+)
+
 type layer2Controller struct {
 	announcer       *layer2.Announce
 	myNode          string
@@ -87,6 +92,13 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	}
 
 	adsForService := l2AdsForService(pool.L2Advertisements, svc)
+
+	if serviceHasSharedIP(svc) && adsHaveServiceSelectors(adsForService) {
+		level.Warn(l).Log("event", "skipping should announce l2", "service", name,
+			"reason", "allow-shared-ip is incompatible with serviceSelectors on L2 advertisements")
+		return "sharedIPWithServiceSelector"
+	}
+
 	if !adsMatchNodeL2(adsForService, c.myNode) {
 		level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "no advertisement matching service on my node")
 		return "noMatchingAdvertisement"
@@ -248,6 +260,28 @@ func l2AdsForNode(ads []*config.L2Advertisement, node string) []*config.L2Advert
 		}
 	}
 	return result
+}
+
+func serviceHasSharedIP(svc *v1.Service) bool {
+	if svc.Annotations == nil {
+		return false
+	}
+	if _, ok := svc.Annotations[annotationAllowSharedIP]; ok {
+		return true
+	}
+	if _, ok := svc.Annotations[deprecatedAnnotationAllowSharedIP]; ok {
+		return true
+	}
+	return false
+}
+
+func adsHaveServiceSelectors(ads []*config.L2Advertisement) bool {
+	for _, ad := range ads {
+		if len(ad.ServiceSelectors) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *layer2Controller) speakersForAds(l log.Logger, name string, ads []*config.L2Advertisement, nodes map[string]*v1.Node) map[string]bool {
