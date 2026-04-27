@@ -197,3 +197,7 @@ interface `eth1`.
 
 Multiple selectors in the `serviceSelectors` list are combined with OR logic - a service
 matching **any** of the selectors will be advertised via that advertisement.
+
+{{% notice warning %}}
+`serviceSelectors` is incompatible with the `metallb.io/allow-shared-ip` annotation. Services using `allow-shared-ip` that match an L2Advertisement with `serviceSelectors` will not be announced, as different services sharing the same IP may match different advertisements and cause split announcements.
+{{% /notice %}}

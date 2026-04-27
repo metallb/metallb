@@ -1851,6 +1851,184 @@ func TestL2ServiceSelectors(t *testing.T) {
 	}
 }
 
+func TestL2SharedIPWithServiceSelectors(t *testing.T) {
+	fakeSL := &fakeSpeakerList{
+		speakers: map[string]bool{
+			"iris1": true,
+		},
+	}
+	c1, err := newController(controllerConfig{
+		MyNode:  "iris1",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c1.client = &testK8S{t: t}
+
+	tests := []struct {
+		desc             string
+		L2Advertisements []*config.L2Advertisement
+		svc              *v1.Service
+		expected         string
+	}{
+		{
+			desc: "allow-shared-ip with serviceSelectors is denied",
+			L2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes:            map[string]bool{"iris1": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=nginx")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-svc",
+					Labels:      map[string]string{"app": "nginx"},
+					Annotations: map[string]string{"metallb.io/allow-shared-ip": "shared"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "sharedIPWithServiceSelector",
+		},
+		{
+			desc: "allow-shared-ip without serviceSelectors is allowed",
+			L2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes:         map[string]bool{"iris1": true},
+					AllInterfaces: true,
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-svc",
+					Labels:      map[string]string{"app": "nginx"},
+					Annotations: map[string]string{"metallb.io/allow-shared-ip": "shared"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "",
+		},
+		{
+			desc: "no allow-shared-ip with serviceSelectors is allowed",
+			L2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes:            map[string]bool{"iris1": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=nginx")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-svc",
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "",
+		},
+		{
+			desc: "deprecated allow-shared-ip with serviceSelectors is denied",
+			L2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes:            map[string]bool{"iris1": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=nginx")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-svc",
+					Labels:      map[string]string{"app": "nginx"},
+					Annotations: map[string]string{"metallb.universe.tf/allow-shared-ip": "shared"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "sharedIPWithServiceSelector",
+		},
+		{
+			desc: "allow-shared-ip with mixed ads (one with selectors) is denied",
+			L2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes:         map[string]bool{"iris1": true},
+					AllInterfaces: true,
+				},
+				{
+					Nodes:            map[string]bool{"iris1": true},
+					AllInterfaces:    true,
+					ServiceSelectors: []labels.Selector{selector("app=nginx")},
+				},
+			},
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-svc",
+					Labels:      map[string]string{"app": "nginx"},
+					Annotations: map[string]string{"metallb.io/allow-shared-ip": "shared"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:                  v1.ServiceTypeLoadBalancer,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			expected: "sharedIPWithServiceSelector",
+		},
+	}
+
+	l := log.NewNopLogger()
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			cfg := &config.Config{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
+					"default": {
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: test.L2Advertisements,
+					},
+				}},
+			}
+			if c1.SetConfig(l, cfg) == controllers.SyncStateError {
+				t.Errorf("SetConfig failed")
+			}
+
+			lbIP := net.ParseIP(test.svc.Status.LoadBalancer.Ingress[0].IP)
+			eps := []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses:  []string{"2.3.4.5"},
+							NodeName:   ptr.To("iris1"),
+							Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			}
+
+			response := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
+			if response != test.expected {
+				t.Errorf("expected %q, got %q", test.expected, response)
+			}
+		})
+	}
+}
+
 func TestL2AdsForService(t *testing.T) {
 	ad1 := &config.L2Advertisement{Nodes: map[string]bool{"nodeA": true}, AllInterfaces: true}
 	ad2 := &config.L2Advertisement{Nodes: map[string]bool{"nodeA": true}, AllInterfaces: true, ServiceSelectors: []labels.Selector{selector("app=nginx")}}

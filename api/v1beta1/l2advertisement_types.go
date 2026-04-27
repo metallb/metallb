@@ -41,6 +41,7 @@ type L2AdvertisementSpec struct {
 	Interfaces []string `json:"interfaces,omitempty"`
 	// ServiceSelectors limits the set of services that will be advertised via this advertisement.
 	// If empty, all services from the selected pools are advertised.
+	// Services matching the selectors cannot use the allow-shared-ip annotation.
 	// +optional
 	ServiceSelectors []metav1.LabelSelector `json:"serviceSelectors,omitempty"`
 }

@@ -208,6 +208,10 @@ There are two main reasons to colocate services in this fashion: to
 work around a Kubernetes limitation, and to work with limited IP
 addresses.
 
+{{% notice warning %}}
+In L2 mode, `allow-shared-ip` is incompatible with `serviceSelectors` on L2Advertisements. Services using `allow-shared-ip` that match an L2Advertisement with `serviceSelectors` will not be announced.
+{{% /notice %}}
+
 Here is an example configuration of two services that share the same ip address:
 
 ```yaml
