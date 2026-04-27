@@ -1349,6 +1349,7 @@ spec:
                   description: |-
                     ServiceSelectors limits the set of services that will be advertised via this advertisement.
                     If empty, all services from the selected pools are advertised.
+                    Services matching the selectors cannot use the allow-shared-ip annotation.
                   items:
                     description: |-
                       A label selector is a label query over a set of resources. The result of matchLabels and
