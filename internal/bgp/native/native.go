@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/safeconvert"
 	"golang.org/x/sys/unix"
@@ -473,7 +475,17 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 		if err != nil {
 			return err
 		}
-		newAdvs[adv.Prefix.String()] = adv
+		key := adv.Prefix.String()
+		existing, ok := newAdvs[key]
+		if !ok {
+			newAdvs[key] = adv
+			continue
+		}
+
+		existing.Communities = mergeCommunities(existing.Communities, adv.Communities)
+		if err := validate(existing); err != nil {
+			return fmt.Errorf("invalid merged advertisement for prefix %s: %w", key, err)
+		}
 	}
 
 	s.new = newAdvs
@@ -482,6 +494,23 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 	s.cond.Broadcast()
 
 	return nil
+}
+
+func mergeCommunities(a, b []community.BGPCommunity) []community.BGPCommunity {
+	byStr := map[string]community.BGPCommunity{}
+	for _, c := range a {
+		byStr[c.String()] = c
+	}
+	for _, c := range b {
+		byStr[c.String()] = c
+	}
+
+	merged := make([]community.BGPCommunity, 0, len(byStr))
+	for _, c := range byStr {
+		merged = append(merged, c)
+	}
+	sort.Slice(merged, func(i, j int) bool { return merged[i].LessThan(merged[j]) })
+	return merged
 }
 
 // abort closes any existing connection, updates stats, and cleans up
