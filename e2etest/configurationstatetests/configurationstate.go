@@ -5,6 +5,7 @@ package configurationstatetests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -25,6 +26,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	hostnameLabel = "kubernetes.io/hostname"
 )
 
 var (
@@ -49,7 +54,7 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		cs := k8sclient.New()
 		allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(allNodes.Items)).To(BeNumerically(">", 0))
+		Expect(len(allNodes.Items)).To(BeNumerically(">", 1))
 
 		ginkgo.By("Verifying all ConfigurationStates exist and are valid")
 		Eventually(func() error {
@@ -61,10 +66,16 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
+		ginkgo.By("Clearing any configuration")
+		err := ConfigUpdater.Clean()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	ginkgo.It("speaker should have invalid result when BGPPeer references secret with wrong type", func() {
-		stateName := "speaker-" + allNodes.Items[0].Name
+	ginkgo.It("all speakers should have invalid result when BGPPeer references secret with wrong type", func() {
+		stateNames := make([]string, 0, len(allNodes.Items))
+		for _, node := range allNodes.Items {
+			stateNames = append(stateNames, "speaker-"+node.Name)
+		}
 		wantStatus := metallbv1beta1.ConfigurationStateStatus{
 			Result:       metallbv1beta1.ConfigurationResultInvalid,
 			ErrorSummary: "configuration error: parsing peer peer1 secret type mismatch on \"metallb-system\"/\"bgp-password\", type \"kubernetes.io/basic-auth\" is expected \nfailed to parse peer peer1 password secret",
@@ -110,7 +121,11 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 
 		ginkgo.By("Verifying status has invalid result with error message")
 		Eventually(func() error {
-			return stateMatches(stateName, wantStatus)
+			var errs []error
+			for _, stateName := range stateNames {
+				errs = append(errs, stateMatches(stateName, wantStatus))
+			}
+			return errors.Join(errs...)
 		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
 		ginkgo.By("Recreating secret with correct type")
@@ -135,7 +150,110 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 
 		ginkgo.By("Verifying status has valid result")
 		Eventually(func() error {
-			return stateMatches(stateName, validStatus)
+			var errs []error
+			for _, stateName := range stateNames {
+				errs = append(errs, stateMatches(stateName, validStatus))
+			}
+			return errors.Join(errs...)
+		}, 60*time.Second, 5*time.Second).Should(Succeed())
+	})
+
+	ginkgo.It("a single speaker should have invalid result when BGPPeer with nodeSelector references secret with wrong type", func() {
+		invalidNode := allNodes.Items[0]
+		invalidStateName := "speaker-" + invalidNode.Name
+		invalidNodeLabel := invalidNode.Labels[hostnameLabel]
+
+		validStateNames := make([]string, 0, len(allNodes.Items)-1)
+		for _, node := range allNodes.Items[1:] {
+			validStateNames = append(validStateNames, "speaker-"+node.Name)
+		}
+		wantStatus := metallbv1beta1.ConfigurationStateStatus{
+			Result:       metallbv1beta1.ConfigurationResultInvalid,
+			ErrorSummary: "configuration error: parsing peer peer1 secret type mismatch on \"metallb-system\"/\"bgp-password\", type \"kubernetes.io/basic-auth\" is expected \nfailed to parse peer peer1 password secret",
+		}
+
+		ginkgo.By("Creating secret with wrong type and BGPPeer referencing it")
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bgp-password",
+				Namespace: metallb.Namespace,
+			},
+			Type: corev1.SecretTypeOpaque,
+			StringData: map[string]string{
+				"password": "mypassword",
+			},
+		}
+		err := ConfigUpdater.Client().Create(context.Background(), secret)
+		Expect(err).NotTo(HaveOccurred())
+		ginkgo.DeferCleanup(func() {
+			ConfigUpdater.Client().Delete(context.Background(), secret)
+		})
+
+		resources := config.Resources{
+			Peers: []metallbv1beta2.BGPPeer{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "peer1",
+					},
+					Spec: metallbv1beta2.BGPPeerSpec{
+						MyASN:   64512,
+						ASN:     64513,
+						Address: "192.168.1.1",
+						PasswordSecret: corev1.SecretReference{
+							Name: "bgp-password",
+						},
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									hostnameLabel: invalidNodeLabel,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		err = ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred())
+
+		ginkgo.By("Verifying status has invalid result with error message")
+		Eventually(func() error {
+			var errs []error
+			errs = append(errs, stateMatches(invalidStateName, wantStatus))
+			for _, stateName := range validStateNames {
+				errs = append(errs, stateMatches(stateName, validStatus))
+			}
+			return errors.Join(errs...)
+		}, 30*time.Second, 5*time.Second).Should(Succeed())
+
+		ginkgo.By("Recreating secret with correct type")
+		err = ConfigUpdater.Client().Delete(context.Background(), secret) // field is immutable, need to delete first
+		Expect(err).NotTo(HaveOccurred())
+
+		ginkgo.By("Ensuring secret is fully deleted")
+		Eventually(func() bool {
+			var s corev1.Secret
+			err := ConfigUpdater.Client().Get(context.Background(), types.NamespacedName{
+				Name:      "bgp-password",
+				Namespace: metallb.Namespace,
+			}, &s)
+			return apierrors.IsNotFound(err)
+		}, 30*time.Second, 1*time.Second).Should(Equal(true))
+
+		secret.ResourceVersion = ""
+		secret.UID = ""
+		secret.Type = corev1.SecretTypeBasicAuth
+		err = ConfigUpdater.Client().Create(context.Background(), secret)
+		Expect(err).NotTo(HaveOccurred())
+
+		ginkgo.By("Verifying status has valid result")
+		Eventually(func() error {
+			var errs []error
+			errs = append(errs, stateMatches(invalidStateName, validStatus))
+			for _, stateName := range validStateNames {
+				errs = append(errs, stateMatches(stateName, validStatus))
+			}
+			return errors.Join(errs...)
 		}, 60*time.Second, 5*time.Second).Should(Succeed())
 	})
 
