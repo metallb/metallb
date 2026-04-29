@@ -434,14 +434,10 @@ spec:
 
 Services not matching `app: frontend` ignore this advertisement.
 
-Caveat: this feature inherits an existing issue with `allow-shared-ip` +
-`serviceSelectors` tracked in [#3025](https://github.com/metallb/metallb/issues/3025).
-`ShouldAnnounce` runs per-service, so two services sharing an IP that match
-different preference-bearing ads compute different score maps and can elect
-different nodes. The hash tie-break only fires on score ties, so divergent
-scores bypass it. Until #3025 is resolved, shared-IP siblings should match the
-same set of preference-bearing ads. The simplest way is to keep preferences on
-ads without `serviceSelectors`.
+With the rule from [#3025](https://github.com/metallb/metallb/issues/3025)
+disallowing `allow-shared-ip` + `serviceSelectors` on L2Advertisements,
+shared-IP siblings always see the same ad set and converge on the same
+announcer.
 
 ## Drawbacks
 
