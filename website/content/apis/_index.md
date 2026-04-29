@@ -467,6 +467,7 @@ _Appears in:_
 | --- | --- |
 | `myASN` _integer_ | AS number to use for the local end of the session. |
 | `peerASN` _integer_ | AS number to expect from the remote end of the session.<br />ASN and DynamicASN are mutually exclusive and one of them must be specified. |
+| `localASN` _integer_ | LocalASN allows advertising a different AS number to the peer using BGP's<br />local-as feature. When set, MetalLB will advertise this ASN to the peer<br />via "neighbor <peer> local-as <ASN> no-prepend replace-as", overriding<br />the router-level MyASN for this specific session.<br />Not supported in native BGP mode. |
 | `dynamicASN` _[DynamicASNMode](#dynamicasnmode)_ | DynamicASN detects the AS number to use for the remote end of the session<br />without explicitly setting it via the ASN field. Limited to:<br />internal - if the neighbor's ASN is different than MyASN connection is denied.<br />external - if the neighbor's ASN is the same as MyASN the connection is denied.<br />ASN and DynamicASN are mutually exclusive and one of them must be specified. |
 | `peerAddress` _string_ | Address to dial when establishing the session. |
 | `interface` _string_ | Interface is the node interface over which the unnumbered BGP peering will<br />be established. No API validation takes place as that string value<br />represents an interface name on the host and if user provides an invalid<br />value, only the actual BGP session will not be established.<br />Address and Interface are mutually exclusive and one of them must be specified. |

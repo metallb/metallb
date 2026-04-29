@@ -262,6 +262,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 				VRFName:                p.cfg.VRF,
 				DualStackAddressFamily: p.cfg.DualStackAddressFamily,
 				DisableMP:              p.cfg.DisableMP, //nolint:staticcheck // SA1019: intentionally using deprecated field for translation
+				LocalASN:               p.cfg.LocalASN,
 			}
 			sessionParams.Password, sessionParams.PasswordRef = passwordForSession(p.cfg, c.bgpType, c.secretHandling)
 

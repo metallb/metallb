@@ -573,6 +573,46 @@ var _ = ginkgo.Describe("BGP", func() {
 		ginkgo.Entry("IPV4", ipfamily.IPv4),
 		ginkgo.Entry("IPV6", ipfamily.IPv6))
 
+	ginkgo.DescribeTable("FRR configure peers with localASN and validate session uses the local-as override", func(ipFamily ipfamily.Family) {
+		// localASN is a different ASN from metalLBASN. MetalLB will advertise
+		// this value to the peer via "neighbor <peer> local-as <localASN>
+		// no-prepend replace-as", so the external FRR container must expect
+		// localASN as MetalLB's remote-as for the session to come up.
+		localASN := uint32(64520)
+
+		ginkgo.By("configure peer with localASN")
+
+		resources := config.Resources{
+			Peers: metallb.PeersForContainers(FRRContainers, ipFamily, func(p *metallbv1beta2.BGPPeer) {
+				p.Spec.LocalASN = localASN
+			}),
+		}
+
+		err := ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred())
+
+		ginkgo.By("pairing FRR containers expecting localASN as MetalLB's remote-as")
+		for _, c := range FRRContainers {
+			err = frrcontainer.PairWithNodes(cs, c, ipFamily, func(c *frrcontainer.FRR) {
+				c.NeighborConfig.ASN = localASN
+			})
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		ginkgo.By("validating sessions are established and peers report localASN as the remote AS")
+		for _, c := range FRRContainers {
+			validateFRRPeeredWithAllNodes(cs, c, ipFamily)
+			neighbors, err := frr.NeighborsInfo(c)
+			Expect(err).NotTo(HaveOccurred())
+			for _, n := range neighbors {
+				Expect(n.RemoteAS).To(Equal(fmt.Sprintf("%d", localASN)),
+					"expected MetalLB to advertise localASN %d to the peer", localASN)
+			}
+		}
+	},
+		ginkgo.Entry("FRR-MODE IPV4", ipfamily.IPv4),
+		ginkgo.Entry("FRR-MODE IPV6", ipfamily.IPv6))
+
 	ginkgo.DescribeTable("validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
 

@@ -242,6 +242,17 @@ spec:
               keepaliveTime:
                 description: Requested BGP keepalive time, per RFC4271.
                 type: string
+              localASN:
+                description: |-
+                  LocalASN allows advertising a different AS number to the peer using BGP's
+                  local-as feature. When set, MetalLB will advertise this ASN to the peer
+                  via "neighbor <peer> local-as <ASN> no-prepend replace-as", overriding
+                  the router-level MyASN for this specific session.
+                  Not supported in native BGP mode.
+                format: int32
+                maximum: 4294967295
+                minimum: 1
+                type: integer
               myASN:
                 description: AS number to use for the local end of the session.
                 format: int32

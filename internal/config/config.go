@@ -138,6 +138,10 @@ type Peer struct {
 	DualStackAddressFamily bool
 	// Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily.
 	DisableMP bool
+	// LocalASN, if non-zero, will be advertised to the peer using
+	// "neighbor <peer> local-as <ASN> no-prepend replace-as".
+	// Supported for FRR mode only.
+	LocalASN uint32
 }
 
 // Pool is the configuration of an IP address pool.
@@ -492,6 +496,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		VRF:                    p.Spec.VRFName,
 		DualStackAddressFamily: p.Spec.DualStackAddressFamily,
 		DisableMP:              p.Spec.DisableMP,
+		LocalASN:               p.Spec.LocalASN,
 	}, nil
 }
 

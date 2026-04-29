@@ -12,6 +12,9 @@
   {{- if .neighbor.EBGPMultiHop }}
   neighbor {{$peer}} ebgp-multihop
   {{- end }}
+  {{- if .neighbor.LocalASN }}
+  neighbor {{$peer}} local-as {{.neighbor.LocalASN}} no-prepend replace-as
+  {{- end }}
   {{ if .neighbor.Port -}}
   neighbor {{$peer}} port {{.neighbor.Port}}
   {{- end }}
