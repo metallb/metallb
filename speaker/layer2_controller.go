@@ -86,19 +86,15 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 		return "notOwner"
 	}
 
-	if !poolMatchesNodeL2(pool, c.myNode) {
-		level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "pool not matching my node")
-		return "notOwner"
-	}
-
-	adsForService := l2AdsForService(pool.L2Advertisements, c.myNode, svc)
-	serviceHasL2Adv := len(adsForService) > 0
-	if !serviceHasL2Adv {
+	adsForService := l2AdsForService(pool.L2Advertisements, svc)
+	if !adsMatchNodeL2(adsForService, c.myNode) {
 		level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "no advertisement matching service on my node")
 		return "noMatchingAdvertisement"
 	}
 
-	speakerMap := c.speakersForPool(l, name, pool, nodes)
+	// All service-matching ads (not filtered by node) so every speaker
+	// evaluates the same candidate set and the election is deterministic.
+	speakerMap := c.speakersForAds(l, name, adsForService, nodes)
 	availableNodes := nodesWithActiveSpeakers(speakerMap)
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
 		availableNodes = nodesWithEndpoint(eps, speakerMap)
@@ -135,9 +131,10 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, client service, svc *v1.Service) error {
 	ifs := c.announcer.GetInterfaces()
 	updateStatus := false
-	adsForService := l2AdsForService(pool.L2Advertisements, c.myNode, svc)
+	allAdsForService := l2AdsForService(pool.L2Advertisements, svc)
+	myAdsForService := l2AdsForNode(allAdsForService, c.myNode)
 	for _, lbIP := range lbIPs {
-		ipAdv := ipAdvertisementFor(lbIP, adsForService)
+		ipAdv := ipAdvertisementFor(lbIP, myAdsForService)
 		if !ipAdv.MatchInterfaces(ifs...) {
 			level.Warn(l).Log("op", "SetBalancer", "protocol", "layer2", "service", name, "IPAdvertisement", ipAdv,
 				"localIfs", ifs, "msg", "the specified interfaces used to announce LB IP don't exist")
@@ -213,24 +210,20 @@ func activeEndpointExists(eps []discovery.EndpointSlice) bool {
 	return false
 }
 
-func poolMatchesNodeL2(pool *config.Pool, node string) bool {
-	for _, adv := range pool.L2Advertisements {
-		if adv.Nodes[node] {
+func adsMatchNodeL2(ads []*config.L2Advertisement, node string) bool {
+	for _, ad := range ads {
+		if ad.Nodes[node] {
 			return true
 		}
 	}
 	return false
 }
 
-// l2AdvsForService returns the L2 advertisements matching the service on the given node.
-func l2AdsForService(ads []*config.L2Advertisement, node string, svc *v1.Service) []*config.L2Advertisement {
+// l2AdsForService returns the L2 advertisements matching the service.
+func l2AdsForService(ads []*config.L2Advertisement, svc *v1.Service) []*config.L2Advertisement {
 	var result []*config.L2Advertisement
 	svcLabels := labels.Set(svc.Labels)
 	for _, ad := range ads {
-		if !ad.Nodes[node] {
-			continue
-		}
-
 		if len(ad.ServiceSelectors) == 0 {
 			result = append(result, ad)
 			continue
@@ -246,7 +239,18 @@ func l2AdsForService(ads []*config.L2Advertisement, node string, svc *v1.Service
 	return result
 }
 
-func (c *layer2Controller) speakersForPool(l log.Logger, name string, pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
+// l2AdsForNode returns the subset of ads that match the given node.
+func l2AdsForNode(ads []*config.L2Advertisement, node string) []*config.L2Advertisement {
+	var result []*config.L2Advertisement
+	for _, ad := range ads {
+		if ad.Nodes[node] {
+			result = append(result, ad)
+		}
+	}
+	return result
+}
+
+func (c *layer2Controller) speakersForAds(l log.Logger, name string, ads []*config.L2Advertisement, nodes map[string]*v1.Node) map[string]bool {
 	sl := c.sList.UsableSpeakers()
 	eligibleNodes := maps.Keys(sl.Nodes)
 	if sl.Disabled {
@@ -266,7 +270,7 @@ func (c *layer2Controller) speakersForPool(l log.Logger, name string, pool *conf
 			continue
 		}
 
-		if poolMatchesNodeL2(pool, s) {
+		if adsMatchNodeL2(ads, s) {
 			res[s] = true
 		}
 	}
