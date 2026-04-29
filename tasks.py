@@ -561,15 +561,10 @@ apiServer:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             frr_k8s_manifest_path = f.name
             result = run(
-                "curl -sL https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.22/config/all-in-one/frr-k8s.yaml",
+                "curl -sL https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.23/config/all-in-one/frr-k8s.yaml",
                 hide=True,
             )
-            f.write(
-                result.stdout.replace(
-                    "gcr.io/kubebuilder/kube-rbac-proxy",
-                    "registry.k8s.io/kubebuilder/kube-rbac-proxy",
-                )
-            )
+            f.write(result.stdout)
         run(
             "{} apply -f {}".format(kubectl_path, frr_k8s_manifest_path),
             echo=True,

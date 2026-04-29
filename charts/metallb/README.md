@@ -17,7 +17,7 @@ Kubernetes: `>= 1.19.0-0`
 | Repository | Name | Version |
 |------------|------|---------|
 |  | crds | 0.0.0 |
-| https://metallb.github.io/frr-k8s | frr-k8s | 0.0.22 |
+| https://metallb.github.io/frr-k8s | frr-k8s | 0.0.23 |
 
 ## Values
 
@@ -59,7 +59,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.webhookMode | string | `"enabled"` |  |
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
-| frr-k8s.prometheus.rbacProxy.repository | string | `"registry.k8s.io/kubebuilder/kube-rbac-proxy"` |  |
+| frr-k8s.prometheus | string | `nil` |  |
 | frrk8s.enabled | bool | `true` |  |
 | frrk8s.external | bool | `false` |  |
 | frrk8s.namespace | string | `""` |  |
