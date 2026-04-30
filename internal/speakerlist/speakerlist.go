@@ -14,6 +14,9 @@ package speakerlist
 
 import (
 	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -66,30 +69,39 @@ func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, lab
 		return &sl, nil
 	}
 
-	mconfig := memberlist.DefaultLANConfig()
+	memberListConfig := memberlist.DefaultLANConfig()
 	if WANNetwork {
-		mconfig = memberlist.DefaultWANConfig()
+		memberListConfig = memberlist.DefaultWANConfig()
 	}
 
-	// mconfig.Name MUST be equal to the spec.nodeName field of the speaker pod as we match it
+	loadedConfig, err := tryToLoadMemberListConfig(memberlistConfigPath, logger)
+	if err != nil && !os.IsNotExist(err) {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to load memberlist config")
+		return nil, err
+	}
+	if err == nil {
+		memberListConfig = loadedConfig
+	}
+
+	// memberListConfig.Name MUST be equal to the spec.nodeName field of the speaker pod as we match it
 	// against the nodeName field of Endpoint objects inside usableNodes().
-	mconfig.Name = nodeName
-	mconfig.BindAddr = bindAddr
+	memberListConfig.Name = nodeName
+	memberListConfig.BindAddr = bindAddr
 	if bindPort != "" {
 		mlport, err := strconv.Atoi(bindPort)
 		if err != nil {
 			level.Error(logger).Log("op", "startup", "error", "unable to parse ml-bindport", "msg", err)
 			return nil, err
 		}
-		mconfig.BindPort = mlport
-		mconfig.AdvertisePort = mlport
+		memberListConfig.BindPort = mlport
+		memberListConfig.AdvertisePort = mlport
 	}
-	mconfig.Logger = newMemberlistLogger(sl.l)
+	memberListConfig.Logger = newMemberlistLogger(sl.l)
 	if secret == "" {
 		level.Warn(logger).Log("op", "startup", "warning", "no ml-secret-key set, memberlist traffic will not be encrypted")
 	} else {
 		sha := sha256.New()
-		mconfig.SecretKey = sha.Sum([]byte(secret))[:32]
+		memberListConfig.SecretKey = sha.Sum([]byte(secret))[:32]
 	}
 
 	// This channel is used by the Rejoin() method which runs on k8s node
@@ -101,9 +113,9 @@ func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, lab
 	// 'big'.
 	// TODO: See https://github.com/metallb/metallb/issues/716
 	sl.mlEventCh = make(chan memberlist.NodeEvent, 1024)
-	mconfig.Events = &memberlist.ChannelEventDelegate{Ch: sl.mlEventCh}
+	memberListConfig.Events = &memberlist.ChannelEventDelegate{Ch: sl.mlEventCh}
 
-	ml, err := memberlist.Create(mconfig)
+	ml, err := memberlist.Create(memberListConfig)
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create memberlist")
 		return nil, err
@@ -334,4 +346,87 @@ func (sl *SpeakerList) memberlistWatchEvents() {
 			return
 		}
 	}
+}
+
+// memberlistConfigPath is the well-known path where an optional memberlist
+// configuration file may be mounted (e.g. from a ConfigMap).
+const memberlistConfigPath = "/etc/metallb/memberlist/config.json"
+
+// memberlistFileConfig is the complete set of memberlist.Config fields exposed
+// for external configuration via a ConfigMap file. All fields are required when
+// the file is present — omitting a field is an error. Duration values must use
+// Go duration string format (e.g. "5s", "200ms").
+type memberlistFileConfig struct {
+	TCPTimeout              string `json:"TCPTimeout"`
+	IndirectChecks          int    `json:"IndirectChecks"`
+	RetransmitMult          int    `json:"RetransmitMult"`
+	SuspicionMult           int    `json:"SuspicionMult"`
+	SuspicionMaxTimeoutMult int    `json:"SuspicionMaxTimeoutMult"`
+	PushPullInterval        string `json:"PushPullInterval"`
+	ProbeTimeout            string `json:"ProbeTimeout"`
+	ProbeInterval           string `json:"ProbeInterval"`
+	DisableTcpPings         bool   `json:"DisableTcpPings"`
+	AwarenessMaxMultiplier  int    `json:"AwarenessMaxMultiplier"`
+	GossipNodes             int    `json:"GossipNodes"`
+	GossipInterval          string `json:"GossipInterval"`
+	GossipToTheDeadTime     string `json:"GossipToTheDeadTime"`
+	GossipVerifyIncoming    bool   `json:"GossipVerifyIncoming"`
+	GossipVerifyOutgoing    bool   `json:"GossipVerifyOutgoing"`
+	EnableCompression       bool   `json:"EnableCompression"`
+	HandoffQueueDepth       int    `json:"HandoffQueueDepth"`
+	UDPBufferSize           int    `json:"UDPBufferSize"`
+	QueueCheckInterval      string `json:"QueueCheckInterval"`
+}
+
+// tryToLoadMemberListConfig attempts to load memberlist configuration from the
+// given path. Returns the parsed config on success, or an error if reading or
+// parsing fails.
+func tryToLoadMemberListConfig(path string, logger log.Logger) (*memberlist.Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	level.Info(logger).Log("op", "startup", "msg", "loading memberlist config from file", "path", path)
+
+	var fc memberlistFileConfig
+	if err := json.Unmarshal(data, &fc); err != nil {
+		return nil, fmt.Errorf("parsing memberlist config file %s: %w", path, err)
+	}
+
+	cfg := memberlist.DefaultLANConfig()
+	cfg.IndirectChecks = fc.IndirectChecks
+	cfg.RetransmitMult = fc.RetransmitMult
+	cfg.SuspicionMult = fc.SuspicionMult
+	cfg.SuspicionMaxTimeoutMult = fc.SuspicionMaxTimeoutMult
+	cfg.GossipNodes = fc.GossipNodes
+	cfg.AwarenessMaxMultiplier = fc.AwarenessMaxMultiplier
+	cfg.HandoffQueueDepth = fc.HandoffQueueDepth
+	cfg.UDPBufferSize = fc.UDPBufferSize
+	cfg.DisableTcpPings = fc.DisableTcpPings
+	cfg.GossipVerifyIncoming = fc.GossipVerifyIncoming
+	cfg.GossipVerifyOutgoing = fc.GossipVerifyOutgoing
+	cfg.EnableCompression = fc.EnableCompression
+
+	for _, item := range []struct {
+		dst *time.Duration
+		src string
+		key string
+	}{
+		{&cfg.TCPTimeout, fc.TCPTimeout, "TCPTimeout"},
+		{&cfg.PushPullInterval, fc.PushPullInterval, "PushPullInterval"},
+		{&cfg.ProbeTimeout, fc.ProbeTimeout, "ProbeTimeout"},
+		{&cfg.ProbeInterval, fc.ProbeInterval, "ProbeInterval"},
+		{&cfg.GossipInterval, fc.GossipInterval, "GossipInterval"},
+		{&cfg.GossipToTheDeadTime, fc.GossipToTheDeadTime, "GossipToTheDeadTime"},
+		{&cfg.QueueCheckInterval, fc.QueueCheckInterval, "QueueCheckInterval"},
+	} {
+		d, err := time.ParseDuration(item.src)
+		if err != nil {
+			return nil, fmt.Errorf("parsing %s %q in memberlist config file: %w", item.key, item.src, err)
+		}
+		*item.dst = d
+	}
+
+	return cfg, nil
 }
