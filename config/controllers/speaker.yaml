@@ -94,6 +94,9 @@ spec:
         - mountPath: /etc/metallb
           name: metallb-excludel2
           readOnly: true
+        - mountPath: /etc/metallb/memberlist
+          name: memberlist-config
+          readOnly: true
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
@@ -107,11 +110,15 @@ spec:
         key: node-role.kubernetes.io/control-plane
         operator: Exists 
       volumes:
-      - name: memberlist 
-        secret: 
+      - name: memberlist
+        secret:
           secretName: memberlist
           defaultMode: 420
       - name: metallb-excludel2
         configMap:
           defaultMode: 256
           name: metallb-excludel2
+      - name: memberlist-config
+        configMap:
+          name: metallb-memberlist-config
+          optional: true

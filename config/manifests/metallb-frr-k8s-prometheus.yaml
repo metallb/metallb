@@ -3837,6 +3837,9 @@ spec:
         - mountPath: /etc/metallb
           name: metallb-excludel2
           readOnly: true
+        - mountPath: /etc/metallb/memberlist
+          name: memberlist-config
+          readOnly: true
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
@@ -3858,6 +3861,10 @@ spec:
           defaultMode: 256
           name: metallb-excludel2
         name: metallb-excludel2
+      - configMap:
+          name: metallb-memberlist-config
+          optional: true
+        name: memberlist-config
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
