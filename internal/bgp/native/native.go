@@ -12,6 +12,8 @@ import (
 	"io"
 	"net"
 	"os"
+	"reflect"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -19,6 +21,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/safeconvert"
 	"golang.org/x/sys/unix"
@@ -459,6 +462,42 @@ func validate(adv *bgp.Advertisement) error {
 	return nil
 }
 
+// mergeAdvertisements combines two advertisements for the same prefix.
+// LocalPref and Peers must match; communities are unioned.
+func mergeAdvertisements(a, b *bgp.Advertisement) (*bgp.Advertisement, error) {
+	if a.Prefix.String() != b.Prefix.String() {
+		return nil, fmt.Errorf("internal: merge advertisements with different prefixes")
+	}
+	if a.LocalPref != b.LocalPref {
+		return nil, fmt.Errorf("internal: merge advertisements with different localpref for %s", a.Prefix.String())
+	}
+	if !reflect.DeepEqual(a.Peers, b.Peers) {
+		return nil, fmt.Errorf("internal: merge advertisements with different peers for %s", a.Prefix.String())
+	}
+
+	byStr := map[string]community.BGPCommunity{}
+	for _, c := range a.Communities {
+		byStr[c.String()] = c
+	}
+	for _, c := range b.Communities {
+		byStr[c.String()] = c
+	}
+
+	mergedComm := make([]community.BGPCommunity, 0, len(byStr))
+	for _, c := range byStr {
+		mergedComm = append(mergedComm, c)
+	}
+	sort.Slice(mergedComm, func(i, j int) bool { return mergedComm[i].LessThan(mergedComm[j]) })
+
+	peers := append([]string(nil), a.Peers...)
+	return &bgp.Advertisement{
+		Prefix:      a.Prefix,
+		LocalPref:   a.LocalPref,
+		Communities: mergedComm,
+		Peers:       peers,
+	}, nil
+}
+
 // Set updates the set of Advertisements that this session's peer should receive.
 //
 // Changes are propagated to the peer asynchronously, Set may return
@@ -473,7 +512,19 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 		if err != nil {
 			return err
 		}
-		newAdvs[adv.Prefix.String()] = adv
+		key := adv.Prefix.String()
+		if existing, ok := newAdvs[key]; ok {
+			merged, err := mergeAdvertisements(existing, adv)
+			if err != nil {
+				return err
+			}
+			if err := validate(merged); err != nil {
+				return err
+			}
+			newAdvs[key] = merged
+		} else {
+			newAdvs[key] = adv
+		}
 	}
 
 	s.new = newAdvs
