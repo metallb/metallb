@@ -170,6 +170,7 @@ func main() {
 		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
 		webhookSecretName   = flag.String("webhook-secret", "metallb-webhook-cert", "webhook secret: the name of webhook secret, default is metallb-webhook-cert")
+		myPod               = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB controller pod")
 		webhookHTTP2        = flag.Bool("webhook-http2", false, "enables http2 for the webhook endpoint")
 		tlsMinVersion       = flag.String("tls-min-version", "", "Minimum TLS version (VersionTLS12 or VersionTLS13). If empty, defaults to VersionTLS13.")
 		tlsCipherSuites     = flag.String("tls-cipher-suites", "", "Comma-separated list of TLS cipher suites. Only applies to TLS 1.2. If empty, uses Go defaults.")
@@ -223,6 +224,7 @@ func main() {
 
 	cfg := &k8s.Config{
 		ProcessName:      "metallb-controller",
+		PodName:          *myPod,
 		MetricsPort:      *port,
 		PprofBindAddress: *pprofBindAddress,
 		Logger:           logger,

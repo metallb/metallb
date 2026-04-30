@@ -205,6 +205,8 @@ roleRef:
   name: {{ include "metallb.fullname" . }}-pod-lister
 subjects:
 - kind: ServiceAccount
+  name: {{ template "metallb.controller.serviceAccountName" . }}
+- kind: ServiceAccount
   name: {{ include "metallb.speaker.serviceAccountName" . }}
 {{- end }}
 ---

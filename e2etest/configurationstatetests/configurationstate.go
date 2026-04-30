@@ -562,7 +562,7 @@ func allStatesExist(allNodes *corev1.NodeList) error {
 	}
 
 	opts := []cmp.Option{
-		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "UID", "CreationTimestamp", "Generation", "ManagedFields"),
+		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "UID", "CreationTimestamp", "Generation", "ManagedFields", "OwnerReferences"),
 		cmpopts.IgnoreFields(metallbv1beta1.ConfigurationState{}, "TypeMeta"),
 		cmpopts.IgnoreFields(metallbv1beta1.ConfigurationStateStatus{}, "Conditions"),
 		cmpopts.SortSlices(func(a, b metallbv1beta1.ConfigurationState) bool {

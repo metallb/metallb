@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -24,6 +25,14 @@ func TestConfigurationStateReconciler(t *testing.T) {
 		configStateNamespace = "metallb-system"
 	)
 
+	ownerPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "metallb-speaker-abc123",
+			Namespace: configStateNamespace,
+			UID:       "pod-uid-12345",
+		},
+	}
+
 	configStateObjectMeta := metav1.ObjectMeta{
 		Name:      configStateName,
 		Namespace: configStateNamespace,
@@ -37,6 +46,10 @@ func TestConfigurationStateReconciler(t *testing.T) {
 			before: nil,
 			want: &metallbv1beta1.ConfigurationState{
 				ObjectMeta: configStateObjectMeta,
+				Status: metallbv1beta1.ConfigurationStateStatus{
+					Result:       metallbv1beta1.ConfigurationResultUnknown,
+					ErrorSummary: "",
+				},
 			},
 		},
 		"no conditions reported": {
@@ -115,6 +128,9 @@ func TestConfigurationStateReconciler(t *testing.T) {
 			if err := metallbv1beta1.AddToScheme(scheme); err != nil {
 				t.Fatalf("failed to add scheme: %v", err)
 			}
+			if err := corev1.AddToScheme(scheme); err != nil {
+				t.Fatalf("failed to add scheme: %v", err)
+			}
 
 			builder := fake.NewClientBuilder().WithScheme(scheme)
 			if test.before != nil {
@@ -128,6 +144,7 @@ func TestConfigurationStateReconciler(t *testing.T) {
 				Scheme:          scheme,
 				Namespace:       configStateNamespace,
 				ConfigStateName: configStateName,
+				OwnerPod:        ownerPod,
 			}
 
 			req := reconcile.Request{
@@ -153,7 +170,7 @@ func TestConfigurationStateReconciler(t *testing.T) {
 			}
 
 			opts := []cmp.Option{
-				cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "UID", "CreationTimestamp", "Generation", "ManagedFields"),
+				cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "UID", "CreationTimestamp", "Generation", "ManagedFields", "OwnerReferences"),
 				cmpopts.IgnoreFields(metallbv1beta1.ConfigurationStateStatus{}, "Conditions"),
 			}
 
@@ -162,6 +179,101 @@ func TestConfigurationStateReconciler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConfigurationStateReconcilerOwnerReference(t *testing.T) {
+	const (
+		configStateName      = "speaker-node1"
+		configStateNamespace = "metallb-system"
+	)
+
+	ownerPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "metallb-speaker-abc123",
+			Namespace: configStateNamespace,
+			UID:       "pod-uid-12345",
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	if err := metallbv1beta1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add scheme: %v", err)
+	}
+
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      configStateName,
+			Namespace: configStateNamespace,
+		},
+	}
+
+	assertOwnerRef := func(t *testing.T, got *metallbv1beta1.ConfigurationState) {
+		t.Helper()
+		if len(got.OwnerReferences) != 1 {
+			t.Fatalf("expect 1 owner reference, but got %d", len(got.OwnerReferences))
+		}
+		if got.OwnerReferences[0].UID != ownerPod.UID {
+			t.Errorf("owner reference is not speaker pod, expect owner reference uid %s, but got %s", ownerPod.UID, got.OwnerReferences[0].UID)
+		}
+	}
+
+	t.Run("set on create", func(t *testing.T) {
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+		reconciler := &ConfigurationStateReconciler{
+			Client:          fakeClient,
+			Logger:          log.NewNopLogger(),
+			Scheme:          scheme,
+			Namespace:       configStateNamespace,
+			ConfigStateName: configStateName,
+			OwnerPod:        ownerPod,
+		}
+
+		_, err := reconciler.Reconcile(context.Background(), req)
+		if err != nil {
+			t.Fatalf("expected no error, got: %v", err)
+		}
+
+		var got metallbv1beta1.ConfigurationState
+		if err := fakeClient.Get(context.Background(), req.NamespacedName, &got); err != nil {
+			t.Fatalf("failed to get ConfigurationState: %v", err)
+		}
+		assertOwnerRef(t, &got)
+	})
+
+	t.Run("adopted on update", func(t *testing.T) {
+		existing := &metallbv1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      configStateName,
+				Namespace: configStateNamespace,
+			},
+		}
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+			WithObjects(existing).WithStatusSubresource(existing).Build()
+
+		reconciler := &ConfigurationStateReconciler{
+			Client:          fakeClient,
+			Logger:          log.NewNopLogger(),
+			Scheme:          scheme,
+			Namespace:       configStateNamespace,
+			ConfigStateName: configStateName,
+			OwnerPod:        ownerPod,
+		}
+
+		_, err := reconciler.Reconcile(context.Background(), req)
+		if err != nil {
+			t.Fatalf("expected no error, got: %v", err)
+		}
+
+		var got metallbv1beta1.ConfigurationState
+		if err := fakeClient.Get(context.Background(), req.NamespacedName, &got); err != nil {
+			t.Fatalf("failed to get ConfigurationState: %v", err)
+		}
+		assertOwnerRef(t, &got)
+	})
 }
 
 func TestNewConfigStateConditionReporterPredicate(t *testing.T) {
