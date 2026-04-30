@@ -182,14 +182,6 @@
         "rbacPrometheus": { "type": "boolean" },
         "serviceAccount": { "type": "string" },
         "namespace": { "type": "string" },
-        "rbacProxy": {
-          "description": "kube-rbac-proxy configuration",
-          "type": "object",
-          "properties": {
-            "repository": { "type": "string" },
-            "tag": { "type": "string" }
-          }
-        },
         "podMonitor": {
           "description": "Prometheus Operator PodMonitors",
           "type": "object",

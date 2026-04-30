@@ -5,7 +5,6 @@
     },
     "spec": {
         "bgp": {
-            "routers": [],
             "bfdProfiles": [
                 {
                     "name": "foo",

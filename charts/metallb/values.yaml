@@ -368,8 +368,6 @@ frrk8s:
 
 frr-k8s:
   prometheus:
-    rbacProxy:
-      repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
     # The FRR-K8s BGP/BFD metrics are exposed with the "frrk8s_" prefix
     # (e.g. frrk8s_bgp_session_up, frrk8s_bfd_session_up).
     # To rename them to the legacy "metallb_" prefix for backward compatibility
