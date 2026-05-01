@@ -40,11 +40,13 @@ type BGPPeerSpec struct {
 	// AS number to use for the local end of the session.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=4294967295
+	// +kubebuilder:validation:Format=int64
 	MyASN uint32 `json:"myASN"`
 
 	// AS number to expect from the remote end of the session.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=4294967295
+	// +kubebuilder:validation:Format=int64
 	ASN uint32 `json:"peerASN"`
 
 	// Address to dial when establishing the session.
