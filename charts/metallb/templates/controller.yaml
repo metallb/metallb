@@ -80,7 +80,7 @@ spec:
         {{- if .Values.tls.minVersion }}
         - --tls-min-version={{ .Values.tls.minVersion }}
         {{- end }}
-        {{- if .Values.tls.metricsTLSSecret }}
+        {{- if .Values.tls.controllerMetricsTLSSecret }}
         - --metrics-cert-dir=/etc/metrics
         {{- end }}
         env:
@@ -110,7 +110,7 @@ spec:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: cert
           readOnly: true
-        {{- if .Values.tls.metricsTLSSecret }}
+        {{- if .Values.tls.controllerMetricsTLSSecret }}
         - name: metrics-certs
           mountPath: /etc/metrics
           readOnly: true
@@ -173,9 +173,9 @@ spec:
         secret:
           defaultMode: 420
           secretName: metallb-webhook-cert
-      {{- if .Values.tls.metricsTLSSecret }}
+      {{- if .Values.tls.controllerMetricsTLSSecret }}
       - name: metrics-certs
         secret:
-          secretName: {{ .Values.tls.metricsTLSSecret }}
+          secretName: {{ .Values.tls.controllerMetricsTLSSecret }}
       {{- end }}
 {{- end }}
