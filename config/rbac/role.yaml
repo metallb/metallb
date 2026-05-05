@@ -375,6 +375,8 @@ roleRef:
   name: pod-lister
 subjects:
   - kind: ServiceAccount
+    name: controller
+  - kind: ServiceAccount
     name: speaker
 ---
 apiVersion: rbac.authorization.k8s.io/v1

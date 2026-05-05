@@ -21,8 +21,10 @@ tls:
   curvePreferences: ""
   # -- Minimum TLS version (VersionTLS12 or VersionTLS13). Defaults to VersionTLS13.
   minVersion: ""
-  # -- The name of the secret to be mounted in the pods to provide TLS certificates for metrics endpoints. If not present, a self-signed certificate is auto-generated.
-  metricsTLSSecret: ""
+  # -- The name of the secret to be mounted in the controller pod to provide TLS certificates for metrics endpoints. If not present, a self-signed certificate is auto-generated.
+  controllerMetricsTLSSecret: ""
+  # -- The name of the secret to be mounted in the speaker pod to provide TLS certificates for metrics endpoints. If not present, a self-signed certificate is auto-generated.
+  speakerMetricsTLSSecret: ""
 
 prometheus:
   # scrape annotations specifies whether to add Prometheus metric

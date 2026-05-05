@@ -189,6 +189,12 @@ func New(cfg *Config) (*Client, error) {
 		ForceSync:      reload,
 	}
 
+	selfPod, err := clientset.CoreV1().Pods(cfg.Namespace).Get(context.TODO(), cfg.PodName, metav1.GetOptions{})
+	if err != nil {
+		level.Error(cfg.Logger).Log("op", "startup", "error", err, "msg", "unable to get own pod for owner references")
+		return nil, err
+	}
+
 	configStateName := "controller"
 	configStateLabels := map[string]string{
 		"metallb.io/component-type": "controller",
@@ -303,6 +309,7 @@ func New(cfg *Config) (*Client, error) {
 		ConfigStateLabels: configStateLabels,
 		Logger:            cfg.Logger,
 		Scheme:            mgr.GetScheme(),
+		OwnerPod:          selfPod.DeepCopy(),
 	}
 	if err := cc.SetupWithManager(mgr); err != nil {
 		level.Error(c.logger).Log("error", err, "unable to create controller", "configurationstatus")
@@ -326,11 +333,6 @@ func New(cfg *Config) (*Client, error) {
 
 	// metallb controller doesn't need this reconciler
 	if cfg.Layer2StatusChan != nil {
-		selfPod, err := clientset.CoreV1().Pods(cfg.Namespace).Get(context.TODO(), cfg.PodName, metav1.GetOptions{})
-		if err != nil {
-			level.Error(c.logger).Log("unable to get speaker pod itself", err)
-			return nil, err
-		}
 		if err = (&controllers.Layer2StatusReconciler{
 			Client:        mgr.GetClient(),
 			Logger:        cfg.Logger,
@@ -345,11 +347,6 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	if cfg.BGPStatusChan != nil {
-		selfPod, err := clientset.CoreV1().Pods(cfg.Namespace).Get(context.TODO(), cfg.PodName, metav1.GetOptions{})
-		if err != nil {
-			level.Error(c.logger).Log("unable to get speaker pod itself", err)
-			return nil, err
-		}
 		if err = (&controllers.ServiceBGPStatusReconciler{
 			Client:        mgr.GetClient(),
 			Logger:        cfg.Logger,
