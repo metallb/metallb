@@ -294,7 +294,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 							Name: "first-adv",
 						},
 						Spec: metallbv1beta1.BGPAdvertisementSpec{
-							NodeSelectors:   k8s.SelectorsForNodes(allNodes.Items),
+							NodeSelectors:  k8s.SelectorsForNodes(allNodes.Items),
 							IPAddressPools: []string{"first-pool"},
 						},
 					}, {
@@ -302,7 +302,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 							Name: "second-adv",
 						},
 						Spec: metallbv1beta1.BGPAdvertisementSpec{
-							NodeSelectors:   k8s.SelectorsForNodes(allNodes.Items),
+							NodeSelectors:  k8s.SelectorsForNodes(allNodes.Items),
 							IPAddressPools: []string{"second-pool"},
 						},
 					},
@@ -414,5 +414,88 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 				2: {0},
 			}),
 		)
+	})
+
+	ginkgo.Context("FRR - Different ASN per node", func() {
+		ginkgo.It("IPV4 - should establish sessions when each node has a different MyASN", func() {
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			if len(allNodes.Items) < 2 {
+				ginkgo.Skip("at least 2 nodes required for different ASN per node test")
+			}
+
+			const baseASN = 64512
+			nodeASNs := make(map[string]uint32)
+			for i, node := range allNodes.Items {
+				nodeASNs[node.Name] = uint32(baseASN + i)
+			}
+
+			ginkgo.By("Creating BGPPeers with different MyASN per node")
+			peers := []metallbv1beta2.BGPPeer{}
+			for _, c := range FRRContainers {
+				addresses := c.AddressesForFamily(ipfamily.IPv4)
+				for i, node := range allNodes.Items {
+					ebgpMultihop := false
+					if c.NeighborConfig.MultiHop && nodeASNs[node.Name] != c.RouterConfig.ASN {
+						ebgpMultihop = true
+					}
+
+					peer := metallbv1beta2.BGPPeer{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("%s-%s-%d", c.Name, node.Name, i),
+						},
+						Spec: metallbv1beta2.BGPPeerSpec{
+							Address:       addresses[0],
+							ASN:           c.RouterConfig.ASN,
+							MyASN:         nodeASNs[node.Name],
+							Port:          c.RouterConfig.BGPPort,
+							EBGPMultiHop:  ebgpMultihop,
+							VRFName:       c.RouterConfig.VRF,
+							NodeSelectors: k8s.SelectorsForNodes([]corev1.Node{node}),
+						},
+					}
+					peers = append(peers, peer)
+				}
+			}
+
+			resources := config.Resources{
+				Peers: peers,
+			}
+
+			ginkgo.By("Configuring external FRR containers with per-node ASNs")
+			for _, c := range FRRContainers {
+				bgpConfig := frrconfig.RouterConfig{
+					ASN:      c.RouterConfig.ASN,
+					RouterID: c.RouterConfig.RouterID,
+					BGPPort:  c.RouterConfig.BGPPort,
+				}
+
+				nodeIPs, err := k8s.NodeIPsForFamily(allNodes.Items, ipfamily.IPv4, c.RouterConfig.VRF)
+				Expect(err).NotTo(HaveOccurred())
+
+				for i, ip := range nodeIPs {
+					neighbor := &frrconfig.NeighborConfig{
+						ASN:      nodeASNs[allNodes.Items[i].Name],
+						Addr:     ip,
+						MultiHop: c.NeighborConfig.MultiHop,
+					}
+					bgpConfig.Neighbors = append(bgpConfig.Neighbors, neighbor)
+					bgpConfig.AcceptV4Neighbors = append(bgpConfig.AcceptV4Neighbors, neighbor)
+				}
+
+				configStr, err := frrconfig.BGPConfigFromRouterConfig(bgpConfig)
+				Expect(err).NotTo(HaveOccurred())
+				err = c.UpdateBGPConfigFile(configStr)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Validating BGP sessions are established for all nodes")
+			for _, c := range FRRContainers {
+				validateFRRPeeredWithNodes(allNodes.Items, c, ipfamily.IPv4)
+			}
+		})
 	})
 })

@@ -124,6 +124,22 @@ const (
 	MultiProtocolEnabled  MultiProtocol = true
 )
 
+// BGPConfigFromRouterConfig generates a BGP configuration string from a RouterConfig.
+func BGPConfigFromRouterConfig(rc RouterConfig) (string, error) {
+	t, err := template.New("bgp Config Template").Parse(bgpConfigTemplate)
+	if err != nil {
+		return "", errors.Join(err, errors.New("Failed to create bgp template"))
+	}
+
+	var b bytes.Buffer
+	err = t.Execute(&b, rc)
+	if err != nil {
+		return "", errors.Join(err, errors.New("Failed to update bgp template"))
+	}
+
+	return b.String(), nil
+}
+
 // Set the IP of each node in the cluster in the BGP router configuration.
 // Each node will peer with the BGP router.
 func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterConfig, ipFamily ipfamily.Family, multiProtocol MultiProtocol) (string, error) {

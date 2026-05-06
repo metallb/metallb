@@ -174,10 +174,10 @@ spec:
         {{- toYaml .Values.speaker.securityContext | nindent 8 }}
       {{- end }}
       volumes:
-      {{- if .Values.tls.metricsTLSSecret }}
+      {{- if .Values.tls.speakerMetricsTLSSecret }}
         - name: metrics-certs
           secret:
-            secretName: {{ .Values.tls.metricsTLSSecret }}
+            secretName: {{ .Values.tls.speakerMetricsTLSSecret }}
       {{- end }}
       {{- if .Values.speaker.memberlist.enabled }}
         - name: memberlist
@@ -289,7 +289,7 @@ spec:
         {{- if .Values.tls.minVersion }}
         - --tls-min-version={{ .Values.tls.minVersion }}
         {{- end }}
-        {{- if .Values.tls.metricsTLSSecret }}
+        {{- if .Values.tls.speakerMetricsTLSSecret }}
         - --metrics-cert-dir=/etc/metrics
         {{- end }}
         env:
@@ -381,7 +381,7 @@ spec:
             - ALL
             add:
             - NET_RAW
-        {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled .Values.speaker.excludeInterfaces.enabled .Values.tls.metricsTLSSecret }}
+        {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled .Values.speaker.excludeInterfaces.enabled .Values.tls.speakerMetricsTLSSecret }}
         volumeMounts:
           {{- if .Values.speaker.memberlist.enabled }}
           - name: memberlist
@@ -395,7 +395,7 @@ spec:
           - name: metallb-excludel2
             mountPath: /etc/metallb
           {{- end }}
-          {{- if .Values.tls.metricsTLSSecret }}
+          {{- if .Values.tls.speakerMetricsTLSSecret }}
           - name: metrics-certs
             mountPath: /etc/metrics
             readOnly: true
@@ -488,7 +488,7 @@ spec:
         args:
           - --metrics-port={{ .Values.speaker.frr.metricsPort }}
           - --metrics-bind-address=0.0.0.0
-          {{- if .Values.tls.metricsTLSSecret }}
+          {{- if .Values.tls.speakerMetricsTLSSecret }}
           - --tls-cert-file=/etc/metrics/tls.crt
           - --tls-private-key-file=/etc/metrics/tls.key
           {{- end }}
@@ -514,7 +514,7 @@ spec:
             mountPath: /etc/frr
           - name: metrics
             mountPath: /etc/frr_metrics
-          {{- if .Values.tls.metricsTLSSecret }}
+          {{- if .Values.tls.speakerMetricsTLSSecret }}
           - name: metrics-certs
             mountPath: /etc/metrics
             readOnly: true

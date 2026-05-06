@@ -25,6 +25,10 @@ spec:
         - --port=9120
         - --log-level=info
         env:
+        - name: METALLB_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         - name: METALLB_ML_SECRET_NAME
           value: memberlist
         - name: METALLB_DEPLOYMENT

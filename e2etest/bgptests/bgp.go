@@ -1277,6 +1277,95 @@ var _ = ginkgo.Describe("BGP", func() {
 				},
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}))
+
+		ginkgo.It("IPV4 - overlapping bgp advertisements union communities for the same prefix", func() {
+				const (
+					communityA = "65000:100"
+					communityB = "65000:200"
+				)
+				ipFamily := ipfamily.IPv4
+				poolAddresses := []string{v4PoolAddresses}
+
+				resources := config.Resources{
+					Pools: []metallbv1beta1.IPAddressPool{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "bgp-overlap-pool"},
+							Spec: metallbv1beta1.IPAddressPoolSpec{
+								Addresses: poolAddresses,
+							},
+						},
+					},
+					Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
+					BGPAdvs: []metallbv1beta1.BGPAdvertisement{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-a"},
+							Spec: metallbv1beta1.BGPAdvertisementSpec{
+								Communities:    []string{communityA},
+								IPAddressPools: []string{"bgp-overlap-pool"},
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-b"},
+							Spec: metallbv1beta1.BGPAdvertisementSpec{
+								Communities:    []string{communityB},
+								IPAddressPools: []string{"bgp-overlap-pool"},
+							},
+						},
+					},
+				}
+
+				for _, c := range FRRContainers {
+					err := frrcontainer.PairWithNodes(cs, c, ipFamily)
+					Expect(err).NotTo(HaveOccurred())
+				}
+
+				err := ConfigUpdater.Update(resources)
+				Expect(err).NotTo(HaveOccurred())
+
+				for _, c := range FRRContainers {
+					validateFRRPeeredWithAllNodes(cs, c, ipFamily)
+				}
+
+				serviceIP, err := config.GetIPFromRangeByIndex(poolAddresses[0], 0)
+				Expect(err).NotTo(HaveOccurred())
+
+				svc, jig := testservice.CreateWithBackend(cs, testNamespace, "svc-ovlp-comm",
+					func(s *corev1.Service) {
+						s.Spec.LoadBalancerIP = serviceIP
+					},
+					testservice.TrafficPolicyCluster)
+				Expect(svc).NotTo(BeNil())
+				Expect(jig).NotTo(BeNil())
+				defer testservice.Delete(cs, svc)
+
+				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				for _, c := range FRRContainers {
+					validateService(svc, allNodes.Items, c)
+				}
+
+				for _, c := range FRRContainers {
+					Eventually(func() error {
+						routesA, err := frr.RoutesForCommunity(c, communityA, ipFamily)
+						if err != nil {
+							return err
+						}
+						if _, ok := routesA[serviceIP]; !ok {
+							return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityA, c.Name)
+						}
+
+						routesB, err := frr.RoutesForCommunity(c, communityB, ipFamily)
+						if err != nil {
+							return err
+						}
+						if _, ok := routesB[serviceIP]; !ok {
+							return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityB, c.Name)
+						}
+						return nil
+					}, 1*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
+				}
+		})
 	})
 
 	ginkgo.DescribeTable("BGP advertisement updates of communities and localpref and aggregation length", func(pairingIPFamily ipfamily.Family, poolAddresses []string, aggLen int32) {

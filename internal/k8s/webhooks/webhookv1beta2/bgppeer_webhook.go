@@ -21,11 +21,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"errors"
-
 	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/api/v1beta2"
 	v1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -105,13 +104,16 @@ func validatePeerCreate(bgpPeer *v1beta2.BGPPeer) (string, error) {
 	if bgpPeer.Namespace != MetalLBNamespace {
 		return "", fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
 	}
-	existingBGPPeers, err := GetExistingBGPPeers()
+	existingPeers, err := GetExistingBGPPeers()
 	if err != nil {
 		return "", err
 	}
-
-	toValidate := bgpPeerListWithUpdate(existingBGPPeers, bgpPeer)
-	err = Validator.Validate(toValidate)
+	existingNodes, err := getExistingNodes()
+	if err != nil {
+		return "", err
+	}
+	validateArgs := peersAndNodesToObjects(bgpPeer, existingPeers, existingNodes)
+	err = Validator.Validate(validateArgs...)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgppeer", "action", "create", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace, "error", err)
 		return "", err
@@ -123,18 +125,28 @@ func validatePeerCreate(bgpPeer *v1beta2.BGPPeer) (string, error) {
 func validatePeerUpdate(bgpPeer *v1beta2.BGPPeer, _ *v1beta2.BGPPeer) error {
 	level.Debug(Logger).Log("webhook", "bgppeer", "action", "update", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace)
 
-	existingBGPPeers, err := GetExistingBGPPeers()
+	existingPeers, err := GetExistingBGPPeers()
 	if err != nil {
 		return err
 	}
-
-	toValidate := bgpPeerListWithUpdate(existingBGPPeers, bgpPeer)
-	err = Validator.Validate(toValidate)
+	existingNodes, err := getExistingNodes()
+	if err != nil {
+		return err
+	}
+	validateArgs := peersAndNodesToObjects(bgpPeer, existingPeers, existingNodes)
+	err = Validator.Validate(validateArgs...)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgppeer", "action", "update", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace, "error", err)
 		return err
 	}
 	return nil
+}
+
+// peersAndNodesToObjects combines the given BGPPeer with existing peers and
+// converts them along with the node list into the ObjectList slice for validation.
+func peersAndNodesToObjects(bgpPeer *v1beta2.BGPPeer, existingBGPPeers *v1beta2.BGPPeerList, existingNodes *corev1.NodeList) []client.ObjectList {
+	toValidate := bgpPeerListWithUpdate(existingBGPPeers, bgpPeer)
+	return []client.ObjectList{toValidate, existingNodes}
 }
 
 // validatePeerDelete implements webhook.Validator so a webhook will be registered for BGPPeer.
@@ -146,9 +158,18 @@ var GetExistingBGPPeers = func() (*v1beta2.BGPPeerList, error) {
 	existingBGPPeerslList := &v1beta2.BGPPeerList{}
 	err := WebhookClient.List(context.Background(), existingBGPPeerslList, &client.ListOptions{Namespace: MetalLBNamespace})
 	if err != nil {
-		return nil, errors.Join(err, errors.New("failed to get existing BGPPeer objects"))
+		return nil, fmt.Errorf("failed to get existing BGPPeer objects: %w", err)
 	}
 	return existingBGPPeerslList, nil
+}
+
+var getExistingNodes = func() (*corev1.NodeList, error) {
+	nodeList := &corev1.NodeList{}
+	err := WebhookClient.List(context.Background(), nodeList)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing Node objects: %w", err)
+	}
+	return nodeList, nil
 }
 
 func bgpPeerListWithUpdate(existing *v1beta2.BGPPeerList, toAdd *v1beta2.BGPPeer) *v1beta2.BGPPeerList {
