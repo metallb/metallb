@@ -86,9 +86,39 @@ type SessionParameters struct {
 	DisableMP              bool
 	LocalASN               uint32
 }
+// OSPFInstanceParams carries the full OSPF instance state the speaker
+// wants reflected in the FRR config.
+type OSPFInstanceParams struct {
+	RouterID   string
+	VRF        string
+	Areas      []OSPFAreaParams
+	Interfaces []OSPFInterfaceParams
+	PrefixesV4 []string
+	PrefixesV6 []string
+	Metric     uint32
+	MetricType uint32
+}
+
+// OSPFAreaParams describes one OSPF area declaration.
+type OSPFAreaParams struct {
+	ID   string
+	Type string // "regular", "stub", "nssa", "totally-stub"
+}
+
+// OSPFInterfaceParams describes per-interface OSPF settings.
+type OSPFInterfaceParams struct {
+	Name          string
+	AreaID        string
+	Passive       bool
+	HelloInterval *int64 // seconds
+	DeadInterval  *int64 // seconds
+	Cost          *uint32
+}
+
 type SessionManager interface {
 	NewSession(logger log.Logger, args SessionParameters) (Session, error)
 	SyncBFDProfiles(profiles map[string]*config.BFDProfile) error
 	SyncExtraInfo(extras string) error
+	SyncOSPFInstances(instances []OSPFInstanceParams) error
 	SetEventCallback(func(interface{}))
 }

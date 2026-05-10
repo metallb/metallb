@@ -174,6 +174,13 @@ func (sm *sessionManager) SyncExtraInfo(extraInfo string) error {
 	return nil
 }
 
+func (sm *sessionManager) SyncOSPFInstances(instances []bgp.OSPFInstanceParams) error {
+	if len(instances) > 0 {
+		return errors.New("OSPF not supported in frr-k8s mode")
+	}
+	return nil
+}
+
 func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*metallbconfig.BFDProfile) error {
 	sm.Lock()
 	defer sm.Unlock()

@@ -1,0 +1,98 @@
+{{ define "ospf" -}}
+{{- /*
+  ospf.tmpl — renders OSPF configuration for each OSPFInstance.
+
+  For each instance this template produces:
+    1. Per-interface stanzas (ip ospf area, timers, cost, passive).
+    2. IPv4 prefix-list + route-map for service IP redistribution.
+    3. router ospf stanza (router-id, area type annotations, redistribute).
+
+  OSPFv3 (IPv6) is handled by the ospf6 section at the bottom if PrefixesV6
+  is non-empty.
+*/ -}}
+{{- range .OSPFInstances -}}
+{{- $inst := . -}}
+
+{{- /*  ── interface configuration ── */ -}}
+{{- range .Interfaces }}
+interface {{ .Name }}
+  ip ospf area {{ .AreaID }}
+{{- if .HelloInterval }}
+  ip ospf hello-interval {{ .HelloInterval }}
+{{- end }}
+{{- if .DeadInterval }}
+  ip ospf dead-interval {{ .DeadInterval }}
+{{- end }}
+{{- if .Cost }}
+  ip ospf cost {{ .Cost }}
+{{- end }}
+{{- if .Passive }}
+  ip ospf passive
+{{- end }}
+!
+{{- end }}
+
+{{- /*  ── IPv4 redistribution filter ── */ -}}
+{{- if gt (len .PrefixesV4) 0 }}
+ip prefix-list {{ .PrefixListName "v4" }} seq 65535 deny any
+{{- range $i, $p := .PrefixesV4 }}
+ip prefix-list {{ $inst.PrefixListName "v4" }} seq {{ $i }} permit {{ $p }}
+{{- end }}
+!
+route-map {{ .RouteMapName "v4" }} permit 10
+  match ip address prefix-list {{ .PrefixListName "v4" }}
+{{- if gt .Metric 0 }}
+  set metric {{ .Metric }}
+{{- end }}
+  set metric-type type-{{ .MetricType }}
+!
+{{- end }}
+
+{{- /*  ── router ospf stanza ── */ -}}
+router ospf{{ if .VRF }} vrf {{ .VRF }}{{ end }}
+{{- if .RouterID }}
+  ospf router-id {{ .RouterID }}
+{{- end }}
+{{- range .Areas }}
+{{- if eq .Type "stub" }}
+  area {{ .ID }} stub
+{{- else if eq .Type "totally-stub" }}
+  area {{ .ID }} stub no-summary
+{{- else if eq .Type "nssa" }}
+  area {{ .ID }} nssa
+{{- end }}
+{{- end }}
+{{- if gt (len .PrefixesV4) 0 }}
+  redistribute static route-map {{ .RouteMapName "v4" }}
+{{- end }}
+!
+
+{{- /*  ── OSPFv3 (IPv6) redistribution filter ── */ -}}
+{{- if gt (len .PrefixesV6) 0 }}
+ipv6 prefix-list {{ .PrefixListName "v6" }} seq 65535 deny any
+{{- range $i, $p := .PrefixesV6 }}
+ipv6 prefix-list {{ $inst.PrefixListName "v6" }} seq {{ $i }} permit {{ $p }}
+{{- end }}
+!
+route-map {{ .RouteMapName "v6" }} permit 10
+  match ipv6 address prefix-list {{ .PrefixListName "v6" }}
+{{- if gt .Metric 0 }}
+  set metric {{ .Metric }}
+{{- end }}
+  set metric-type type-{{ .MetricType }}
+!
+router ospf6{{ if .VRF }} vrf {{ .VRF }}{{ end }}
+{{- if .RouterID }}
+  ospf6 router-id {{ .RouterID }}
+{{- end }}
+{{- range .Interfaces }}
+  interface {{ .Name }} area {{ .AreaID }}
+{{- end }}
+{{- if gt (len .PrefixesV6) 0 }}
+  redistribute static route-map {{ $inst.RouteMapName "v6" }}
+{{- end }}
+!
+{{- end }}
+
+{{ end -}}
+{{ end -}}

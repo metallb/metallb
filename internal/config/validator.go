@@ -30,12 +30,14 @@ type validator struct {
 
 func (v *validator) Validate(resources ...client.ObjectList) error {
 	clusterResources := ClusterResources{
-		Pools:       make([]metallbv1beta1.IPAddressPool, 0),
-		Peers:       make([]metallbv1beta2.BGPPeer, 0),
-		BFDProfiles: make([]metallbv1beta1.BFDProfile, 0),
-		BGPAdvs:     make([]metallbv1beta1.BGPAdvertisement, 0),
-		L2Advs:      make([]metallbv1beta1.L2Advertisement, 0),
-		Communities: make([]metallbv1beta1.Community, 0),
+		Pools:         make([]metallbv1beta1.IPAddressPool, 0),
+		Peers:         make([]metallbv1beta2.BGPPeer, 0),
+		BFDProfiles:   make([]metallbv1beta1.BFDProfile, 0),
+		BGPAdvs:       make([]metallbv1beta1.BGPAdvertisement, 0),
+		L2Advs:        make([]metallbv1beta1.L2Advertisement, 0),
+		OSPFInstances: make([]metallbv1beta1.OSPFInstance, 0),
+		OSPFAdvs:      make([]metallbv1beta1.OSPFAdvertisement, 0),
+		Communities:   make([]metallbv1beta1.Community, 0),
 	}
 	for _, list := range resources {
 		switch list := list.(type) {
@@ -49,6 +51,10 @@ func (v *validator) Validate(resources ...client.ObjectList) error {
 			clusterResources.BGPAdvs = append(clusterResources.BGPAdvs, list.Items...)
 		case *metallbv1beta1.L2AdvertisementList:
 			clusterResources.L2Advs = append(clusterResources.L2Advs, list.Items...)
+		case *metallbv1beta1.OSPFInstanceList:
+			clusterResources.OSPFInstances = append(clusterResources.OSPFInstances, list.Items...)
+		case *metallbv1beta1.OSPFAdvertisementList:
+			clusterResources.OSPFAdvs = append(clusterResources.OSPFAdvs, list.Items...)
 		case *metallbv1beta1.CommunityList:
 			clusterResources.Communities = append(clusterResources.Communities, list.Items...)
 		case *v1.NodeList:

@@ -33,11 +33,12 @@ var (
 )
 
 type frrConfig struct {
-	Loglevel    string
-	Hostname    string
-	Routers     []*routerConfig
-	BFDProfiles []BFDProfile
-	ExtraConfig string
+	Loglevel      string
+	Hostname      string
+	Routers       []*routerConfig
+	BFDProfiles   []BFDProfile
+	ExtraConfig   string
+	OSPFInstances []*ospfInstanceConfig
 }
 
 type reloadEvent struct {
@@ -147,6 +148,60 @@ type LocalPrefPrefixList struct {
 
 func (l LocalPrefPrefixList) SetStatement() string {
 	return fmt.Sprintf("set local-preference %d", l.LocalPreference)
+}
+
+// ospfInstanceConfig holds the FRR-level representation of one OSPF process.
+type ospfInstanceConfig struct {
+	// RouterID is the OSPF router-id in dotted-quad form (may be empty).
+	RouterID string
+	// VRF name; empty string means the default VRF.
+	VRF string
+	// Areas lists area declarations (type annotations for stub/nssa).
+	Areas []ospfAreaConfig
+	// Interfaces lists per-interface OSPF configuration.
+	Interfaces []ospfInterfaceConfig
+	// PrefixesV4 is the sorted list of IPv4 service prefixes to redistribute.
+	PrefixesV4 []string
+	// PrefixesV6 is the sorted list of IPv6 service prefixes to redistribute.
+	PrefixesV6 []string
+	// Metric is the OSPF external metric (0 means use FRR default).
+	Metric uint32
+	// MetricType is 1 or 2 (OSPF external metric type).
+	MetricType uint32
+}
+
+// RouteMapName returns a deterministic route-map name for this OSPF instance.
+func (o *ospfInstanceConfig) RouteMapName(family string) string {
+	id := o.RouterID
+	if id == "" {
+		id = "default"
+	}
+	vrf := o.VRF
+	if vrf == "" {
+		vrf = "default"
+	}
+	return fmt.Sprintf("METALLB-OSPF-%s-%s-%s", id, vrf, family)
+}
+
+// PrefixListName returns a deterministic prefix-list name for this OSPF instance.
+func (o *ospfInstanceConfig) PrefixListName(family string) string {
+	return o.RouteMapName(family) + "-pl"
+}
+
+type ospfAreaConfig struct {
+	// ID is the area identifier in dotted-quad form.
+	ID string
+	// Type is "stub", "nssa", "totally-stub", or "" for a regular area.
+	Type string
+}
+
+type ospfInterfaceConfig struct {
+	Name          string
+	AreaID        string
+	Passive       bool
+	HelloInterval *int64 // seconds, nil means use FRR default
+	DeadInterval  *int64 // seconds, nil means use FRR default
+	Cost          *uint32
 }
 
 // RouterName() defines the format of the key of the "Routers" map in the

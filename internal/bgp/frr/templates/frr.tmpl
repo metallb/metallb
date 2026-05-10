@@ -66,6 +66,10 @@ bfd
 {{- end }}
 {{- end }}
 
+{{- if gt (len .OSPFInstances) 0 }}
+{{- template "ospf" . }}
+{{- end }}
+
 {{- if .ExtraConfig }}
 {{ .ExtraConfig }}
 {{- end }}

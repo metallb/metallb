@@ -327,6 +327,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 		secretHandling = SecretConvert
 	}
 
+	bgpSM := newBGP(cfg)
 	bgpController := &bgpController{
 		logger:             cfg.Logger,
 		myNode:             cfg.MyNode,
@@ -334,16 +335,26 @@ func newController(cfg controllerConfig) (*controller, error) {
 		activeAds:          make(map[string]sets.Set[string]),
 		adsChangedCallback: cfg.BGPAdsChangedCallback,
 		bgpType:            cfg.bgpType,
-		sessionManager:     newBGP(cfg),
+		sessionManager:     bgpSM,
 		ignoreExcludeLB:    cfg.IgnoreExcludeLB,
 		secretHandling:     secretHandling,
 	}
 	bgpPeersFetcher := bgpController.PeersForService
 
-	handlers := map[config.Proto]Protocol{
-		config.BGP: bgpController,
+	ospfCtrl := &ospfController{
+		logger:          cfg.Logger,
+		myNode:          cfg.MyNode,
+		sessionManager:  bgpSM,
+		ignoreExcludeLB: cfg.IgnoreExcludeLB,
+		svcPrefixesV4:   make(map[string][]string),
+		svcPrefixesV6:   make(map[string][]string),
 	}
-	protocols := []config.Proto{config.BGP}
+
+	handlers := map[config.Proto]Protocol{
+		config.BGP:  bgpController,
+		config.OSPF: ospfCtrl,
+	}
+	protocols := []config.Proto{config.BGP, config.OSPF}
 
 	layer2StatusFetcher := func(types.NamespacedName) []layer2.IPAdvertisement { return nil }
 	if !cfg.DisableLayer2 {
@@ -374,6 +385,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	}
 	ret.announced[config.BGP] = map[string]bool{}
 	ret.announced[config.Layer2] = map[string]bool{}
+	ret.announced[config.OSPF] = map[string]bool{}
 
 	ret.nodes = make(map[string]*v1.Node)
 

@@ -46,6 +46,8 @@ type ClusterResources struct {
 	BFDProfiles     []metallbv1beta1.BFDProfile       `json:"bfdprofiles"`
 	BGPAdvs         []metallbv1beta1.BGPAdvertisement `json:"bgpadvertisements"`
 	L2Advs          []metallbv1beta1.L2Advertisement  `json:"l2advertisements"`
+	OSPFInstances   []metallbv1beta1.OSPFInstance     `json:"ospfinstances"`
+	OSPFAdvs        []metallbv1beta1.OSPFAdvertisement `json:"ospfadvertisements"`
 	Communities     []metallbv1beta1.Community        `json:"communities"`
 	PasswordSecrets map[string]corev1.Secret          `json:"passwordsecrets"`
 	Nodes           []corev1.Node                     `json:"nodes"`
@@ -63,6 +65,8 @@ type Config struct {
 	BFDProfiles map[string]*BFDProfile
 	// Protocol dependent extra config. Currently used only by FRR
 	BGPExtras string
+	// OSPF instances to run on matching nodes.
+	OSPFInstances map[string]*OSPFInstance
 }
 
 // Pools contains address pools and its namespace/service specific allocations.
@@ -82,12 +86,48 @@ type Proto string
 const (
 	BGP    Proto = "bgp"
 	Layer2 Proto = "layer2"
+	OSPF   Proto = "ospf"
 )
 
 const bgpExtrasField = "extras"
 
 var Protocols = []Proto{
-	BGP, Layer2,
+	BGP, Layer2, OSPF,
+}
+
+// OSPFArea is the parsed representation of an OSPF area declaration.
+type OSPFArea struct {
+	ID   string
+	Type string // "regular", "stub", "nssa", "totally-stub"
+}
+
+// OSPFInterface is the parsed representation of a per-interface OSPF config.
+type OSPFInterface struct {
+	Name          string
+	AreaID        string
+	Passive       bool
+	HelloInterval *time.Duration
+	DeadInterval  *time.Duration
+	Cost          *uint32
+}
+
+// OSPFInstance is the parsed configuration for an OSPF process on a node.
+type OSPFInstance struct {
+	Name          string
+	RouterID      string
+	Areas         []OSPFArea
+	Interfaces    []OSPFInterface
+	NodeSelectors []labels.Selector
+	VRF           string
+}
+
+// OSPFAdvertisement is the parsed representation of an OSPF redistribution rule.
+type OSPFAdvertisement struct {
+	Name             string
+	Nodes            map[string]bool
+	ServiceSelectors []labels.Selector
+	Metric           uint32
+	MetricType       uint32
 }
 
 // Peer is the configuration of a BGP peering session.
@@ -167,6 +207,9 @@ type Pool struct {
 
 	// The list of L2Advertisements associated with this address pool.
 	L2Advertisements []*L2Advertisement
+
+	// The list of OSPFAdvertisements associated with this address pool.
+	OSPFAdvertisements []*OSPFAdvertisement
 
 	cidrsPerAddresses map[string][]*net.IPNet
 
@@ -261,6 +304,16 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	cfg.BGPExtras = bgpExtrasFor(resources)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.OSPFInstances, err = ospfInstancesFor(resources)
+	if err != nil {
+		return nil, err
+	}
+
+	err = setOSPFAdvertisementsToPools(resources.Pools, resources.OSPFAdvs, resources.Nodes, cfg.Pools.ByName)
 	if err != nil {
 		return nil, err
 	}
@@ -1221,6 +1274,178 @@ func validateLabelSelectorMatchExpressions(matchExpressions []metav1.LabelSelect
 		}
 	}
 	return nil
+}
+
+func ospfInstancesFor(resources ClusterResources) (map[string]*OSPFInstance, error) {
+	res := make(map[string]*OSPFInstance)
+	for _, cr := range resources.OSPFInstances {
+		inst, err := ospfInstanceFromCR(cr, resources.Nodes)
+		if err != nil {
+			return nil, fmt.Errorf("parsing OSPFInstance %s: %w", cr.Name, err)
+		}
+		if _, dup := res[inst.Name]; dup {
+			return nil, fmt.Errorf("duplicate OSPFInstance name %q", inst.Name)
+		}
+		res[inst.Name] = inst
+	}
+	return res, nil
+}
+
+func ospfInstanceFromCR(cr metallbv1beta1.OSPFInstance, nodes []corev1.Node) (*OSPFInstance, error) {
+	inst := &OSPFInstance{
+		Name:     cr.Name,
+		RouterID: cr.Spec.RouterID,
+		VRF:      cr.Spec.VRF,
+	}
+
+	// Build area map for cross-reference checks.
+	areaTypes := map[string]metallbv1beta1.AreaType{}
+	for _, a := range cr.Spec.Areas {
+		if a.ID == "0.0.0.0" && a.Type != "" && a.Type != metallbv1beta1.AreaTypeRegular {
+			return nil, fmt.Errorf("area 0.0.0.0 (backbone) must be regular, got %q", a.Type)
+		}
+		if _, dup := areaTypes[a.ID]; dup {
+			return nil, fmt.Errorf("duplicate area ID %q", a.ID)
+		}
+		areaTypes[a.ID] = a.Type
+		inst.Areas = append(inst.Areas, OSPFArea{
+			ID:   a.ID,
+			Type: string(a.Type),
+		})
+	}
+
+	// Validate interfaces and cross-reference their area IDs.
+	ifaceNames := map[string]bool{}
+	usedAreas := map[string]bool{}
+	for _, iface := range cr.Spec.Interfaces {
+		if iface.Name == "" {
+			return nil, fmt.Errorf("interface name must not be empty")
+		}
+		if ifaceNames[iface.Name] {
+			return nil, fmt.Errorf("duplicate interface name %q", iface.Name)
+		}
+		ifaceNames[iface.Name] = true
+
+		areaType, known := areaTypes[iface.AreaID]
+		if !known {
+			return nil, fmt.Errorf("interface %q references area %q not declared in spec.areas", iface.Name, iface.AreaID)
+		}
+		if areaType == metallbv1beta1.AreaTypeStub || areaType == metallbv1beta1.AreaTypeTotallyStub {
+			return nil, fmt.Errorf("interface %q is in %s area %q; external route redistribution is not possible in stub or totally-stub areas",
+				iface.Name, areaType, iface.AreaID)
+		}
+		usedAreas[iface.AreaID] = true
+
+		if iface.HelloInterval != nil && iface.DeadInterval != nil &&
+			iface.DeadInterval.Duration <= iface.HelloInterval.Duration {
+			return nil, fmt.Errorf("interface %q: deadInterval (%s) must be greater than helloInterval (%s)",
+				iface.Name, iface.DeadInterval, iface.HelloInterval)
+		}
+
+		parsed := OSPFInterface{
+			Name:    iface.Name,
+			AreaID:  iface.AreaID,
+			Passive: iface.Passive,
+			Cost:    iface.Cost,
+		}
+		if iface.HelloInterval != nil {
+			d := iface.HelloInterval.Duration
+			parsed.HelloInterval = &d
+		}
+		if iface.DeadInterval != nil {
+			d := iface.DeadInterval.Duration
+			parsed.DeadInterval = &d
+		}
+		inst.Interfaces = append(inst.Interfaces, parsed)
+	}
+
+	// When interfaces span multiple areas the node acts as an ABR and must
+	// have at least one interface in the backbone area.
+	if len(usedAreas) > 1 {
+		if _, hasBackbone := areaTypes["0.0.0.0"]; !hasBackbone {
+			return nil, fmt.Errorf("node has interfaces in multiple areas but area 0.0.0.0 (backbone) is not declared; an ABR must be connected to the backbone")
+		}
+	}
+
+	if err := validateLabelSelectorDuplicate(cr.Spec.NodeSelectors, "nodeSelectors"); err != nil {
+		return nil, err
+	}
+	for _, s := range cr.Spec.NodeSelectors {
+		sel, err := metav1.LabelSelectorAsSelector(&s)
+		if err != nil {
+			return nil, fmt.Errorf("invalid node selector: %w", err)
+		}
+		inst.NodeSelectors = append(inst.NodeSelectors, sel)
+	}
+	if len(inst.NodeSelectors) == 0 {
+		inst.NodeSelectors = []labels.Selector{labels.Everything()}
+	}
+
+	return inst, nil
+}
+
+func setOSPFAdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, ospfAdvs []metallbv1beta1.OSPFAdvertisement,
+	nodes []corev1.Node, ipPoolMap map[string]*Pool) error {
+	for _, ospfAdv := range ospfAdvs {
+		adv, err := ospfAdvertisementFromCR(ospfAdv, nodes)
+		if err != nil {
+			return err
+		}
+		ipPoolsSelected, err := selectedPools(ipPools, ospfAdv.Spec.IPAddressPoolSelectors)
+		if err != nil {
+			return err
+		}
+		if len(ospfAdv.Spec.IPAddressPools) == 0 && len(ospfAdv.Spec.IPAddressPoolSelectors) == 0 {
+			for _, pool := range ipPoolMap {
+				pool.OSPFAdvertisements = append(pool.OSPFAdvertisements, adv)
+			}
+			continue
+		}
+		for _, poolName := range append(ospfAdv.Spec.IPAddressPools, ipPoolsSelected...) {
+			if pool, ok := ipPoolMap[poolName]; ok {
+				pool.OSPFAdvertisements = append(pool.OSPFAdvertisements, adv)
+			}
+		}
+	}
+	return nil
+}
+
+func ospfAdvertisementFromCR(cr metallbv1beta1.OSPFAdvertisement, nodes []corev1.Node) (*OSPFAdvertisement, error) {
+	if err := validateDuplicate(cr.Spec.IPAddressPools, "ipAddressPools"); err != nil {
+		return nil, err
+	}
+	if err := validateLabelSelectorDuplicate(cr.Spec.IPAddressPoolSelectors, "ipAddressPoolSelectors"); err != nil {
+		return nil, err
+	}
+	if err := validateLabelSelectorDuplicate(cr.Spec.NodeSelectors, "nodeSelectors"); err != nil {
+		return nil, err
+	}
+	if err := validateLabelSelectorDuplicate(cr.Spec.ServiceSelectors, "serviceSelectors"); err != nil {
+		return nil, err
+	}
+
+	selected, err := selectedNodes(nodes, cr.Spec.NodeSelectors)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse node selector for %s: %w", cr.Name, err)
+	}
+
+	serviceSelectors, err := parseSelectors(cr.Spec.ServiceSelectors)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse service selector for %s: %w", cr.Name, err)
+	}
+
+	metricType := uint32(cr.Spec.MetricType)
+	if metricType == 0 {
+		metricType = 2 // default
+	}
+
+	return &OSPFAdvertisement{
+		Name:             cr.Name,
+		Nodes:            selected,
+		ServiceSelectors: serviceSelectors,
+		Metric:           cr.Spec.Metric,
+		MetricType:       metricType,
+	}, nil
 }
 
 func validateDuplicate(strSlice []string, sliceType string) error {

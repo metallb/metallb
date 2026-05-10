@@ -92,6 +92,16 @@ func enableWebhook(mgr manager.Manager, validate config.Validate, namespace stri
 		return err
 	}
 
+	if err := (&webhookv1beta1.OSPFInstanceValidator{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "OSPFInstance")
+		return err
+	}
+
+	if err := (&webhookv1beta1.OSPFAdvertisementValidator{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "OSPFAdvertisement")
+		return err
+	}
+
 	// Register conversion webhook manually since we are not directly handling the types.
 	mgr.GetWebhookServer().Register("/convert", conversion.NewWebhookHandler(mgr.GetScheme()))
 

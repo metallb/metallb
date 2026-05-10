@@ -26,11 +26,12 @@ import (
 // no need to lock this data structure. TODO: confirm this.
 
 type sessionManager struct {
-	sessions     map[string]*session
-	bfdProfiles  []BFDProfile
-	extraConfig  string
-	reloadConfig chan reloadEvent
-	logLevel     string
+	sessions      map[string]*session
+	bfdProfiles   []BFDProfile
+	extraConfig   string
+	ospfInstances []*ospfInstanceConfig
+	reloadConfig  chan reloadEvent
+	logLevel      string
 	sync.Mutex
 }
 
@@ -209,10 +210,11 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	}
 
 	config := &frrConfig{
-		Hostname:    hostname,
-		Loglevel:    sm.logLevel,
-		BFDProfiles: sm.bfdProfiles,
-		ExtraConfig: sm.extraConfig,
+		Hostname:      hostname,
+		Loglevel:      sm.logLevel,
+		BFDProfiles:   sm.bfdProfiles,
+		ExtraConfig:   sm.extraConfig,
+		OSPFInstances: sm.ospfInstances,
 	}
 
 	type router struct {
@@ -408,6 +410,44 @@ func communityPrefixList(neighbor *neighborConfig, community, ipFamily string) s
 
 func largeCommunityPrefixList(neighbor *neighborConfig, community, ipFamily string) string {
 	return fmt.Sprintf("%s-large:%s-%s-community-prefixes", neighbor.ID(), community, ipFamily)
+}
+
+func (sm *sessionManager) SyncOSPFInstances(instances []bgp.OSPFInstanceParams) error {
+	sm.Lock()
+	defer sm.Unlock()
+
+	sm.ospfInstances = make([]*ospfInstanceConfig, 0, len(instances))
+	for _, inst := range instances {
+		cfg := &ospfInstanceConfig{
+			RouterID:   inst.RouterID,
+			VRF:        inst.VRF,
+			PrefixesV4: inst.PrefixesV4,
+			PrefixesV6: inst.PrefixesV6,
+			Metric:     inst.Metric,
+			MetricType: inst.MetricType,
+		}
+		for _, a := range inst.Areas {
+			cfg.Areas = append(cfg.Areas, ospfAreaConfig{ID: a.ID, Type: a.Type})
+		}
+		for _, iface := range inst.Interfaces {
+			cfg.Interfaces = append(cfg.Interfaces, ospfInterfaceConfig{
+				Name:          iface.Name,
+				AreaID:        iface.AreaID,
+				Passive:       iface.Passive,
+				HelloInterval: iface.HelloInterval,
+				DeadInterval:  iface.DeadInterval,
+				Cost:          iface.Cost,
+			})
+		}
+		sm.ospfInstances = append(sm.ospfInstances, cfg)
+	}
+
+	frrConfig, err := sm.createConfig()
+	if err != nil {
+		return err
+	}
+	sm.reloadConfig <- reloadEvent{config: frrConfig}
+	return nil
 }
 
 func (sm *sessionManager) SetEventCallback(func(interface{})) {}
