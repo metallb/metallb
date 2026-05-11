@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/go-kit/log"
@@ -385,3 +387,251 @@ var (
 		},
 	}
 )
+
+func TestFilterBGPAdvertisementsByNode(t *testing.T) {
+	node := corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+			Labels: map[string]string{
+				"node-name": "node1",
+			},
+		},
+	}
+
+	tcs := []struct {
+		name                      string
+		bgpAdvertisements         []v1beta1.BGPAdvertisement
+		filteredBGPAdvertisements []v1beta1.BGPAdvertisement
+		expectedError             string
+	}{
+		{
+			name: "filters matching BGPAdvertisements",
+			bgpAdvertisements: []v1beta1.BGPAdvertisement{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: v1beta1.BGPAdvertisementSpec{
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									"node-name": "node1",
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test2",
+					},
+					Spec: v1beta1.BGPAdvertisementSpec{},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test3",
+					},
+					Spec: v1beta1.BGPAdvertisementSpec{
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									"node-name": "node2",
+								},
+							},
+						},
+					},
+				},
+			},
+			filteredBGPAdvertisements: []v1beta1.BGPAdvertisement{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: v1beta1.BGPAdvertisementSpec{
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									"node-name": "node1",
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test2",
+					},
+					Spec: v1beta1.BGPAdvertisementSpec{},
+				},
+			},
+		},
+		{
+			name: "reports errors",
+			bgpAdvertisements: []v1beta1.BGPAdvertisement{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: v1beta1.BGPAdvertisementSpec{
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Operator: "invalid",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "\"invalid\" is not a valid label selector operator\ninvalid label selector {map[] [{ invalid []}]}",
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			bgpAdvertisements, err := filterBGPAdvertisementsByNode(tc.bgpAdvertisements, node)
+			switch err {
+			case nil:
+				if tc.expectedError != "" {
+					t.Fatalf("expected error %q but got no error", tc.expectedError)
+				}
+				if !reflect.DeepEqual(bgpAdvertisements, tc.filteredBGPAdvertisements) {
+					t.Fatalf("expected filtered BGP peers and actual filtered BGP peers do not match: "+
+						"expected: %+v, got: %+v", tc.filteredBGPAdvertisements, bgpAdvertisements)
+				}
+			default:
+				if tc.expectedError == "" {
+					t.Fatalf("expected no error, but got error %q", err)
+				}
+				if !strings.Contains(err.Error(), tc.expectedError) {
+					t.Fatalf("expected error %q but got error %q", tc.expectedError, err)
+				}
+			}
+		})
+	}
+}
+
+func TestFilterBGPPeersByNode(t *testing.T) {
+	node := corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+			Labels: map[string]string{
+				"node-name": "node1",
+			},
+		},
+	}
+
+	tcs := []struct {
+		name             string
+		bgpPeers         []v1beta2.BGPPeer
+		filteredBGPPeers []v1beta2.BGPPeer
+		expectedError    string
+	}{
+		{
+			name: "filters matching BGPPeers",
+			bgpPeers: []v1beta2.BGPPeer{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: v1beta2.BGPPeerSpec{
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									"node-name": "node1",
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test2",
+					},
+					Spec: v1beta2.BGPPeerSpec{},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test3",
+					},
+					Spec: v1beta2.BGPPeerSpec{
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									"node-name": "node2",
+								},
+							},
+						},
+					},
+				},
+			},
+			filteredBGPPeers: []v1beta2.BGPPeer{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: v1beta2.BGPPeerSpec{
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									"node-name": "node1",
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test2",
+					},
+					Spec: v1beta2.BGPPeerSpec{},
+				},
+			},
+		},
+		{
+			name: "reports errors",
+			bgpPeers: []v1beta2.BGPPeer{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: v1beta2.BGPPeerSpec{
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Operator: "invalid",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: "\"invalid\" is not a valid label selector operator\ninvalid label selector {map[] [{ invalid []}]}",
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			bgpPeers, err := filterBGPPeersByNode(tc.bgpPeers, node)
+			switch err {
+			case nil:
+				if tc.expectedError != "" {
+					t.Fatalf("expected error %q but got no error", tc.expectedError)
+				}
+				if !reflect.DeepEqual(bgpPeers, tc.filteredBGPPeers) {
+					t.Fatalf("expected filtered BGP peers and actual filtered BGP peers do not match: "+
+						"expected: %+v, got: %+v", tc.filteredBGPPeers, bgpPeers)
+				}
+			default:
+				if tc.expectedError == "" {
+					t.Fatalf("expected no error, but got error %q", err)
+				}
+				if !strings.Contains(err.Error(), tc.expectedError) {
+					t.Fatalf("expected error %q but got error %q", tc.expectedError, err)
+				}
+			}
+		})
+	}
+}
