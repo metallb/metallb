@@ -3,8 +3,8 @@
 package consts
 
 const (
-	// BGPConfigFile contains the BGP router configuration file.
-	BGPConfigFile = "bgpd.conf"
+	// BGPConfigFile contains the FRR configuration file.
+	BGPConfigFile = "frr.conf"
 	// DaemonsConfigFile contains the frr daemons configuration file.
 	DaemonsConfigFile = "daemons"
 )

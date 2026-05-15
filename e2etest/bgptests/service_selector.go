@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("BGP Service Selector", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, c := range FRRContainers {
-			err := c.UpdateBGPConfigFile(frrconfig.Empty)
+			err := c.UpdateConfigFile(frrconfig.Empty)
 			Expect(err).NotTo(HaveOccurred())
 		}
 		cs = k8sclient.New()

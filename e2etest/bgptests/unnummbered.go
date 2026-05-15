@@ -123,7 +123,7 @@ var _ = ginkgo.Describe("FRR Unnumbered BGP", func() {
 
 		c, err := rc.Config()
 		Expect(err).NotTo(HaveOccurred())
-		err = remoteP2PContainer.UpdateBGPConfigFile(c)
+		err = remoteP2PContainer.UpdateConfigFile(c)
 		Expect(err).NotTo(HaveOccurred())
 
 		err = ConfigUpdater.Update(resources)
