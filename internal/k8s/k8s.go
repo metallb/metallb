@@ -475,6 +475,12 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
+// Update writes the service metadata and spec back into the Kubernetes cluster.
+func (c *Client) Update(svc *corev1.Service) error {
+	_, err := c.client.CoreV1().Services(svc.Namespace).Update(context.TODO(), svc, metav1.UpdateOptions{})
+	return err
+}
+
 // UpdateStatus writes the protected "status" field of svc back into
 // the Kubernetes cluster.
 func (c *Client) UpdateStatus(svc *corev1.Service) error {
