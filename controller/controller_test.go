@@ -70,8 +70,14 @@ type testK8S struct {
 	t                   *testing.T
 }
 
+func (s *testK8S) Update(svc *v1.Service) error {
+	s.updateService = svc.DeepCopy()
+	return nil
+}
+
 func (s *testK8S) UpdateStatus(svc *v1.Service) error {
-	s.updateServiceStatus = &svc.Status
+	status := svc.Status
+	s.updateServiceStatus = &status
 	return nil
 }
 
@@ -1146,6 +1152,63 @@ func TestControllerMutation(t *testing.T) {
 			tests[x], tests[nx] = tests[nx], tests[x]
 		}
 		t.Logf("Shuffled test cases")
+	}
+}
+
+func TestControllerRemovesDeprecatedManagedAllocationAnnotation(t *testing.T) {
+	k := &testK8S{t: t}
+	c := &controller{
+		ips:    allocator.New(noopCallback),
+		client: k,
+	}
+	c.SetPools(log.NewNopLogger(), &config.Pools{
+		ByName: map[string]*config.Pool{
+			"pool1": {
+				Name:       "pool1",
+				AutoAssign: true,
+				CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+			},
+		},
+	})
+
+	in := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				AnnotationIPAllocateFromPool:           "pool1",
+				DeprecatedAnnotationIPAllocateFromPool: "pool1",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIPs: []string{"1.2.3.4"},
+			Type:       "LoadBalancer",
+		},
+		Status: statusAssigned([]string{"1.2.3.0"}),
+	}
+	want := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				AnnotationIPAllocateFromPool: "pool1",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIPs: []string{"1.2.3.4"},
+			Type:       "LoadBalancer",
+		},
+		Status: statusAssigned([]string{"1.2.3.0"}),
+	}
+
+	if c.SetBalancer(log.NewNopLogger(), "test", in, []discovery.EndpointSlice{}) == controllers.SyncStateError {
+		t.Fatalf("SetBalancer returned error")
+	}
+	if !k.loggedWarning {
+		t.Fatal("expected deprecated annotation warning")
+	}
+	gotSvc := k.gotService(in)
+	if gotSvc == nil {
+		t.Fatal("expected service metadata update")
+	}
+	if diff := diffService(want, gotSvc); diff != "" {
+		t.Errorf("wrong service mutation (-want +got)\n%s", diff)
 	}
 }
 
