@@ -45,6 +45,7 @@ type BGPPeerSpec struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=4294967295
+	// +kubebuilder:validation:Format=int64
 	LocalASN uint32 `json:"localASN,omitempty"`
 
 	// DynamicASN detects the AS number to use for the remote end of the session
