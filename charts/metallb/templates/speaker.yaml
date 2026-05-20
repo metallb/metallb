@@ -145,6 +145,7 @@ spec:
         {{- if .Values.prometheus.scrapeAnnotations }}
         prometheus.io/scrape: "true"
         {{- if not .Values.speaker.frr.enabled }}
+        prometheus.io/scheme: "https"
         prometheus.io/port: "{{ .Values.prometheus.metricsPort }}"
         {{- end }}
         {{- end }}
