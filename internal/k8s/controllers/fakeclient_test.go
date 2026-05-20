@@ -92,5 +92,9 @@ func objectsFromResources(r config.ClusterResources) []client.Object {
 		objects = append(objects, community.DeepCopy())
 	}
 
+	for _, node := range r.Nodes {
+		objects = append(objects, node.DeepCopy())
+	}
+
 	return objects
 }

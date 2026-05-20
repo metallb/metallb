@@ -132,7 +132,7 @@ func PairWithNodes(cs clientset.Interface, c *FRR, ipFamily ipfamily.Family, mod
 		return err
 	}
 
-	err = c.UpdateBGPConfigFile(bgpConfig)
+	err = c.UpdateConfigFile(bgpConfig)
 	if err != nil {
 		return err
 	}
@@ -266,16 +266,16 @@ func (c *FRR) updateIPS() (err error) {
 	return nil
 }
 
-// Updating the BGP config file.
-func (c *FRR) UpdateBGPConfigFile(bgpConfig string) error {
+// Updating the FRR config file.
+func (c *FRR) UpdateConfigFile(bgpConfig string) error {
 	err := frrconfig.SetBGPConfig(c.configDir, bgpConfig)
 	if err != nil {
-		return errors.Join(err, errors.New("failed to update BGP config file"))
+		return errors.Join(err, errors.New("failed to update FRR config file"))
 	}
 
 	err = reloadFRRConfig(consts.BGPConfigFile, c)
 	if err != nil {
-		return errors.Join(err, errors.New("failed to update BGP config file"))
+		return errors.Join(err, errors.New("failed to update FRR config file"))
 
 	}
 

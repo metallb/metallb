@@ -261,9 +261,6 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	cfg.BGPExtras = bgpExtrasFor(resources)
-	if err != nil {
-		return nil, err
-	}
 
 	err = validateConfig(cfg)
 	if err != nil {
@@ -669,6 +666,10 @@ func bfdProfileFromCR(p metallbv1beta1.BFDProfile) (*BFDProfile, error) {
 	return res, nil
 }
 
+// setL2AdvertisementsToPools populates the L2Advertisements field of each pool
+// in ipPoolMap. It converts each L2Advertisement CR into an internal representation
+// (resolving node selectors) and assigns it to every matching pool.
+// The function is called for its side effects: the goal is to modify ipPoolMap in place.
 func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs []metallbv1beta1.L2Advertisement,
 	nodes []corev1.Node, ipPoolMap map[string]*Pool) error {
 	for _, l2Adv := range l2Advs {
@@ -676,7 +677,7 @@ func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs [
 		if err != nil {
 			return err
 		}
-		ipPoolsSelected, err := selectedPools(ipPools, l2Adv.Spec.IPAddressPoolSelectors)
+		ipPoolsSelected, err := filterPoolsWithLabelSelector(ipPools, l2Adv.Spec.IPAddressPoolSelectors)
 		if err != nil {
 			return err
 		}
@@ -689,7 +690,7 @@ func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs [
 			}
 			continue
 		}
-		for _, poolName := range append(l2Adv.Spec.IPAddressPools, ipPoolsSelected...) {
+		for _, poolName := range append(l2Adv.Spec.IPAddressPools, ipPoolsSelected.UnsortedList()...) {
 			if pool, ok := ipPoolMap[poolName]; ok {
 				if !containsAdvertisement(pool.L2Advertisements, adv) {
 					pool.L2Advertisements = append(pool.L2Advertisements, adv)
@@ -700,6 +701,10 @@ func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs [
 	return nil
 }
 
+// setBGPAdvertisementsToPools populates the BGPAdvertisements field of each pool
+// in ipPoolMap. It converts each BGPAdvertisement CR into an internal representation
+// (resolving node selectors) and assigns it to every matching pool.
+// The function is called for its side effects: the goal is to modify ipPoolMap in place.
 func setBGPAdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, bgpAdvs []metallbv1beta1.BGPAdvertisement,
 	nodes []corev1.Node, ipPoolMap map[string]*Pool, communities map[string]community.BGPCommunity) error {
 	for _, bgpAdv := range bgpAdvs {
@@ -707,7 +712,7 @@ func setBGPAdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, bgpAdvs
 		if err != nil {
 			return err
 		}
-		ipPoolsSelected, err := selectedPools(ipPools, bgpAdv.Spec.IPAddressPoolSelectors)
+		ipPoolsSelected, err := filterPoolsWithLabelSelector(ipPools, bgpAdv.Spec.IPAddressPoolSelectors)
 		if err != nil {
 			return err
 		}
@@ -722,7 +727,7 @@ func setBGPAdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, bgpAdvs
 			}
 			continue
 		}
-		for _, poolName := range append(bgpAdv.Spec.IPAddressPools, ipPoolsSelected...) {
+		for _, poolName := range append(bgpAdv.Spec.IPAddressPools, ipPoolsSelected.UnsortedList()...) {
 			if pool, ok := ipPoolMap[poolName]; ok {
 				err := validateBGPAdvPerPool(adv, pool)
 				if err != nil {
@@ -1138,54 +1143,13 @@ func parseSelectors(selectors []metav1.LabelSelector) ([]labels.Selector, error)
 	return result, nil
 }
 
-func selectedNodes(nodes []corev1.Node, selectors []metav1.LabelSelector) (map[string]bool, error) {
-	labelSelectors := []labels.Selector{}
-	for _, selector := range selectors {
-		l, err := metav1.LabelSelectorAsSelector(&selector)
-		if err != nil {
-			return nil, errors.Join(err, fmt.Errorf("invalid label selector %v", selector))
-		}
-		labelSelectors = append(labelSelectors, l)
+// selectedNodes returns a Set of node names that match any of the provided label selectors, or if no selectors are
+// specified extracts and return all node names.
+func selectedNodes(nodes []corev1.Node, selectors []metav1.LabelSelector) (Set, error) {
+	if len(selectors) == 0 {
+		return extractNodeNames(nodes), nil
 	}
-
-	res := make(map[string]bool)
-OUTER:
-	for _, node := range nodes {
-		if len(labelSelectors) == 0 { // no selector mean all nodes are valid
-			res[node.Name] = true
-		}
-		for _, s := range labelSelectors {
-			nodeLabels := labels.Set(node.Labels)
-			if s.Matches(nodeLabels) {
-				res[node.Name] = true
-				continue OUTER
-			}
-		}
-	}
-	return res, nil
-}
-
-func selectedPools(pools []metallbv1beta1.IPAddressPool, selectors []metav1.LabelSelector) ([]string, error) {
-	labelSelectors := []labels.Selector{}
-	for _, selector := range selectors {
-		l, err := metav1.LabelSelectorAsSelector(&selector)
-		if err != nil {
-			return nil, errors.Join(err, fmt.Errorf("invalid label selector %v", selector))
-		}
-		labelSelectors = append(labelSelectors, l)
-	}
-	var ipPools []string
-OUTER:
-	for _, pool := range pools {
-		for _, s := range labelSelectors {
-			poolLabels := labels.Set(pool.Labels)
-			if s.Matches(poolLabels) {
-				ipPools = append(ipPools, pool.Name)
-				continue OUTER
-			}
-		}
-	}
-	return ipPools, nil
+	return FilterNodesWithLabelSelector(nodes, selectors)
 }
 
 func validateLabelSelectorDuplicate(labelSelectors []metav1.LabelSelector, labelSelectorType string) error {
@@ -1232,4 +1196,72 @@ func validateDuplicate(strSlice []string, sliceType string) error {
 		}
 	}
 	return nil
+}
+
+// Set represents a set. It's similar to k8s Set but uses map[string]bool as its backing store for compatibility with
+// L2Advertisement's and BGPAdvertisement's `Nodes map[string]bool` field.
+type Set map[string]bool
+
+// UnsortedList returns an unsorted list from the set.
+func (s Set) UnsortedList() []string {
+	list := make([]string, 0, len(s))
+	for item := range s {
+		list = append(list, item)
+	}
+	return list
+}
+
+// FilterNodesWithLabelSelector returns a Set of nodes that match any of the provided label selectors.
+func FilterNodesWithLabelSelector(nodes []corev1.Node, selectors []metav1.LabelSelector) (Set, error) {
+	return filterWithLabelSelector(
+		nodes,
+		selectors,
+		func(p corev1.Node) map[string]string { return p.Labels },
+		func(p corev1.Node) string { return p.Name },
+	)
+}
+
+// filterPoolsWithLabelSelector returns a Set of IPAddressPools that match any of the provided label selectors.
+func filterPoolsWithLabelSelector(ipPools []metallbv1beta1.IPAddressPool, selectors []metav1.LabelSelector) (Set, error) {
+	return filterWithLabelSelector(
+		ipPools,
+		selectors,
+		func(p metallbv1beta1.IPAddressPool) map[string]string { return p.Labels },
+		func(p metallbv1beta1.IPAddressPool) string { return p.Name },
+	)
+}
+
+// filterWithLabelSelector implements the business logic for the more specific filter functions such as
+// FilterNodesWithLabelSelector.
+func filterWithLabelSelector[T any](toFilterSlice []T, selectors []metav1.LabelSelector,
+	getLabels func(T) map[string]string, getName func(T) string) (Set, error) {
+	labelSelectors := []labels.Selector{}
+	for _, selector := range selectors {
+		l, err := metav1.LabelSelectorAsSelector(&selector)
+		if err != nil {
+			return nil, errors.Join(err, fmt.Errorf("invalid label selector %v", selector))
+		}
+		labelSelectors = append(labelSelectors, l)
+	}
+	filteredSet := Set{}
+OUTER:
+	for _, obj := range toFilterSlice {
+		objLabels := labels.Set(getLabels(obj))
+		for _, s := range labelSelectors {
+			if s.Matches(objLabels) {
+				filteredSet[getName(obj)] = true
+				continue OUTER
+			}
+		}
+	}
+	return filteredSet, nil
+}
+
+// extractNodeNames iterates over the provided slice of Nodes and returns a set with their names.
+func extractNodeNames(nodes []corev1.Node) Set {
+	nodeNames := Set{}
+	for _, node := range nodes {
+		nodeNames[node.GetName()] = true
+	}
+	return nodeNames
 }

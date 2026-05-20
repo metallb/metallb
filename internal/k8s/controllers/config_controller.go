@@ -53,6 +53,7 @@ type ConfigReconciler struct {
 	BGPType         string
 	ConfigStateName string
 	currentConfig   *config.Config
+	NodeName        string
 }
 
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -136,12 +137,37 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	// A BGP speaker should only care about the resources corresponding to it. Therefore, filter BGPAdvertisements,
+	// BGPPeers by the node name. If configuration is invalid, only the configurationstate for
+	// the concerned speaker will flag an error. In theory, it would be possible to filter IPPools, as well.
+	// However, this is cumbersome and the webhooks make it impossible for the user to push invalid configuration for
+	// pools, so the cost for filtering pools is not justified. We also deliberately do not filter L2Advertisements:
+	// the speakers need to know about all of the ads to build the proper candidate set for a service, therefore
+	// filtering would break this.
+	var node corev1.Node
+	key = client.ObjectKey{Name: r.NodeName}
+	if err := r.Get(ctx, key, &node); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get node for "+r.NodeName, "error", err)
+		return ctrl.Result{}, err
+	}
+
+	bgpAdvs, err := filterBGPAdvertisementsByNode(bgpAdvertisements.Items, node)
+	if err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to filter BGPAdvertisements", "error", err)
+		return ctrl.Result{}, err
+	}
+	peers, err := filterBGPPeersByNode(bgpPeers.Items, node)
+	if err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to filter BGPPeers", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	resources := config.ClusterResources{
 		Pools:           ipAddressPools.Items,
-		Peers:           bgpPeers.Items,
+		Peers:           peers,
 		BFDProfiles:     bfdProfiles.Items,
 		L2Advs:          l2Advertisements.Items,
-		BGPAdvs:         bgpAdvertisements.Items,
+		BGPAdvs:         bgpAdvs,
 		Communities:     communities.Items,
 		PasswordSecrets: secrets,
 		Nodes:           nodes.Items,
@@ -321,4 +347,46 @@ func (r *ConfigReconciler) reportCondition(ctx context.Context, conditionErr err
 	}
 
 	return nil
+}
+
+// filterBGPAdvertisementsByNode takes a slice of bgpAdvertisements and a node. It will return all
+// bgpAdvertisements that fulfill either condition:
+// - they have an empty nodeSelector
+// - their nodeSelector matches the provided node.
+func filterBGPAdvertisementsByNode(bgpAdvertisements []metallbv1beta1.BGPAdvertisement, node corev1.Node) ([]metallbv1beta1.BGPAdvertisement, error) {
+	return filterByNode(bgpAdvertisements, node, func(bgpAdv metallbv1beta1.BGPAdvertisement) []metav1.LabelSelector {
+		return bgpAdv.Spec.NodeSelectors
+	})
+}
+
+// filterBGPPeersByNode takes a slice of bgpPeers and a node. It will return all
+// bgpPeers that fulfill either condition:
+// - they have an empty nodeSelector
+// - their nodeSelector matches the provided node.
+func filterBGPPeersByNode(bgpPeers []metallbv1beta2.BGPPeer, node corev1.Node) ([]metallbv1beta2.BGPPeer, error) {
+	return filterByNode(bgpPeers, node, func(bgpPeer metallbv1beta2.BGPPeer) []metav1.LabelSelector {
+		return bgpPeer.Spec.NodeSelectors
+	})
+}
+
+// filterByNode implements the business logic for the more specific filter functions such as filterBGPPeersByNode.
+func filterByNode[T any](customResources []T, node corev1.Node, getNodeSelector func(T) []metav1.LabelSelector) ([]T, error) {
+	filteredCustomResources := make([]T, 0, len(customResources))
+	for _, customResource := range customResources {
+		ns := getNodeSelector(customResource)
+		// If the custom resource has no node selector, it matches all nodes.
+		if len(ns) == 0 {
+			filteredCustomResources = append(filteredCustomResources, customResource)
+			continue
+		}
+		// Otherwise, filter by label selector. If the label selector matches our node, append the custom resource.
+		nodes, err := config.FilterNodesWithLabelSelector([]corev1.Node{node}, ns)
+		if err != nil {
+			return nil, err
+		}
+		if len(nodes) > 0 {
+			filteredCustomResources = append(filteredCustomResources, customResource)
+		}
+	}
+	return filteredCustomResources, nil
 }

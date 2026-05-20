@@ -5,6 +5,7 @@ package configurationstatetests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -25,6 +26,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	hostnameLabel = "kubernetes.io/hostname"
 )
 
 var (
@@ -49,7 +54,7 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		cs := k8sclient.New()
 		allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(allNodes.Items)).To(BeNumerically(">", 0))
+		Expect(len(allNodes.Items)).To(BeNumerically(">", 1))
 
 		ginkgo.By("Verifying all ConfigurationStates exist and are valid")
 		Eventually(func() error {
@@ -61,10 +66,20 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
+		ginkgo.By("Clearing any configuration")
+		err := ConfigUpdater.Clean()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	ginkgo.It("speaker should have invalid result when BGPPeer references secret with wrong type", func() {
-		stateName := "speaker-" + allNodes.Items[0].Name
+	ginkgo.It("a single speaker should have invalid result when BGPPeer with nodeSelector references secret with wrong type", func() {
+		invalidNode := allNodes.Items[0]
+		invalidStateName := "speaker-" + invalidNode.Name
+		invalidNodeLabel := invalidNode.Labels[hostnameLabel]
+
+		validStateNames := make([]string, 0, len(allNodes.Items)-1)
+		for _, node := range allNodes.Items[1:] {
+			validStateNames = append(validStateNames, "speaker-"+node.Name)
+		}
 		wantStatus := metallbv1beta1.ConfigurationStateStatus{
 			Result:       metallbv1beta1.ConfigurationResultInvalid,
 			ErrorSummary: "configuration error: parsing peer peer1 secret type mismatch on \"metallb-system\"/\"bgp-password\", type \"kubernetes.io/basic-auth\" is expected \nfailed to parse peer peer1 password secret",
@@ -100,17 +115,28 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 						PasswordSecret: corev1.SecretReference{
 							Name: "bgp-password",
 						},
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									hostnameLabel: invalidNodeLabel,
+								},
+							},
+						},
 					},
 				},
 			},
 		}
-
 		err = ConfigUpdater.Update(resources)
 		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("Verifying status has invalid result with error message")
+		ginkgo.By("Verifying status has invalid result with error message on invalid node, and valid on others")
 		Eventually(func() error {
-			return stateMatches(stateName, wantStatus)
+			var errs []error
+			errs = append(errs, stateMatches(invalidStateName, wantStatus))
+			for _, stateName := range validStateNames {
+				errs = append(errs, stateMatches(stateName, validStatus))
+			}
+			return errors.Join(errs...)
 		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
 		ginkgo.By("Recreating secret with correct type")
@@ -133,9 +159,14 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		err = ConfigUpdater.Client().Create(context.Background(), secret)
 		Expect(err).NotTo(HaveOccurred())
 
-		ginkgo.By("Verifying status has valid result")
+		ginkgo.By("Verifying status for all nodes has valid result")
 		Eventually(func() error {
-			return stateMatches(stateName, validStatus)
+			var errs []error
+			errs = append(errs, stateMatches(invalidStateName, validStatus))
+			for _, stateName := range validStateNames {
+				errs = append(errs, stateMatches(stateName, validStatus))
+			}
+			return errors.Join(errs...)
 		}, 60*time.Second, 5*time.Second).Should(Succeed())
 	})
 
@@ -580,6 +611,93 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		Eventually(func() error {
 			return allStatesExist(allNodes)
 		}, 60*time.Second, 5*time.Second).Should(Succeed())
+	})
+
+	ginkgo.It("FRR - speaker should report node-specific validation results", func() {
+		node0 := allNodes.Items[0]
+		node1 := allNodes.Items[1]
+		speakerNode0 := "speaker-" + node0.Name
+		speakerNode1 := "speaker-" + node1.Name
+
+		ginkgo.By("Creating a valid secret for BGP peer authentication")
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "secret-valid",
+				Namespace: metallb.Namespace,
+			},
+			Type: corev1.SecretTypeBasicAuth,
+			StringData: map[string]string{
+				"password": "CorrectPassword",
+			},
+		}
+		err := ConfigUpdater.Client().Create(context.Background(), secret)
+		Expect(err).NotTo(HaveOccurred())
+		ginkgo.DeferCleanup(func() {
+			ConfigUpdater.Client().Delete(context.Background(), secret)
+		})
+
+		ginkgo.By("Configuring node 0 with a valid BGPPeer and node 1 with a BGPPeer referencing a non-existent BFD profile")
+		resources := config.Resources{
+			Peers: []metallbv1beta2.BGPPeer{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "peer-node-valid",
+					},
+					Spec: metallbv1beta2.BGPPeerSpec{
+						MyASN:   64512,
+						ASN:     64513,
+						Address: "192.168.100.1",
+						PasswordSecret: corev1.SecretReference{
+							Name: "secret-valid",
+						},
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									hostnameLabel: node0.Labels[hostnameLabel],
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "bgp-bfd",
+					},
+					Spec: metallbv1beta2.BGPPeerSpec{
+						MyASN:      64512,
+						ASN:        64513,
+						Address:    "192.168.100.3",
+						BFDProfile: "bfd-profile",
+						NodeSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									hostnameLabel: node1.Labels[hostnameLabel],
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err = ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred())
+
+		wantInvalid := metallbv1beta1.ConfigurationStateStatus{
+			Result:       metallbv1beta1.ConfigurationResultInvalid,
+			ErrorSummary: "configuration error: peer bgp-bfd referencing non existing bfd profile bfd-profile",
+		}
+
+		ginkgo.By("Verifying speaker on node 1 reports Invalid due to missing BFD profile")
+		Eventually(func() error {
+			return stateMatches(speakerNode1, wantInvalid)
+		}, 30*time.Second, 5*time.Second).Should(Succeed())
+
+		ginkgo.By("Verifying speaker on node 0 remains Valid")
+		Expect(stateMatches(speakerNode0, validStatus)).To(Succeed())
+
+		ginkgo.By("Verifying controller ConfigurationState remains Valid")
+		Expect(stateMatches("controller", validStatus)).To(Succeed())
 	})
 
 	ginkgo.It("should self-heal after deletion", func() {

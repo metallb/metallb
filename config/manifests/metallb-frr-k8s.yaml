@@ -1197,7 +1197,7 @@ spec:
                         asn:
                           description: ASN is the AS number to use for the local end
                             of the session.
-                          format: int32
+                          format: int64
                           maximum: 4294967295
                           minimum: 0
                           type: integer
@@ -1231,7 +1231,7 @@ spec:
                                 description: |-
                                   ASN is the AS number to use for the local end of the session.
                                   ASN and DynamicASN are mutually exclusive and one of them must be specified.
-                                format: int32
+                                format: int64
                                 maximum: 4294967295
                                 minimum: 0
                                 type: integer
@@ -1318,7 +1318,7 @@ spec:
                                   the router-level ASN for this specific session.
                                   Note: this field is only applicable to eBGP sessions (where the peer ASN differs
                                   from the router ASN). Setting it on an iBGP session is rejected.
-                                format: int32
+                                format: int64
                                 maximum: 4294967295
                                 minimum: 1
                                 type: integer
@@ -3345,7 +3345,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.24
+        image: quay.io/metallb/frr-k8s:v0.0.25
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3461,7 +3461,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.24
+        image: quay.io/metallb/frr-k8s:v0.0.25
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3619,7 +3619,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-reloader.sh /etc/frr_reloader/
-        image: quay.io/metallb/frr-k8s:v0.0.24
+        image: quay.io/metallb/frr-k8s:v0.0.25
         name: cp-reloader
         volumeMounts:
         - mountPath: /etc/frr_reloader
@@ -3628,7 +3628,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-metrics /etc/frr_metrics/
-        image: quay.io/metallb/frr-k8s:v0.0.24
+        image: quay.io/metallb/frr-k8s:v0.0.25
         name: cp-metrics
         volumeMounts:
         - mountPath: /etc/frr_metrics
@@ -3637,7 +3637,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-status /etc/frr_status/
-        image: quay.io/metallb/frr-k8s:v0.0.24
+        image: quay.io/metallb/frr-k8s:v0.0.25
         name: cp-frr-status
         volumeMounts:
         - mountPath: /etc/frr_status
