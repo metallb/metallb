@@ -2,6 +2,51 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.16.0
+
+**NOTE: From this version on, frr-k8s is the default backend for BGP. In order to ease the development, all new features will be added only to**
+**this backend. The FRR mode will be deprecated with the ultimate goal of removing it in the future.**
+
+### Feature
+
+- FRR-K8s is now the default BGP mode, replacing the FRR mode which is now deprecated.
+  FRR-K8s provides the same featureset that MetalLB exposed via FRR mode, while also
+  enabling users to merge additional FRR configuration and share BGP sessions with other
+  actors. Maintaining both FRR and FRR-K8s as parallel implementations is costly, and
+  consolidating on FRR-K8s allows us to focus development effort on a single, more capable backend.
+  Going forward, new BGP features and improvements will be made in FRR-K8s only.
+  The native BGP implementation remains available for deployments that require a smaller footprint.
+  FRR mode will continue to work but will be removed in a future release. See the installation
+  and BGP concepts pages for information. (#2965, @oribon)
+- Add `localASN` field to `BGPPeer` to allow per-peer local-AS override via FRR's `local-as <ASN> no-prepend replace-as`. (#2997, @adilGhaffarDev)
+- BGP debounce timeout for FRR configuration reloads is configurable. Only applies when METALLB_BGP_TYPE=frr. Can also be set via METALLB_BGP_DEBOUNCE_TIMEOUT or by bgp-debounce-timeout flag, default is 3000 ms. (#2952, @adilGhaffarDev)
+- Bump frr-k8s dependency to v0.0.23 (#2998, @oribon)
+- Bump frr-k8s dependency to v0.0.24 (#3039, @adilGhaffarDev)
+- Bump frr-k8s to 0.0.22 and align frr mode to log to stdout instead of a file, enabling log rotation (as done in frr-k8s) (#2903, @oribon)
+- Exposes the underlying memberlist configuration and make it configurable via env variables. (#2956, @SteffenLindner)
+- Extend the advertisement resources with a ServiceSelector, allowing an advertisement to target only a set of services within its selected pools. (#2917, @oribon)
+- Replace kube-rbac-proxy with native TLS and RBAC, which enables configuring some TLS parameters. The old HTTP endpoints are no longer available, they are now HTTPS served by self-signed certificates / certificates passed to the binaries. (#2979, @oribon)
+- Use FRR version 10.5.1 for FRR-mode (#2970, @smoshiur1237)
+- Use FRR version 10.5.3 for FRR-mode (#2993, @booxter)
+- Bump frrk8s to 0.0.25 (#3041, @fedepaol)+ echo Contributors
+
+### Bug or Regression
+
+- Add OwnerRef to ConfigurationState resources, enabling cleanup by the k8s gc. (#3017, @oribon)
+- Allocation: fix the AllocationFailed event to indicate when the pool doesn't have any IPs left. (#2891, @oribon)
+- Fix ConfigurationState to be updated when the resource is recreated. (#2953, @oribon)
+- Fix L2 speaker election ignoring service selectors, making sure only the relevant L2Advertisements for the service are considered. (#3014, @oribon)
+- Fix never changing session down metric with peer address in native mode. All the other events are generated with address:port, here we restore to the original format with the address only. (#2879, @fedepaol)
+- Fixes invalid maximum value in CRD validation of ASNs in Kubernetes v1.36.0 (#3035, @PseudoResonance)
+- L2Status controller: fix a scenario where two speakers try to modify the same status resource (#2938, @oribon)
+- Simplify hasHealthyEndpoint logic in BGP controller to correctly handle endpoint health when IP addresses are reused (e.g., during KubeVirt migrations). (#2908, @tarabrind)
+- Speakers now only parse BGP configuration resources (BGPPeers, BGPAdvertisements) that target them via node selectors, preventing unrelated misconfigurations from affecting other speakers. (#3026, @andreaskaris)
+
+
+This release includes contributions from:
+
+Andreas Karis, Anvesh J, Denis Tarabrin, dependabot[bot], evgenLevin, Federico Paolinelli, Gregory Kopels, Ihar Hrachyshka, Jakob Hahn, Jeppe Lund Andersen, Marcin Klekowiecki, Muhammad Adil Ghaffar, Ori Braunshtein, PseudoResonance, smoshiur1237, Steffen Lindner, Tyler Auerbeck
+
 ## Version 0.15.3
 
 ### New Features
