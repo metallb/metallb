@@ -4,7 +4,7 @@ package consts
 
 const (
 	// BGPConfigFile contains the FRR configuration file.
-	BGPConfigFile = "frr.conf"
+	BGPConfigFile = "frr.conf.new"
 	// DaemonsConfigFile contains the frr daemons configuration file.
 	DaemonsConfigFile = "daemons"
 )
