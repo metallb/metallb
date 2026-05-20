@@ -24,6 +24,7 @@ spec:
       annotations:
         {{- if .Values.prometheus.scrapeAnnotations }}
         prometheus.io/scrape: "true"
+        prometheus.io/scheme: "https"
         prometheus.io/port: "{{ .Values.prometheus.metricsPort }}"
         {{- end }}
         {{- with .Values.controller.podAnnotations }}
