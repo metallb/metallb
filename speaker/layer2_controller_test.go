@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"sort"
 	"testing"
 
@@ -2328,6 +2329,55 @@ func TestIPAdvertisementFor(t *testing.T) {
 			r := ipAdvertisementFor(test.ip, test.l2Advertisements)
 			if !r.Equal(&test.expect) {
 				t.Errorf("expect %+v, but got %+v", test.expect, r)
+			}
+		})
+	}
+}
+
+func TestSortL2Candidates(t *testing.T) {
+	tests := []struct {
+		desc       string
+		candidates []string
+		ip         string
+		want       []string
+	}{
+		{
+			desc:       "empty input",
+			candidates: nil,
+			ip:         "10.0.0.1",
+			want:       nil,
+		},
+		{
+			desc:       "single candidate",
+			candidates: []string{"node-a"},
+			ip:         "10.0.0.1",
+			want:       []string{"node-a"},
+		},
+		{
+			desc:       "stable hash order independent of input order",
+			candidates: []string{"node-a", "node-b", "node-c"},
+			ip:         "10.0.0.1",
+			want:       []string{"node-b", "node-a", "node-c"},
+		},
+		{
+			desc:       "hash order depends on the IP",
+			candidates: []string{"node-a", "node-b", "node-c"},
+			ip:         "10.0.0.2",
+			want:       []string{"node-b", "node-c", "node-a"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			// Sort an unrelated permutation to confirm output is determined by hash.
+			permuted := slices.Clone(test.candidates)
+			for i := range permuted {
+				j := (i + 1) % len(permuted)
+				permuted[i], permuted[j] = permuted[j], permuted[i]
+			}
+			sortL2Candidates(permuted, test.ip)
+			if !slices.Equal(permuted, test.want) {
+				t.Fatalf("sortL2Candidates(%v, %q) = %v, want %v",
+					test.candidates, test.ip, permuted, test.want)
 			}
 		})
 	}

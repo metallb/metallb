@@ -109,15 +109,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 
 	// Using the first IP should work for both single and dual stack.
 	ipString := toAnnounce[0].String()
-	// Sort the slice by the hash of node + load balancer ips. This
-	// produces an ordering of ready nodes that is unique to all the services
-	// with the same ip.
-	sort.Slice(availableNodes, func(i, j int) bool {
-		hi := sha256.Sum256([]byte(availableNodes[i] + "#" + ipString))
-		hj := sha256.Sum256([]byte(availableNodes[j] + "#" + ipString))
-
-		return bytes.Compare(hi[:], hj[:]) < 0
-	})
+	sortL2Candidates(availableNodes, ipString)
 
 	// Are we first in the list? If so, we win and should announce.
 	if len(availableNodes) > 0 && availableNodes[0] == c.myNode {
@@ -175,6 +167,17 @@ func (c *layer2Controller) SetNode(l log.Logger, n *v1.Node) error {
 
 func (c *layer2Controller) SetEventCallback(callback func(interface{})) {
 	// Do nothing
+}
+
+// sortL2Candidates orders the candidate nodes by the sha256 hash of
+// node + "#" + ip so every speaker observes the same ordering and the
+// L2 election is deterministic across the cluster.
+func sortL2Candidates(candidates []string, ip string) {
+	sort.Slice(candidates, func(i, j int) bool {
+		hi := sha256.Sum256([]byte(candidates[i] + "#" + ip))
+		hj := sha256.Sum256([]byte(candidates[j] + "#" + ip))
+		return bytes.Compare(hi[:], hj[:]) < 0
+	})
 }
 
 func ipAdvertisementFor(ip net.IP, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
