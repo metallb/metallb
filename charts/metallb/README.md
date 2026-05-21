@@ -59,10 +59,10 @@ Kubernetes: `>= 1.19.0-0`
 | controller.webhookMode | string | `"enabled"` |  |
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
-| frr-k8s.prometheus | string | `nil` |  |
-| frrk8s.enabled | bool | `true` |  |
-| frrk8s.external | bool | `false` |  |
-| frrk8s.namespace | string | `""` |  |
+| frr-k8s.prometheus.serviceMonitor.enabled | bool | `false` | Enable Prometheus ServiceMonitor for frr-k8s metrics. |
+| frrk8s.enabled | bool | `true` | If set, enables frrk8s as a backend. This is mutually exclusive to frr mode. |
+| frrk8s.external | bool | `false` | If true, uses an external frr-k8s installation instead of the bundled subchart. |
+| frrk8s.namespace | string | `""` | Namespace where external frr-k8s is installed (only used when external=true). |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
