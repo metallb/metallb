@@ -368,23 +368,34 @@ frrk8s:
   external: false
   namespace: ""
 
-frr-k8s:
-  prometheus:
-    # The FRR-K8s BGP/BFD metrics are exposed with the "frrk8s_" prefix
-    # (e.g. frrk8s_bgp_session_up, frrk8s_bfd_session_up).
-    # To rename them to the legacy "metallb_" prefix for backward compatibility
-    # with existing dashboards or alerts, uncomment section below.
-    # serviceMonitor:
-    #   enabled: true
-    #   metricRelabelings:
-    #   - sourceLabels: [__name__]
-    #     regex: "frrk8s_bgp_(.*)"
-    #     targetLabel: "__name__"
-    #     replacement: "metallb_bgp_$1"
-    #   - sourceLabels: [__name__]
-    #     regex: "frrk8s_bfd_(.*)"
-    #     targetLabel: "__name__"
-    #     replacement: "metallb_bfd_$1"
+# The frr-k8s subchart inherits its `prometheus:` defaults from
+# charts/frr-k8s/values.yaml. The block below is an empty map on purpose:
+# previously this file declared `frr-k8s.prometheus:` with only commented
+# child keys, which parses as a null map and then nukes the frr-k8s
+# subchart's own `prometheus:` defaults via Helm's value deep-merge.
+# The next render of `frr-k8s/templates/service-monitor.yaml` aborted on a
+# nil dereference at `.Values.prometheus.serviceMonitor.enabled` and the
+# whole install failed.
+#
+# To rename frr-k8s BGP/BFD metrics from the "frrk8s_" prefix to the
+# legacy "metallb_" prefix (for backward compatibility with existing
+# dashboards or alerts), replace the `frr-k8s: {}` line below with the
+# block (note: no leading spaces, paste at the top level of this file):
+#
+# frr-k8s:
+#   prometheus:
+#     serviceMonitor:
+#       enabled: true
+#       metricRelabelings:
+#       - sourceLabels: [__name__]
+#         regex: "frrk8s_bgp_(.*)"
+#         targetLabel: "__name__"
+#         replacement: "metallb_bgp_$1"
+#       - sourceLabels: [__name__]
+#         regex: "frrk8s_bfd_(.*)"
+#         targetLabel: "__name__"
+#         replacement: "metallb_bfd_$1"
+frr-k8s: {}
 
 # networkpolicies
 networkpolicies:

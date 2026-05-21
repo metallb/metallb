@@ -59,7 +59,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.webhookMode | string | `"enabled"` |  |
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
-| frr-k8s.prometheus | string | `nil` |  |
+| frr-k8s | object | `{}` |  |
 | frrk8s.enabled | bool | `true` |  |
 | frrk8s.external | bool | `false` |  |
 | frrk8s.namespace | string | `""` |  |
