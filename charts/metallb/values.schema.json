@@ -361,7 +361,7 @@
             },
             "bgpDebounceTimeout": {
               "anyOf": [
-                { "type": "integer", "minimum": 0 },
+                { "type": "integer", "minimum": 1 },
                 { "type": "null" }
               ]
             },
