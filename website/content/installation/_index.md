@@ -63,21 +63,21 @@ Choose the one that fits your deployment:
 which provides BGP with BFD support, IPv6, and the ability to merge additional FRR configuration:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.16.0/config/manifests/metallb-frr-k8s.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.16.1/config/manifests/metallb-frr-k8s.yaml
 ```
 
 **Native mode** -- a lightweight deployment with the built-in native BGP implementation
 (no BFD, no IPv6 BGP). Suitable for L2-only or simple BGP setups:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.16.0/config/manifests/metallb-native.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.16.1/config/manifests/metallb-native.yaml
 ```
 
 **FRR mode (deprecated)** -- configures [FRR directly]({{% relref "concepts/bgp.md" %}}#frr-mode-deprecated)
 without the FRR-K8s layer. Migrate to FRR-K8s mode instead:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.16.0/config/manifests/metallb-frr.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.16.1/config/manifests/metallb-frr.yaml
 ```
 
 {{% notice note %}}
@@ -106,7 +106,7 @@ need to be changed.
 
 {{% notice note %}}
 
-You may notice the "prometheus" variants of the manifests (for example `https://raw.githubusercontent.com/metallb/metallb/v0.16.0/config/manifests/metallb-native-prometheus.yaml`).
+You may notice the "prometheus" variants of the manifests (for example `https://raw.githubusercontent.com/metallb/metallb/v0.16.1/config/manifests/metallb-native-prometheus.yaml`).
 Those manifests rely on a very specific way of deploying Prometheus via the [kube prometheus](https://github.com/prometheus-operator/kube-prometheus) repository, and
 are mainly used by our CI, but they might not be compatible to your Prometheus deployment.
 
@@ -135,7 +135,7 @@ To deploy with the native BGP implementation:
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb/config/native?ref=v0.16.0
+  - github.com/metallb/metallb/config/native?ref=v0.16.1
 ```
 
 To deploy with the [FRR mode]({{% relref "concepts/bgp.md" %}}#frr-mode-deprecated) (**deprecated**):
@@ -145,7 +145,7 @@ To deploy with the [FRR mode]({{% relref "concepts/bgp.md" %}}#frr-mode-deprecat
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb/config/frr?ref=v0.16.0
+  - github.com/metallb/metallb/config/frr?ref=v0.16.1
 ```
 
 ## Installation with Helm
