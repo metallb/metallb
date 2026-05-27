@@ -49,6 +49,8 @@ import (
 )
 
 const (
+	DefaultHealthProbePort = 17472
+
 	caName          = "cert"
 	caOrganization  = "metallb"
 	MLSecretKeyName = "secretkey"
@@ -94,26 +96,27 @@ type Client struct {
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
 type Config struct {
-	ProcessName         string
-	NodeName            string
-	PodName             string
-	MetricsPort         int
-	PprofBindAddress    string
-	ReadEndpoints       bool
-	Logger              log.Logger
-	Namespace           string
-	ValidateConfig      config.Validate
-	EnableWebhook       bool
-	TLSOpt              func(*tls.Config)
-	DisableCertRotation bool
-	MetricsCertDir      string
-	WebhookSecretName   string
-	CertDir             string
-	CertServiceName     string
-	LoadBalancerClass   string
-	WebhookWithHTTP2    bool
-	WithFRRK8s          bool
-	FRRK8sNamespace     string
+	ProcessName            string
+	NodeName               string
+	PodName                string
+	MetricsPort            int
+	PprofBindAddress       string
+	HealthProbeBindAddress string
+	ReadEndpoints          bool
+	Logger                 log.Logger
+	Namespace              string
+	ValidateConfig         config.Validate
+	EnableWebhook          bool
+	TLSOpt                 func(*tls.Config)
+	DisableCertRotation    bool
+	MetricsCertDir         string
+	WebhookSecretName      string
+	CertDir                string
+	CertServiceName        string
+	LoadBalancerClass      string
+	WebhookWithHTTP2       bool
+	WithFRRK8s             bool
+	FRRK8sNamespace        string
 	Listener
 	Layer2StatusChan    <-chan event.GenericEvent
 	Layer2StatusFetcher controllers.L2StatusFetcher
@@ -159,7 +162,7 @@ func New(cfg *Config) (*Client, error) {
 		Cache:                  cache.Options{ByObject: objectsPerNamespace},
 		WebhookServer:          webhookServer(cfg),
 		Metrics:                metricsOpts,
-		HealthProbeBindAddress: "127.0.0.1:17472",
+		HealthProbeBindAddress: cfg.HealthProbeBindAddress,
 		PprofBindAddress:       cfg.PprofBindAddress,
 	}
 
