@@ -670,7 +670,7 @@ spec:
                   via "neighbor <peer> local-as <ASN> no-prepend replace-as", overriding
                   the router-level MyASN for this specific session.
                   Not supported in native BGP mode.
-                format: int32
+                format: int64
                 maximum: 4294967295
                 minimum: 1
                 type: integer
@@ -2137,7 +2137,6 @@ spec:
         livenessProbe:
           failureThreshold: 3
           httpGet:
-            host: 127.0.0.1
             path: /healthz
             port: 17472
           initialDelaySeconds: 10
@@ -2154,7 +2153,6 @@ spec:
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            host: 127.0.0.1
             path: /readyz
             port: 17472
           initialDelaySeconds: 10

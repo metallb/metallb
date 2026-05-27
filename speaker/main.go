@@ -94,6 +94,7 @@ func main() {
 		port                = flag.Int("port", 9120, "HTTPS metrics listening port")
 		logLevel            = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		pprofBindAddress    = flag.String("pprof-bind-address", "", "Bind address for pprof endpoint (e.g. 127.0.0.1:6060). Empty disables pprof.")
+		healthProbePort     = flag.Int("health-probe-port", k8s.DefaultHealthProbePort, "Port for health probe endpoint")
 		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		ignoreLBExclude     = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
 		frrK8sNamespace     = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
@@ -241,12 +242,13 @@ func main() {
 		PodName:     *myPod,
 		Logger:      logger,
 
-		MetricsPort:      *port,
-		PprofBindAddress: *pprofBindAddress,
-		TLSOpt:           tlsOpt,
-		MetricsCertDir:   *metricsCertDir,
-		ReadEndpoints:    true,
-		Namespace:        *namespace,
+		MetricsPort:            *port,
+		PprofBindAddress:       *pprofBindAddress,
+		HealthProbeBindAddress: fmt.Sprintf("127.0.0.1:%d", *healthProbePort),
+		TLSOpt:                 tlsOpt,
+		MetricsCertDir:         *metricsCertDir,
+		ReadEndpoints:          true,
+		Namespace:              *namespace,
 
 		Listener: k8s.Listener{
 			ServiceChanged: ctrl.SetBalancer,

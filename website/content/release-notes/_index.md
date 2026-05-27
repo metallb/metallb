@@ -2,6 +2,18 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.16.1
+
+### Bug or Regression
+
+- Fix helm chart rendering issue when default values are provided. (#3058, @fedepaol)
+- Fixed BGPPeer v1beta2 schema: `localASN` now correctly declares `format: int64` (was `int32`, which cannot represent the declared `Maximum=4294967295`). (#3054, @lexfrei)
+- Fixed controller health probes and the health bind address is now configurable and defaults to all interfaces (#3062, @Jakob3xD)
+- Helm chart: pod-level `prometheus.io/scrape` annotations, the `PodMonitor` endpoints, and the annotation-only Service objects bundled with the ServiceMonitor now all emit `scheme: https` to match the HTTPS-only metrics endpoint introduced in v0.16.0. Annotation-based and PodMonitor-based Prometheus scrapers no longer fail with TLS handshake errors against the metrics port. (#3055, @lexfrei) 
+
+This release includes contributions from:
+Aleksei Sviridkin, Federico Paolinelli, Jakob Hahn, + end
+
 ## Version 0.16.0
 
 **NOTE: From this version on, frr-k8s is the default backend for BGP. In order to ease the development, all new features will be added only to**
