@@ -123,8 +123,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 17472
-            host: 127.0.0.1
+            port: {{ .Values.controller.livenessProbe.port }}
           initialDelaySeconds: {{ .Values.controller.livenessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.controller.livenessProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.controller.livenessProbe.timeoutSeconds }}
@@ -135,8 +134,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 17472
-            host: 127.0.0.1
+            port: {{ .Values.controller.readinessProbe.port }}
           initialDelaySeconds: {{ .Values.controller.readinessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.controller.readinessProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.controller.readinessProbe.timeoutSeconds }}

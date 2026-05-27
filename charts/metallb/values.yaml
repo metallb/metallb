@@ -233,6 +233,7 @@ controller:
   labels: {}
   livenessProbe:
     enabled: true
+    port: 17472
     failureThreshold: 3
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -240,6 +241,7 @@ controller:
     timeoutSeconds: 1
   readinessProbe:
     enabled: true
+    port: 17472
     failureThreshold: 3
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -307,6 +309,7 @@ speaker:
   labels: {}
   livenessProbe:
     enabled: true
+    port: 17472
     failureThreshold: 3
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -314,6 +317,7 @@ speaker:
     timeoutSeconds: 1
   readinessProbe:
     enabled: true
+    port: 17472
     failureThreshold: 3
     initialDelaySeconds: 10
     periodSeconds: 10

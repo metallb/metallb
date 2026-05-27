@@ -3260,7 +3260,6 @@ spec:
         livenessProbe:
           failureThreshold: 3
           httpGet:
-            host: 127.0.0.1
             path: /healthz
             port: 17472
           initialDelaySeconds: 10
@@ -3277,7 +3276,6 @@ spec:
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            host: 127.0.0.1
             path: /readyz
             port: 17472
           initialDelaySeconds: 10

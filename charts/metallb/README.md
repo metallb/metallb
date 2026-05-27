@@ -34,6 +34,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.livenessProbe.failureThreshold | int | `3` |  |
 | controller.livenessProbe.initialDelaySeconds | int | `10` |  |
 | controller.livenessProbe.periodSeconds | int | `10` |  |
+| controller.livenessProbe.port | int | `17472` |  |
 | controller.livenessProbe.successThreshold | int | `1` |  |
 | controller.livenessProbe.timeoutSeconds | int | `1` |  |
 | controller.logLevel | string | `"info"` | Controller log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none` |
@@ -44,6 +45,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.readinessProbe.failureThreshold | int | `3` |  |
 | controller.readinessProbe.initialDelaySeconds | int | `10` |  |
 | controller.readinessProbe.periodSeconds | int | `10` |  |
+| controller.readinessProbe.port | int | `17472` |  |
 | controller.readinessProbe.successThreshold | int | `1` |  |
 | controller.readinessProbe.timeoutSeconds | int | `1` |  |
 | controller.resources | object | `{}` |  |
@@ -139,6 +141,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.livenessProbe.failureThreshold | int | `3` |  |
 | speaker.livenessProbe.initialDelaySeconds | int | `10` |  |
 | speaker.livenessProbe.periodSeconds | int | `10` |  |
+| speaker.livenessProbe.port | int | `17472` |  |
 | speaker.livenessProbe.successThreshold | int | `1` |  |
 | speaker.livenessProbe.timeoutSeconds | int | `1` |  |
 | speaker.logLevel | string | `"info"` | Speaker log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none` |
@@ -153,6 +156,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.readinessProbe.failureThreshold | int | `3` |  |
 | speaker.readinessProbe.initialDelaySeconds | int | `10` |  |
 | speaker.readinessProbe.periodSeconds | int | `10` |  |
+| speaker.readinessProbe.port | int | `17472` |  |
 | speaker.readinessProbe.successThreshold | int | `1` |  |
 | speaker.readinessProbe.timeoutSeconds | int | `1` |  |
 | speaker.reloader.resources | object | `{}` |  |
