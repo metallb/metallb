@@ -582,6 +582,23 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		ginkgo.By("configure peer with localASN")
 
+		// For iBGP containers, update router ASN to match localASN before creating BGPPeers.
+		// This is needed because when MetalLB advertises localASN, the external FRR
+		// must also use localASN as its own ASN to maintain iBGP (same ASN on both sides).
+		// Save original values to restore after the test.
+		originalASNs := make(map[string]uint32)
+		for _, c := range FRRContainers {
+			originalASNs[c.Name] = c.RouterConfig.ASN
+			if c.RouterConfig.ASN == metalLBASN {
+				c.RouterConfig.ASN = localASN
+			}
+		}
+		defer func() {
+			for _, c := range FRRContainers {
+				c.RouterConfig.ASN = originalASNs[c.Name]
+			}
+		}()
+
 		resources := config.Resources{
 			Peers: metallb.PeersForContainers(FRRContainers, ipFamily, func(p *metallbv1beta2.BGPPeer) {
 				p.Spec.LocalASN = localASN
@@ -611,7 +628,9 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 	},
 		ginkgo.Entry("FRR-MODE IPV4", ipfamily.IPv4),
-		ginkgo.Entry("FRR-MODE IPV6", ipfamily.IPv6))
+		ginkgo.Entry("FRR-MODE IPV6", ipfamily.IPv6),
+		ginkgo.Entry("FRRK8S-MODE IPV4", ipfamily.IPv4),
+		ginkgo.Entry("FRRK8S-MODE IPV6", ipfamily.IPv6))
 
 	ginkgo.DescribeTable("validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
