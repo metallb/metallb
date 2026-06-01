@@ -38,6 +38,7 @@ import (
 
 // Service offers methods to mutate a Kubernetes service object.
 type service interface {
+	Update(svc *v1.Service) error
 	UpdateStatus(svc *v1.Service) error
 	Infof(svc *v1.Service, desc, msg string, args ...interface{})
 	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
@@ -92,6 +93,14 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		syncStateRes = controllers.SyncStateReprocessAll
 	}
 
+	cleanedDeprecatedManagedAnnotation := false
+	if hasDeprecatedManagedAnnotation(svcRo) && hasManagedAnnotation(svc) {
+		level.Warn(l).Log("event", "deprecatedAnnotation", "annotation", DeprecatedAnnotationIPAllocateFromPool, "msg", "The used annotation is deprecated. Removing it.")
+		c.client.Errorf(svcRo, "deprecatedAnnotation", "Service uses deprecated annotation %s", DeprecatedAnnotationIPAllocateFromPool)
+		delete(svc.Annotations, DeprecatedAnnotationIPAllocateFromPool)
+		cleanedDeprecatedManagedAnnotation = true
+	}
+
 	if reflect.DeepEqual(svcRo, svc) {
 		level.Debug(l).Log("event", "noChange", "msg", "service converged, no change")
 		return syncStateRes
@@ -102,6 +111,9 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	// However, generating an event every time the svc is processed would be very noisy.
 	// Therefore, we check for deprecated annotations only, if there is something to do.
 	for key := range svcRo.Annotations {
+		if key == DeprecatedAnnotationIPAllocateFromPool && cleanedDeprecatedManagedAnnotation {
+			continue
+		}
 		if strings.HasPrefix(key, DeprecatedAnnotationPrefix) {
 			level.Warn(l).Log("event", "deprecatedAnnotation", "annotation", key, "msg", "The used annotation is deprecated. Support might get removed in future versions")
 			c.client.Errorf(svcRo, "deprecatedAnnotation", "Service uses deprecated annotation %s", key)
@@ -119,26 +131,45 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		}
 	}
 
-	toWrite := svcRo.DeepCopy()
-	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
-		toWrite.Status = svc.Status
-	}
-
-	if !reflect.DeepEqual(svcRo.Annotations, svc.Annotations) {
+	if cleanedDeprecatedManagedAnnotation {
+		toWrite := svcRo.DeepCopy()
 		toWrite.Annotations = svc.Annotations
+		if err := c.client.Update(toWrite); err != nil {
+			level.Error(l).Log("op", "updateService", "error", err, "msg", "failed to update service")
+			return controllers.SyncStateError
+		}
 	}
 
-	if !reflect.DeepEqual(toWrite, svcRo) {
+	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
 		if err := c.client.UpdateStatus(svc); err != nil {
 			level.Error(l).Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service")
 			return controllers.SyncStateError
 		}
+	}
+
+	if cleanedDeprecatedManagedAnnotation || !reflect.DeepEqual(svcRo.Status, svc.Status) {
 		level.Info(l).Log("event", "serviceUpdated", "msg", "updated service object")
 		return syncStateRes
 	}
 
 	level.Info(l).Log("event", "serviceUpdated", "msg", "service is not updated")
 	return syncStateRes
+}
+
+func hasDeprecatedManagedAnnotation(svc *v1.Service) bool {
+	if svc == nil || svc.Annotations == nil {
+		return false
+	}
+	_, ok := svc.Annotations[DeprecatedAnnotationIPAllocateFromPool]
+	return ok
+}
+
+func hasManagedAnnotation(svc *v1.Service) bool {
+	if svc == nil || svc.Annotations == nil {
+		return false
+	}
+	_, ok := svc.Annotations[AnnotationIPAllocateFromPool]
+	return ok
 }
 
 func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.SyncState {
