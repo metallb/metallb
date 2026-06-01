@@ -145,6 +145,7 @@ spec:
         {{- if .Values.prometheus.scrapeAnnotations }}
         prometheus.io/scrape: "true"
         {{- if not .Values.speaker.frr.enabled }}
+        prometheus.io/scheme: "https"
         prometheus.io/port: "{{ .Values.prometheus.metricsPort }}"
         {{- end }}
         {{- end }}
@@ -353,7 +354,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 17472
+            port: {{ .Values.speaker.livenessProbe.port }}
             host: 127.0.0.1
           initialDelaySeconds: {{ .Values.speaker.livenessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.speaker.livenessProbe.periodSeconds }}
@@ -365,7 +366,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 17472
+            port: {{ .Values.speaker.readinessProbe.port }}
             host: 127.0.0.1
           initialDelaySeconds: {{ .Values.speaker.readinessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.speaker.readinessProbe.periodSeconds }}

@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, c := range FRRContainers {
-			err := c.UpdateBGPConfigFile(frrconfig.Empty)
+			err := c.UpdateConfigFile(frrconfig.Empty)
 			Expect(err).NotTo(HaveOccurred())
 		}
 		cs = k8sclient.New()
@@ -485,7 +485,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 
 				configStr, err := frrconfig.BGPConfigFromRouterConfig(bgpConfig)
 				Expect(err).NotTo(HaveOccurred())
-				err = c.UpdateBGPConfigFile(configStr)
+				err = c.UpdateConfigFile(configStr)
 				Expect(err).NotTo(HaveOccurred())
 			}
 

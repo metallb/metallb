@@ -66,6 +66,7 @@ kind: Service
 metadata:
   annotations:
     prometheus.io/scrape: "true"
+    prometheus.io/scheme: "https"
   {{- if .Values.prometheus.serviceMonitor.speaker.annotations }}
 {{ toYaml .Values.prometheus.serviceMonitor.speaker.annotations | indent 4 }}
   {{- end }}
@@ -140,6 +141,7 @@ kind: Service
 metadata:
   annotations:
     prometheus.io/scrape: "true"
+    prometheus.io/scheme: "https"
   {{- if .Values.prometheus.serviceMonitor.controller.annotations }}
 {{ toYaml .Values.prometheus.serviceMonitor.controller.annotations | indent 4 }}
   {{- end }}

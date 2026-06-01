@@ -25,6 +25,7 @@ spec:
   podMetricsEndpoints:
   - port: monitoring
     path: /metrics
+    scheme: https
     {{- if .Values.prometheus.podMonitor.interval }}
     interval: {{ .Values.prometheus.podMonitor.interval }}
     {{- end }}
@@ -64,6 +65,7 @@ spec:
   podMetricsEndpoints:
   - port: monitoring
     path: /metrics
+    scheme: https
     {{- if .Values.prometheus.podMonitor.interval }}
     interval: {{ .Values.prometheus.podMonitor.interval }}
     {{- end }}

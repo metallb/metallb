@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, c := range FRRContainers {
-			err := c.UpdateBGPConfigFile(frrconfig.Empty)
+			err := c.UpdateConfigFile(frrconfig.Empty)
 			Expect(err).NotTo(HaveOccurred())
 		}
 
