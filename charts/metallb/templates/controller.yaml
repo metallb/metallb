@@ -63,6 +63,7 @@ spec:
         {{- end }}
         args:
         - --port={{ .Values.prometheus.metricsPort }}
+        - --health-probe-port={{ .Values.controller.livenessProbe.port }}
         {{- with .Values.controller.logLevel }}
         - --log-level={{ . }}
         {{- end }}
