@@ -249,7 +249,7 @@ spec:
                   via "neighbor <peer> local-as <ASN> no-prepend replace-as", overriding
                   the router-level MyASN for this specific session.
                   Not supported in native BGP mode.
-                format: int32
+                format: int64
                 maximum: 4294967295
                 minimum: 1
                 type: integer

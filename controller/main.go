@@ -164,6 +164,7 @@ func main() {
 		deployName          = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
 		logLevel            = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		pprofBindAddress    = flag.String("pprof-bind-address", "", "Bind address for pprof endpoint (e.g. 127.0.0.1:6060). Empty disables pprof.")
+		healthProbePort     = flag.Int("health-probe-port", k8s.DefaultHealthProbePort, "Port for health probe endpoint")
 		disableCertRotation = flag.Bool("disable-cert-rotation", false, "disable automatic generation and rotation of webhook TLS certificates/keys")
 		certDir             = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
 		certServiceName     = flag.String("cert-service-name", "metallb-webhook-service", "The service name used to generate the TLS cert's hostname")
@@ -223,11 +224,12 @@ func main() {
 	validation := config.ValidationFor(bgpType)
 
 	cfg := &k8s.Config{
-		ProcessName:      "metallb-controller",
-		PodName:          *myPod,
-		MetricsPort:      *port,
-		PprofBindAddress: *pprofBindAddress,
-		Logger:           logger,
+		ProcessName:            "metallb-controller",
+		PodName:                *myPod,
+		MetricsPort:            *port,
+		PprofBindAddress:       *pprofBindAddress,
+		HealthProbeBindAddress: fmt.Sprintf(":%d", *healthProbePort),
+		Logger:                 logger,
 
 		Namespace: *namespace,
 		Listener: k8s.Listener{

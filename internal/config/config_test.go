@@ -4,6 +4,7 @@ package config
 
 import (
 	"net"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -3924,6 +3925,66 @@ func TestContainsAdvertisement(t *testing.T) {
 			},
 			expect: false,
 		},
+		{
+			desc: "Ads carrying preferences never dedupe so speaker can sum weights",
+			advs: []*L2Advertisement{
+				{
+					Nodes:          map[string]bool{"edge-a": true},
+					AllInterfaces:  true,
+					PreferredNodes: map[string]int64{"edge-a": 50},
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes:          map[string]bool{"edge-a": true},
+				AllInterfaces:  true,
+				PreferredNodes: map[string]int64{"edge-a": 50},
+			},
+			expect: false,
+		},
+		{
+			desc: "Existing ad has preferences but candidate does not should not dedupe",
+			advs: []*L2Advertisement{
+				{
+					Nodes:          map[string]bool{"edge-a": true},
+					AllInterfaces:  true,
+					PreferredNodes: map[string]int64{"edge-a": 50},
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes:         map[string]bool{"edge-a": true},
+				AllInterfaces: true,
+			},
+			expect: false,
+		},
+		{
+			desc: "Candidate has preferences but existing ad does not should not dedupe",
+			advs: []*L2Advertisement{
+				{
+					Nodes:         map[string]bool{"edge-a": true},
+					AllInterfaces: true,
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes:          map[string]bool{"edge-a": true},
+				AllInterfaces:  true,
+				PreferredNodes: map[string]int64{"edge-a": 50},
+			},
+			expect: false,
+		},
+		{
+			desc: "Identical ads without preferences still dedupe",
+			advs: []*L2Advertisement{
+				{
+					Nodes:         map[string]bool{"a": true},
+					AllInterfaces: true,
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes:         map[string]bool{"a": true},
+				AllInterfaces: true,
+			},
+			expect: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
@@ -4346,6 +4407,249 @@ func TestServiceSelectors(t *testing.T) {
 
 			if diff := cmp.Diff(tt.want, got, selectorComparer, cidrPerAddressComparer, cmp.AllowUnexported(Pool{})); diff != "" {
 				t.Errorf("parse returned wrong result (-want, +got)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestL2AdvertisementFromCRPreferred(t *testing.T) {
+	edgeNodes := []corev1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: "edge-a", Labels: map[string]string{"role": "edge", "zone": "primary"}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "edge-b", Labels: map[string]string{"role": "edge"}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "worker-a", Labels: map[string]string{"role": "worker"}}},
+	}
+
+	tests := []struct {
+		desc             string
+		nodes            []corev1.Node
+		crd              v1beta1.L2Advertisement
+		wantNodes        map[string]bool
+		wantPreferred    map[string]int64
+		wantSvcSelectors []string
+	}{
+		{
+			desc:  "preferred selector scores matching nodes",
+			nodes: edgeNodes,
+			crd: v1beta1.L2Advertisement{
+				ObjectMeta: metav1.ObjectMeta{Name: "prefer-edge"},
+				Spec: v1beta1.L2AdvertisementSpec{
+					PreferredNodeSelectors: []v1beta1.PreferredNodeSelector{
+						{Weight: 100, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"role": "edge"}}},
+					},
+				},
+			},
+			wantNodes:     map[string]bool{"edge-a": true, "edge-b": true, "worker-a": true},
+			wantPreferred: map[string]int64{"edge-a": 100, "edge-b": 100},
+		},
+		{
+			desc:  "service selectors do not restrict preferred scoring",
+			nodes: edgeNodes,
+			crd: v1beta1.L2Advertisement{
+				ObjectMeta: metav1.ObjectMeta{Name: "prefer-edge-with-svc-selectors"},
+				Spec: v1beta1.L2AdvertisementSpec{
+					ServiceSelectors: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"app": "web"}},
+					},
+					PreferredNodeSelectors: []v1beta1.PreferredNodeSelector{
+						{Weight: 100, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"role": "edge"}}},
+					},
+				},
+			},
+			wantNodes:        map[string]bool{"edge-a": true, "edge-b": true, "worker-a": true},
+			wantPreferred:    map[string]int64{"edge-a": 100, "edge-b": 100},
+			wantSvcSelectors: []string{"app=web"},
+		},
+		{
+			desc:  "no preferred selectors leaves PreferredNodes nil",
+			nodes: edgeNodes,
+			crd: v1beta1.L2Advertisement{
+				ObjectMeta: metav1.ObjectMeta{Name: "basic"},
+				Spec:       v1beta1.L2AdvertisementSpec{},
+			},
+			wantNodes:     map[string]bool{"edge-a": true, "edge-b": true, "worker-a": true},
+			wantPreferred: nil,
+		},
+		{
+			desc:  "preferred selectors disjoint from node selectors yield no scores",
+			nodes: edgeNodes,
+			crd: v1beta1.L2Advertisement{
+				ObjectMeta: metav1.ObjectMeta{Name: "disjoint"},
+				Spec: v1beta1.L2AdvertisementSpec{
+					NodeSelectors: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"role": "worker"}},
+					},
+					PreferredNodeSelectors: []v1beta1.PreferredNodeSelector{
+						{Weight: 50, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"role": "edge"}}},
+					},
+				},
+			},
+			wantNodes:     map[string]bool{"worker-a": true},
+			wantPreferred: nil,
+		},
+		{
+			desc:  "multiple preferred selectors sum on matching nodes",
+			nodes: edgeNodes,
+			crd: v1beta1.L2Advertisement{
+				ObjectMeta: metav1.ObjectMeta{Name: "sum-edge-zone"},
+				Spec: v1beta1.L2AdvertisementSpec{
+					PreferredNodeSelectors: []v1beta1.PreferredNodeSelector{
+						{Weight: 40, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"role": "edge"}}},
+						{Weight: 30, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"zone": "primary"}}},
+					},
+				},
+			},
+			wantNodes:     map[string]bool{"edge-a": true, "edge-b": true, "worker-a": true},
+			wantPreferred: map[string]int64{"edge-a": 70, "edge-b": 40},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			got, err := l2AdvertisementFromCR(tc.crd, tc.nodes)
+			if err != nil {
+				t.Fatalf("l2AdvertisementFromCR returned error: %v", err)
+			}
+			if tc.wantNodes != nil {
+				if diff := cmp.Diff(tc.wantNodes, got.Nodes); diff != "" {
+					t.Fatalf("Nodes mismatch (-want +got):\n%s", diff)
+				}
+			}
+			if diff := cmp.Diff(tc.wantPreferred, got.PreferredNodes); diff != "" {
+				t.Fatalf("PreferredNodes mismatch (-want +got):\n%s", diff)
+			}
+			gotSvcSelectors := make([]string, 0, len(got.ServiceSelectors))
+			for _, s := range got.ServiceSelectors {
+				gotSvcSelectors = append(gotSvcSelectors, s.String())
+			}
+			if diff := cmp.Diff(tc.wantSvcSelectors, gotSvcSelectors, cmp.Transformer("nilEmpty", func(in []string) []string {
+				if len(in) == 0 {
+					return nil
+				}
+				return in
+			})); diff != "" {
+				t.Fatalf("ServiceSelectors mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSetL2AdvertisementsToPoolsPreferred(t *testing.T) {
+	tests := []struct {
+		desc          string
+		pools         []v1beta1.IPAddressPool
+		advs          []v1beta1.L2Advertisement
+		wantPreferred []map[string]int64
+	}{
+		{
+			desc: "pool selected by name and selector attaches once",
+			pools: []v1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pool-a", Labels: map[string]string{"shared": "true"}},
+					Spec:       v1beta1.IPAddressPoolSpec{Addresses: []string{"10.20.0.0/24"}},
+				},
+			},
+			advs: []v1beta1.L2Advertisement{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "prefer-edge"},
+					Spec: v1beta1.L2AdvertisementSpec{
+						IPAddressPools: []string{"pool-a"},
+						IPAddressPoolSelectors: []metav1.LabelSelector{
+							{MatchLabels: map[string]string{"shared": "true"}},
+						},
+						PreferredNodeSelectors: []v1beta1.PreferredNodeSelector{
+							{Weight: 50, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"role": "edge"}}},
+						},
+					},
+				},
+			},
+			wantPreferred: []map[string]int64{{"edge-a": 50}},
+		},
+		{
+			desc: "two CRs targeting the same pool attach independently",
+			pools: []v1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pool-a"},
+					Spec:       v1beta1.IPAddressPoolSpec{Addresses: []string{"10.20.0.0/24"}},
+				},
+			},
+			advs: []v1beta1.L2Advertisement{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "ad1-edge-70"},
+					Spec: v1beta1.L2AdvertisementSpec{
+						IPAddressPools: []string{"pool-a"},
+						PreferredNodeSelectors: []v1beta1.PreferredNodeSelector{
+							{Weight: 70, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"role": "edge"}}},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "ad2-edge-30"},
+					Spec: v1beta1.L2AdvertisementSpec{
+						IPAddressPools: []string{"pool-a"},
+						PreferredNodeSelectors: []v1beta1.PreferredNodeSelector{
+							{Weight: 30, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"role": "edge"}}},
+						},
+					},
+				},
+			},
+			wantPreferred: []map[string]int64{{"edge-a": 30}, {"edge-a": 70}},
+		},
+		{
+			desc: "one CR with two selectors sums on the same node",
+			pools: []v1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pool-a"},
+					Spec:       v1beta1.IPAddressPoolSpec{Addresses: []string{"10.20.0.0/24"}},
+				},
+			},
+			advs: []v1beta1.L2Advertisement{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "sum-edge-zone"},
+					Spec: v1beta1.L2AdvertisementSpec{
+						IPAddressPools: []string{"pool-a"},
+						PreferredNodeSelectors: []v1beta1.PreferredNodeSelector{
+							{Weight: 40, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"role": "edge"}}},
+							{Weight: 30, Preference: metav1.LabelSelector{MatchLabels: map[string]string{"zone": "primary"}}},
+						},
+					},
+				},
+			},
+			wantPreferred: []map[string]int64{{"edge-a": 70}},
+		},
+	}
+
+	nodes := []corev1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: "edge-a", Labels: map[string]string{"role": "edge", "zone": "primary"}}},
+	}
+
+	sortPreferred := func(s []map[string]int64) {
+		sort.Slice(s, func(i, j int) bool {
+			var ti, tj int64
+			for _, v := range s[i] {
+				ti += v
+			}
+			for _, v := range s[j] {
+				tj += v
+			}
+			return ti < tj
+		})
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			poolMap := map[string]*Pool{"pool-a": {Name: "pool-a"}}
+			if err := setL2AdvertisementsToPools(tc.pools, tc.advs, nodes, poolMap); err != nil {
+				t.Fatalf("setL2AdvertisementsToPools: %v", err)
+			}
+			gotAds := poolMap["pool-a"].L2Advertisements
+			gotPreferred := make([]map[string]int64, 0, len(gotAds))
+			for _, a := range gotAds {
+				gotPreferred = append(gotPreferred, a.PreferredNodes)
+			}
+			sortPreferred(gotPreferred)
+			sortPreferred(tc.wantPreferred)
+			if diff := cmp.Diff(tc.wantPreferred, gotPreferred); diff != "" {
+				t.Fatalf("pool-a L2Advertisements mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

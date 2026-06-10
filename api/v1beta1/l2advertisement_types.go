@@ -43,6 +43,31 @@ type L2AdvertisementSpec struct {
 	// If empty, all services from the selected pools are advertised.
 	// +optional
 	ServiceSelectors []metav1.LabelSelector `json:"serviceSelectors,omitempty"`
+	// PreferredNodeSelectors allows specifying soft node preferences for L2
+	// leader election. Nodes matching these selectors receive a higher score
+	// and are preferred as the announcing node. If no preferred node is
+	// available, any eligible node (per NodeSelectors) can announce.
+	// Modeled after Kubernetes PreferredSchedulingTerm.
+	// +optional
+	PreferredNodeSelectors []PreferredNodeSelector `json:"preferredNodeSelectors,omitempty"`
+}
+
+// PreferredNodeSelector expresses a weighted soft preference for nodes.
+// This follows the Kubernetes PreferredSchedulingTerm pattern where Weight
+// controls relative priority and Preference selects matching nodes.
+type PreferredNodeSelector struct {
+	// Weight associated with matching the corresponding preference,
+	// in the range 1-100. Higher weights rank the node higher in the
+	// L2 leader election. Weights from selectors that both match a
+	// node sum together.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	Weight int32 `json:"weight"`
+
+	// Preference selects the nodes that receive this weight. An empty
+	// selector matches every node. Preferences only apply to nodes
+	// already eligible under the advertisement's NodeSelectors.
+	Preference metav1.LabelSelector `json:"preference"`
 }
 
 // L2AdvertisementStatus defines the observed state of L2Advertisement.
