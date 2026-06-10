@@ -218,6 +218,9 @@ type L2Advertisement struct {
 	AllInterfaces bool
 	// Sorted list of service selectors to select services for which advertisement is applied.
 	ServiceSelectors []labels.Selector
+	// PreferredNodes maps an eligible node (subset of Nodes) to its aggregated
+	// preference weight for this advertisement. Missing keys score zero.
+	PreferredNodes map[string]int64
 }
 
 // BFDProfile describes a BFD profile to be applied to a set of peers.
@@ -690,7 +693,11 @@ func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs [
 			}
 			continue
 		}
-		for _, poolName := range append(l2Adv.Spec.IPAddressPools, ipPoolsSelected.UnsortedList()...) {
+		// The same CR can reach a pool through both ipAddressPools and a
+		// matching ipAddressPoolSelectors entry. Attach once so the speaker
+		// doesn't sum the ad's preference weights twice.
+		allPools := sets.New(l2Adv.Spec.IPAddressPools...).Insert(ipPoolsSelected.UnsortedList()...)
+		for poolName := range allPools {
 			if pool, ok := ipPoolMap[poolName]; ok {
 				if !containsAdvertisement(pool.L2Advertisements, adv) {
 					pool.L2Advertisements = append(pool.L2Advertisements, adv)
@@ -765,15 +772,57 @@ func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.
 	if err != nil {
 		return nil, errors.Join(err, fmt.Errorf("failed to parse service selector for %s", crdAd.Name))
 	}
+	preferredNodes, err := preferredNodeScores(nodes, selected, crdAd.Spec.PreferredNodeSelectors)
+	if err != nil {
+		return nil, errors.Join(err, fmt.Errorf("failed to parse preferred node selectors for %s", crdAd.Name))
+	}
 	l2 := &L2Advertisement{
 		Nodes:            selected,
 		Interfaces:       crdAd.Spec.Interfaces,
 		ServiceSelectors: serviceSelectors,
+		PreferredNodes:   preferredNodes,
 	}
 	if len(crdAd.Spec.Interfaces) == 0 {
 		l2.AllInterfaces = true
 	}
 	return l2, nil
+}
+
+func preferredNodeScores(nodes []corev1.Node, eligible map[string]bool, preferred []metallbv1beta1.PreferredNodeSelector) (map[string]int64, error) {
+	if len(preferred) == 0 {
+		return nil, nil
+	}
+	selectors := make([]labels.Selector, 0, len(preferred))
+	weights := make([]int64, 0, len(preferred))
+	for i := range preferred {
+		sel, err := metav1.LabelSelectorAsSelector(&preferred[i].Preference)
+		if err != nil {
+			return nil, errors.Join(err, fmt.Errorf("invalid preferred node selector %v", preferred[i].Preference))
+		}
+		selectors = append(selectors, sel)
+		weights = append(weights, int64(preferred[i].Weight))
+	}
+
+	scores := make(map[string]int64)
+	for _, node := range nodes {
+		if !eligible[node.Name] {
+			continue
+		}
+		nodeLabels := labels.Set(node.Labels)
+		var total int64
+		for i, sel := range selectors {
+			if sel.Matches(nodeLabels) {
+				total += weights[i]
+			}
+		}
+		if total > 0 {
+			scores[node.Name] = total
+		}
+	}
+	if len(scores) == 0 {
+		return nil, nil
+	}
+	return scores, nil
 }
 
 func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities map[string]community.BGPCommunity, nodes []corev1.Node) (*BGPAdvertisement, error) {
@@ -1107,7 +1156,15 @@ func validateDuplicateBGPAdvertisements(ads []metallbv1beta1.BGPAdvertisement) e
 }
 
 func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bool {
+	// Preference-bearing ads must stack rather than dedupe: the speaker sums
+	// PreferredNodes across every matching ad to pick the elected node.
+	if len(toCheck.PreferredNodes) > 0 {
+		return false
+	}
 	for _, adv := range advs {
+		if len(adv.PreferredNodes) > 0 {
+			continue
+		}
 		if adv.AllInterfaces != toCheck.AllInterfaces {
 			continue
 		}

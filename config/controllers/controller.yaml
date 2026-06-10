@@ -45,7 +45,6 @@ spec:
           httpGet:
             path: /healthz
             port: 17472
-            host: 127.0.0.1
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 1
@@ -55,7 +54,6 @@ spec:
           httpGet:
             path: /readyz
             port: 17472
-            host: 127.0.0.1
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 1
