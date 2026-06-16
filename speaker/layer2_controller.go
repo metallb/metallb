@@ -121,15 +121,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 
 	// Using the first IP should work for both single and dual stack.
 	ipString := toAnnounce[0].String()
-	// Sort the slice by the hash of node + load balancer ips. This
-	// produces an ordering of ready nodes that is unique to all the services
-	// with the same ip.
-	sort.Slice(availableNodes, func(i, j int) bool {
-		hi := sha256.Sum256([]byte(availableNodes[i] + "#" + ipString))
-		hj := sha256.Sum256([]byte(availableNodes[j] + "#" + ipString))
-
-		return bytes.Compare(hi[:], hj[:]) < 0
-	})
+	sortL2Candidates(availableNodes, ipString, preferredScoresFor(adsForService))
 
 	// Are we first in the list? If so, we win and should announce.
 	if len(availableNodes) > 0 && availableNodes[0] == c.myNode {
@@ -187,6 +179,37 @@ func (c *layer2Controller) SetNode(l log.Logger, n *v1.Node) error {
 
 func (c *layer2Controller) SetEventCallback(callback func(interface{})) {
 	// Do nothing
+}
+
+// sortL2Candidates orders the candidate nodes deterministically across the
+// cluster: highest preference score first, then sha256(node + "#" + ip) as a
+// stable tie-break. A nil scores map falls back to pure hash ordering.
+func sortL2Candidates(candidates []string, ip string, scores map[string]int64) {
+	sort.Slice(candidates, func(i, j int) bool {
+		si, sj := scores[candidates[i]], scores[candidates[j]]
+		if si != sj {
+			return si > sj
+		}
+		hi := sha256.Sum256([]byte(candidates[i] + "#" + ip))
+		hj := sha256.Sum256([]byte(candidates[j] + "#" + ip))
+		return bytes.Compare(hi[:], hj[:]) < 0
+	})
+}
+
+// preferredScoresFor sums per-advertisement preference weights across
+// all ads applicable to a service. Returns nil when no ad carries
+// preferences. Callers must tolerate a nil map; reads return zero.
+func preferredScoresFor(ads []*config.L2Advertisement) map[string]int64 {
+	scores := map[string]int64{}
+	for _, ad := range ads {
+		for node, weight := range ad.PreferredNodes {
+			scores[node] += weight
+		}
+	}
+	if len(scores) == 0 {
+		return nil
+	}
+	return scores
 }
 
 func ipAdvertisementFor(ip net.IP, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {

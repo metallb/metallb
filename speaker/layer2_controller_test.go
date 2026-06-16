@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"sort"
 	"testing"
 
@@ -2509,4 +2510,419 @@ func TestIPAdvertisementFor(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSortL2Candidates(t *testing.T) {
+	tests := []struct {
+		desc       string
+		candidates []string
+		ip         string
+		scores     map[string]int64
+		want       []string
+	}{
+		{
+			desc: "empty input",
+			ip:   "10.0.0.1",
+		},
+		{
+			desc:       "single candidate",
+			candidates: []string{"node-a"},
+			ip:         "10.0.0.1",
+			want:       []string{"node-a"},
+		},
+		{
+			desc:       "no scores: stable hash order independent of input order",
+			candidates: []string{"node-a", "node-b", "node-c"},
+			ip:         "10.0.0.1",
+			want:       []string{"node-b", "node-a", "node-c"},
+		},
+		{
+			desc:       "no scores: hash order depends on the IP",
+			candidates: []string{"node-a", "node-b", "node-c"},
+			ip:         "10.0.0.2",
+			want:       []string{"node-b", "node-c", "node-a"},
+		},
+		{
+			desc:       "highest score wins regardless of hash",
+			candidates: []string{"edge-a", "edge-b", "worker-a", "worker-b"},
+			ip:         "10.20.30.1",
+			scores:     map[string]int64{"edge-a": 100},
+			want:       []string{"edge-a", "edge-b", "worker-a", "worker-b"},
+		},
+		{
+			desc:       "equal non-zero scores fall through to hash",
+			candidates: []string{"node-a", "node-b"},
+			ip:         "10.20.30.1",
+			scores:     map[string]int64{"node-a": 100, "node-b": 100},
+			want:       []string{"node-b", "node-a"},
+		},
+		{
+			desc:       "preferred group sorted by hash, unpreferred trail",
+			candidates: []string{"edge-a", "edge-b", "worker-a"},
+			ip:         "10.20.30.1",
+			scores:     map[string]int64{"edge-a": 100, "edge-b": 100},
+			want:       []string{"edge-b", "edge-a", "worker-a"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			// Sort an unrelated permutation to confirm output is determined
+			// by score+hash, not input order.
+			permuted := slices.Clone(test.candidates)
+			for i := range permuted {
+				j := (i + 1) % len(permuted)
+				permuted[i], permuted[j] = permuted[j], permuted[i]
+			}
+			sortL2Candidates(permuted, test.ip, test.scores)
+			if !slices.Equal(permuted, test.want) {
+				t.Fatalf("sortL2Candidates(%v, %q, %v) = %v, want %v",
+					test.candidates, test.ip, test.scores, permuted, test.want)
+			}
+		})
+	}
+}
+
+func TestPreferredScoresFor(t *testing.T) {
+	tests := []struct {
+		desc string
+		ads  []*config.L2Advertisement
+		want map[string]int64
+	}{
+		{
+			desc: "nil ads",
+		},
+		{
+			desc: "ads without preferences",
+			ads:  []*config.L2Advertisement{{Nodes: map[string]bool{"a": true}}},
+		},
+		{
+			desc: "preferences across ads sum",
+			ads: []*config.L2Advertisement{
+				{Nodes: map[string]bool{"a": true, "b": true}, PreferredNodes: map[string]int64{"a": 70}},
+				{Nodes: map[string]bool{"a": true, "b": true}, PreferredNodes: map[string]int64{"a": 30, "b": 50}},
+			},
+			want: map[string]int64{"a": 100, "b": 50},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := preferredScoresFor(tc.ads)
+			if len(got) != len(tc.want) {
+				t.Fatalf("size mismatch: want %d got %d (%v)", len(tc.want), len(got), got)
+			}
+			for k, v := range tc.want {
+				if got[k] != v {
+					t.Fatalf("score[%s]: want %d got %d", k, v, got[k])
+				}
+			}
+		})
+	}
+}
+
+func TestShouldAnnouncePreferredNode(t *testing.T) {
+	lbIP := net.ParseIP("10.20.30.1")
+
+	tests := []struct {
+		desc       string
+		speakerMap map[string]bool
+		svc        *v1.Service
+		eps        []discovery.EndpointSlice
+		ad         *config.L2Advertisement
+		wantWinner string
+	}{
+		{
+			desc:       "preferred node with highest score wins",
+			speakerMap: map[string]bool{"edge-a": true, "edge-b": true, "worker-a": true, "worker-b": true},
+			svc: &v1.Service{
+				Spec:   v1.ServiceSpec{Type: "LoadBalancer"},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: []discovery.EndpointSlice{{
+				Endpoints: []discovery.Endpoint{{
+					Addresses:  []string{"2.3.4.5"},
+					NodeName:   ptr.To("worker-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				}},
+			}},
+			ad: &config.L2Advertisement{
+				Nodes:          map[string]bool{"edge-a": true, "edge-b": true, "worker-a": true, "worker-b": true},
+				PreferredNodes: map[string]int64{"edge-a": 100},
+				AllInterfaces:  true,
+			},
+			wantWinner: "edge-a",
+		},
+		{
+			// ETP:Local drops nodes without local ready endpoints before preference
+			// scoring. A preferred node without endpoints must lose to an unpreferred
+			// node that has them.
+			desc:       "ETP Local drops preferred node without local endpoints",
+			speakerMap: map[string]bool{"preferred-a": true, "worker-a": true},
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: []discovery.EndpointSlice{{
+				Endpoints: []discovery.Endpoint{{
+					Addresses:  []string{"2.3.4.5"},
+					NodeName:   ptr.To("worker-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+				}},
+			}},
+			ad: &config.L2Advertisement{
+				Nodes:          map[string]bool{"preferred-a": true, "worker-a": true},
+				PreferredNodes: map[string]int64{"preferred-a": 100},
+				AllInterfaces:  true,
+			},
+			wantWinner: "worker-a",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			cfg := &config.Config{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
+					"default": {
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: []*config.L2Advertisement{tc.ad},
+					},
+				}},
+			}
+			nodes := map[string]*v1.Node{}
+			for n := range tc.speakerMap {
+				nodes[n] = &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: n}}
+			}
+			fakeSL := &fakeSpeakerList{speakers: tc.speakerMap}
+			l := log.NewNopLogger()
+			var winners []string
+			for nodeName := range tc.speakerMap {
+				c, err := newController(controllerConfig{
+					MyNode:  nodeName,
+					Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+					SList:   fakeSL,
+					bgpType: bgpNative,
+				})
+				if err != nil {
+					t.Fatalf("new controller: %s", err)
+				}
+				c.client = &testK8S{t: t}
+				if c.SetConfig(l, cfg) == controllers.SyncStateError {
+					t.Fatalf("SetConfig failed")
+				}
+				if c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "svc1", []net.IP{lbIP}, cfg.Pools.ByName["default"], tc.svc, tc.eps, nodes) == "" {
+					winners = append(winners, nodeName)
+				}
+			}
+			if len(winners) != 1 {
+				t.Fatalf("expected exactly one announcer, got %d: %v", len(winners), winners)
+			}
+			if winners[0] != tc.wantWinner {
+				t.Fatalf("expected %q to announce, got %q", tc.wantWinner, winners[0])
+			}
+		})
+	}
+}
+
+func TestShouldAnnounceSplitBrainWithMixedAds(t *testing.T) {
+	// Ad1 covers edges and carries the preference. Ad2 covers everyone with none.
+	// If scoring used a node-filtered ad set, worker speakers would disagree with
+	// edge speakers. The adPoison ad has ServiceSelectors that must not match svc.
+	// Otherwise worker-a's 1000 would outscore edge-a's 100.
+	speakerMap := map[string]bool{"edge-a": true, "worker-a": true}
+	adEdge := &config.L2Advertisement{
+		Nodes:          map[string]bool{"edge-a": true},
+		PreferredNodes: map[string]int64{"edge-a": 100},
+		AllInterfaces:  true,
+	}
+	adAll := &config.L2Advertisement{
+		Nodes:         map[string]bool{"edge-a": true, "worker-a": true},
+		AllInterfaces: true,
+	}
+	adPoison := &config.L2Advertisement{
+		Nodes:            map[string]bool{"edge-a": true, "worker-a": true},
+		PreferredNodes:   map[string]int64{"worker-a": 1000},
+		ServiceSelectors: []labels.Selector{selector("app=does-not-match")},
+		AllInterfaces:    true,
+	}
+	cfg := &config.Config{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
+			"default": {
+				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				L2Advertisements: []*config.L2Advertisement{adEdge, adAll, adPoison},
+			},
+		}},
+	}
+	svc := &v1.Service{
+		Spec:   v1.ServiceSpec{Type: "LoadBalancer"},
+		Status: statusAssigned("10.20.30.1"),
+	}
+	eps := []discovery.EndpointSlice{{
+		Endpoints: []discovery.Endpoint{{
+			Addresses:  []string{"2.3.4.5"},
+			NodeName:   ptr.To("worker-a"),
+			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+		}},
+	}}
+	nodes := map[string]*v1.Node{
+		"edge-a":   {ObjectMeta: metav1.ObjectMeta{Name: "edge-a"}},
+		"worker-a": {ObjectMeta: metav1.ObjectMeta{Name: "worker-a"}},
+	}
+	fakeSL := &fakeSpeakerList{speakers: speakerMap}
+	l := log.NewNopLogger()
+	lbIP := net.ParseIP("10.20.30.1")
+	var winners []string
+	for nodeName := range speakerMap {
+		c, err := newController(controllerConfig{
+			MyNode:  nodeName,
+			Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+			SList:   fakeSL,
+			bgpType: bgpNative,
+		})
+		if err != nil {
+			t.Fatalf("new controller: %s", err)
+		}
+		c.client = &testK8S{t: t}
+		if c.SetConfig(l, cfg) == controllers.SyncStateError {
+			t.Fatalf("SetConfig failed")
+		}
+		if c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "svc1", []net.IP{lbIP}, cfg.Pools.ByName["default"], svc, eps, nodes) == "" {
+			winners = append(winners, nodeName)
+		}
+	}
+	if len(winners) != 1 || winners[0] != "edge-a" {
+		t.Fatalf("edge-a must win due to preference score; got %v", winners)
+	}
+}
+
+func TestShouldAnnouncePreferredNodeFailover(t *testing.T) {
+	// Three failover stages: preferred node pruned, preferred node returns,
+	// all preferred unavailable. Each stage swaps the speakerMap and re-elects.
+	lbIP := net.ParseIP("10.20.30.1")
+	ad := &config.L2Advertisement{
+		Nodes: map[string]bool{
+			"edge-a":   true,
+			"edge-b":   true,
+			"worker-a": true,
+		},
+		PreferredNodes: map[string]int64{
+			"edge-a": 100,
+			"edge-b": 100,
+		},
+		AllInterfaces: true,
+	}
+	cfg := &config.Config{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
+			"default": {
+				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				L2Advertisements: []*config.L2Advertisement{ad},
+			},
+		}},
+	}
+	svc := &v1.Service{
+		Spec:   v1.ServiceSpec{Type: "LoadBalancer"},
+		Status: statusAssigned("10.20.30.1"),
+	}
+	eps := []discovery.EndpointSlice{{
+		Endpoints: []discovery.Endpoint{{
+			Addresses:  []string{"2.3.4.5"},
+			NodeName:   ptr.To("worker-a"),
+			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+		}},
+	}}
+	allNodes := map[string]*v1.Node{
+		"edge-a":   {ObjectMeta: metav1.ObjectMeta{Name: "edge-a"}},
+		"edge-b":   {ObjectMeta: metav1.ObjectMeta{Name: "edge-b"}},
+		"worker-a": {ObjectMeta: metav1.ObjectMeta{Name: "worker-a"}},
+	}
+
+	elect := func(t *testing.T, cfg *config.Config, eps []discovery.EndpointSlice, speakerMap map[string]bool, nodes map[string]*v1.Node) []string {
+		t.Helper()
+		fakeSL := &fakeSpeakerList{speakers: speakerMap}
+		l := log.NewNopLogger()
+		var winners []string
+		for nodeName := range speakerMap {
+			c, err := newController(controllerConfig{
+				MyNode:  nodeName,
+				Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+				SList:   fakeSL,
+				bgpType: bgpNative,
+			})
+			if err != nil {
+				t.Fatalf("new controller: %s", err)
+			}
+			c.client = &testK8S{t: t}
+			if c.SetConfig(l, cfg) == controllers.SyncStateError {
+				t.Fatalf("SetConfig failed")
+			}
+			if c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "svc1", []net.IP{lbIP}, cfg.Pools.ByName["default"], svc, eps, nodes) == "" {
+				winners = append(winners, nodeName)
+			}
+		}
+		return winners
+	}
+
+	t.Run("preferred node pruned leaves remaining preferred as winner", func(t *testing.T) {
+		speakerMap := map[string]bool{"edge-b": true, "worker-a": true}
+		winners := elect(t, cfg, eps, speakerMap, allNodes)
+		if len(winners) != 1 || winners[0] != "edge-b" {
+			t.Fatalf("expected edge-b (remaining preferred) to announce, got %v", winners)
+		}
+	})
+
+	t.Run("preferred node returns and reclaims via sha256 tie-break", func(t *testing.T) {
+		speakerMap := map[string]bool{"edge-a": true, "edge-b": true, "worker-a": true}
+		// edge-a and edge-b tie on score (100); the hash tie-break picks edge-b
+		// (verified independently in TestSortL2Candidates).
+		winners := elect(t, cfg, eps, speakerMap, allNodes)
+		if len(winners) != 1 || winners[0] != "edge-b" {
+			t.Fatalf("expected sha256 tie-break winner edge-b among preferred nodes, got %v", winners)
+		}
+	})
+
+	t.Run("all preferred unavailable falls through to hash across zero-score survivors", func(t *testing.T) {
+		speakerMap := map[string]bool{"worker-a": true, "worker-b": true}
+		adAllWorkers := &config.L2Advertisement{
+			Nodes: map[string]bool{
+				"edge-a":   true,
+				"edge-b":   true,
+				"worker-a": true,
+				"worker-b": true,
+			},
+			PreferredNodes: map[string]int64{
+				"edge-a": 100,
+				"edge-b": 100,
+			},
+			AllInterfaces: true,
+		}
+		cfgWorkers := &config.Config{
+			Pools: &config.Pools{ByName: map[string]*config.Pool{
+				"default": {
+					CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+					L2Advertisements: []*config.L2Advertisement{adAllWorkers},
+				},
+			}},
+		}
+		workerEps := []discovery.EndpointSlice{{
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"2.3.4.5"},
+				NodeName:   ptr.To("worker-a"),
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+			}},
+		}}
+		nodes := map[string]*v1.Node{
+			"edge-a":   {ObjectMeta: metav1.ObjectMeta{Name: "edge-a"}},
+			"edge-b":   {ObjectMeta: metav1.ObjectMeta{Name: "edge-b"}},
+			"worker-a": {ObjectMeta: metav1.ObjectMeta{Name: "worker-a"}},
+			"worker-b": {ObjectMeta: metav1.ObjectMeta{Name: "worker-b"}},
+		}
+		// worker-a and worker-b both have score 0; hash tie-break picks worker-a
+		// (verified independently in TestSortL2Candidates).
+		winners := elect(t, cfgWorkers, workerEps, speakerMap, nodes)
+		if len(winners) != 1 || winners[0] != "worker-a" {
+			t.Fatalf("expected sha256 winner worker-a among zero-score survivors, got %v", winners)
+		}
+	})
 }

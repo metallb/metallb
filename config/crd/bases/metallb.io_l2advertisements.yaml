@@ -176,6 +176,83 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              preferredNodeSelectors:
+                description: |-
+                  PreferredNodeSelectors allows specifying soft node preferences for L2
+                  leader election. Nodes matching these selectors receive a higher score
+                  and are preferred as the announcing node. If no preferred node is
+                  available, any eligible node (per NodeSelectors) can announce.
+                  Modeled after Kubernetes PreferredSchedulingTerm.
+                items:
+                  description: |-
+                    PreferredNodeSelector expresses a weighted soft preference for nodes.
+                    This follows the Kubernetes PreferredSchedulingTerm pattern where Weight
+                    controls relative priority and Preference selects matching nodes.
+                  properties:
+                    preference:
+                      description: |-
+                        Preference selects the nodes that receive this weight. An empty
+                        selector matches every node. Preferences only apply to nodes
+                        already eligible under the advertisement's NodeSelectors.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    weight:
+                      description: |-
+                        Weight associated with matching the corresponding preference,
+                        in the range 1-100. Higher weights rank the node higher in the
+                        L2 leader election. Weights from selectors that both match a
+                        node sum together.
+                      format: int32
+                      maximum: 100
+                      minimum: 1
+                      type: integer
+                  required:
+                  - preference
+                  - weight
+                  type: object
+                type: array
               serviceSelectors:
                 description: |-
                   ServiceSelectors limits the set of services that will be advertised via this advertisement.

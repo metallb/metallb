@@ -233,6 +233,7 @@ controller:
   labels: {}
   livenessProbe:
     enabled: true
+    port: 17472
     failureThreshold: 3
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -240,6 +241,7 @@ controller:
     timeoutSeconds: 1
   readinessProbe:
     enabled: true
+    port: 17472
     failureThreshold: 3
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -307,6 +309,7 @@ speaker:
   labels: {}
   livenessProbe:
     enabled: true
+    port: 17472
     failureThreshold: 3
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -314,6 +317,7 @@ speaker:
     timeoutSeconds: 1
   readinessProbe:
     enabled: true
+    port: 17472
     failureThreshold: 3
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -362,29 +366,34 @@ crds:
 # This allows configuring additional frr parameters in combination to those
 # applied by MetalLB.
 frrk8s:
-  # if set, enables frrk8s as a backend. This is mutually exclusive to frr
-  # mode.
+  # -- If set, enables frrk8s as a backend. This is mutually exclusive to frr mode.
   enabled: true
+  # -- If true, uses an external frr-k8s installation instead of the bundled subchart.
   external: false
+  # -- Namespace where external frr-k8s is installed (only used when external=true).
   namespace: ""
 
+# Values passed to the frr-k8s subchart (note the hyphen in "frr-k8s").
+# For all available options, see:
+# https://github.com/metallb/frr-k8s/blob/main/charts/frr-k8s/values.yaml
 frr-k8s:
   prometheus:
-    # The FRR-K8s BGP/BFD metrics are exposed with the "frrk8s_" prefix
-    # (e.g. frrk8s_bgp_session_up, frrk8s_bfd_session_up).
-    # To rename them to the legacy "metallb_" prefix for backward compatibility
-    # with existing dashboards or alerts, uncomment section below.
-    # serviceMonitor:
-    #   enabled: true
-    #   metricRelabelings:
-    #   - sourceLabels: [__name__]
-    #     regex: "frrk8s_bgp_(.*)"
-    #     targetLabel: "__name__"
-    #     replacement: "metallb_bgp_$1"
-    #   - sourceLabels: [__name__]
-    #     regex: "frrk8s_bfd_(.*)"
-    #     targetLabel: "__name__"
-    #     replacement: "metallb_bfd_$1"
+    serviceMonitor:
+      # -- Enable Prometheus ServiceMonitor for frr-k8s metrics.
+      enabled: false
+      # The FRR-K8s BGP/BFD metrics are exposed with the "frrk8s_" prefix
+      # (e.g. frrk8s_bgp_session_up, frrk8s_bfd_session_up).
+      # To rename them to the legacy "metallb_" prefix for backward compatibility
+      # with existing dashboards or alerts, enable and configure metric relabelings:
+      # metricRelabelings:
+      # - sourceLabels: [__name__]
+      #   regex: "frrk8s_bgp_(.*)"
+      #   targetLabel: "__name__"
+      #   replacement: "metallb_bgp_$1"
+      # - sourceLabels: [__name__]
+      #   regex: "frrk8s_bfd_(.*)"
+      #   targetLabel: "__name__"
+      #   replacement: "metallb_bfd_$1"
 
 # networkpolicies
 networkpolicies:
