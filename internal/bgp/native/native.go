@@ -430,9 +430,13 @@ func (s *session) consumeBGP(conn io.ReadCloser) {
 			Type             uint8
 		}{}
 		if err := binary.Read(conn, binary.BigEndian, &hdr); err != nil {
-			// io.EOF is the expected outcome when the session is closed, so
-			// only surface unexpected read errors.
-			if !errors.Is(err, io.EOF) {
+			// io.EOF is the expected outcome when the session is closed remotely.
+			// A locally closed session causes net.ErrClosed, which is also expected.
+			// Only log genuine unexpected read errors.
+			s.mu.Lock()
+			closed := s.closed
+			s.mu.Unlock()
+			if !closed && !errors.Is(err, io.EOF) {
 				level.Error(s.logger).Log("op", "readMessageHeader", "error", err, "msg", "failed to read BGP message header, closing session")
 			}
 			return
