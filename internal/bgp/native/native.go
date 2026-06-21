@@ -430,7 +430,11 @@ func (s *session) consumeBGP(conn io.ReadCloser) {
 			Type             uint8
 		}{}
 		if err := binary.Read(conn, binary.BigEndian, &hdr); err != nil {
-			// TODO: log, or propagate the error somehow.
+			// io.EOF is the expected outcome when the session is closed, so
+			// only surface unexpected read errors.
+			if !errors.Is(err, io.EOF) {
+				level.Error(s.logger).Log("op", "readMessageHeader", "error", err, "msg", "failed to read BGP message header, closing session")
+			}
 			return
 		}
 		if hdr.Marker1 != 0xffffffffffffffff || hdr.Marker2 != 0xffffffffffffffff {
