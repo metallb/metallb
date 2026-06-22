@@ -138,6 +138,7 @@ spec:
   {{- if .Values.speaker.updateStrategy }}
   updateStrategy: {{- toYaml .Values.speaker.updateStrategy | nindent 4 }}
   {{- end }}
+  revisionHistoryLimit: {{ .Values.speaker.revisionHistoryLimit }}
   selector:
     matchLabels:
       {{- include "metallb.selectorLabels" . | nindent 6 }}
