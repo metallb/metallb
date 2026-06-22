@@ -206,6 +206,7 @@ controller:
   ##    maxSurge: 25%
   ##    maxUnavailable: 25%
   ##
+  revisionHistoryLimit: 10
   strategy:
     type: RollingUpdate
   serviceAccount:
@@ -278,6 +279,7 @@ speaker:
   ## @param speaker.updateStrategy.type Speaker daemonset strategy type
   ## ref: https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/
   ##
+  revisionHistoryLimit: 10
   updateStrategy:
     ## StrategyType
     ## Can be set to RollingUpdate or OnDelete

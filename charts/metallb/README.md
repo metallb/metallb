@@ -49,6 +49,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.readinessProbe.successThreshold | int | `1` |  |
 | controller.readinessProbe.timeoutSeconds | int | `1` |  |
 | controller.resources | object | `{}` |  |
+| controller.revisionHistoryLimit | int | `10` |  |
 | controller.runtimeClassName | string | `""` |  |
 | controller.securityContext.fsGroup | int | `65534` |  |
 | controller.securityContext.runAsNonRoot | bool | `true` |  |
@@ -161,6 +162,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.readinessProbe.timeoutSeconds | int | `1` |  |
 | speaker.reloader.resources | object | `{}` |  |
 | speaker.resources | object | `{}` |  |
+| speaker.revisionHistoryLimit | int | `10` |  |
 | speaker.runtimeClassName | string | `""` |  |
 | speaker.securityContext | object | `{}` |  |
 | speaker.serviceAccount.annotations | object | `{}` |  |
