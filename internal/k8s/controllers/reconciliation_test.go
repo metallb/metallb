@@ -52,6 +52,7 @@ var (
 	ctx       context.Context
 	cancel    context.CancelFunc
 	mgrDone   atomic.Bool
+	mgrStart  atomic.Bool
 
 	configRequestHandler = requestHandler
 	configMutex          sync.Mutex
@@ -253,6 +254,7 @@ var _ = BeforeSuite(func() {
 	}
 	err = poolStatusReconciler.SetupWithManager(k8sManager)
 
+	mgrStart.Store(true)
 	go func() {
 		defer func() { mgrDone.Store(true) }()
 		defer GinkgoRecover()
@@ -272,10 +274,16 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
-	cancel()
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
-	Eventually(mgrDone.Load, 5*time.Second, 200*time.Millisecond).Should(BeTrue())
+	if cancel != nil {
+		cancel()
+	}
+	if testEnv != nil {
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	}
+	if mgrStart.Load() {
+		Eventually(mgrDone.Load, 5*time.Second, 200*time.Millisecond).Should(BeTrue())
+	}
 	requestHandler = configRequestHandler
 })
 
