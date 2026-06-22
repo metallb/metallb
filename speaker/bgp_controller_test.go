@@ -1630,6 +1630,22 @@ func TestPasswordForSession(t *testing.T) {
 				Namespace: "my-namespace",
 			},
 		},
+		{
+			name: "FRR-K8s BGP with unresolved secret ref, passthrough",
+			cfg: &config.Peer{
+				PasswordRef: v1.SecretReference{
+					Name:      "my-secret",
+					Namespace: "my-namespace",
+				},
+			},
+			bgpType:        bgpFrrK8s,
+			secretHandling: SecretPassThrough,
+			expectedPass:   "",
+			expectedRef: v1.SecretReference{
+				Name:      "my-secret",
+				Namespace: "my-namespace",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2044,7 +2060,7 @@ func TestCheckBGPAdvConflicts(t *testing.T) {
 				Spec:       metallbv1beta1.IPAddressPoolSpec{Addresses: []string{"10.20.30.0/24"}},
 			},
 		},
-	}, config.DontValidate)
+	}, config.DontValidate, config.ForOptions{})
 	if err != nil {
 		t.Fatalf("failed to create config: %v", err)
 	}
@@ -2393,7 +2409,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 						Spec:       metallbv1beta1.IPAddressPoolSpec{Addresses: []string{"10.20.30.0/24"}},
 					},
 				},
-			}, config.DontValidate)
+			}, config.DontValidate, config.ForOptions{})
 			if err != nil {
 				t.Fatalf("failed to create config: %v", err)
 			}

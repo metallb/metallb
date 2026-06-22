@@ -289,6 +289,9 @@ spec:
         {{- end }}
         {{- if .Values.frrk8s.external }}
         - --frrk8s-namespace={{ required "namespace is required when frrk8s is external" .Values.frrk8s.namespace }}
+        {{- if .Values.frrk8s.secretPassthrough }}
+        - --frrk8s-secret-passthrough
+        {{- end }}
         {{- end }}
         {{- if .Values.tls.cipherSuites }}
         - --tls-cipher-suites={{ .Values.tls.cipherSuites }}
