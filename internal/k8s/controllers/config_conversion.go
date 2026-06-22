@@ -8,7 +8,7 @@ import (
 	"go.universe.tf/metallb/internal/config"
 )
 
-func toConfig(fromK8s config.ClusterResources, validate config.Validate) (*config.Config, error) {
+func toConfig(fromK8s config.ClusterResources, validate config.Validate, opts config.ForOptions) (*config.Config, error) {
 	resources := config.ClusterResources{
 		Pools:           sortedCopy(fromK8s.Pools),
 		Peers:           sortedCopy(fromK8s.Peers),
@@ -22,7 +22,7 @@ func toConfig(fromK8s config.ClusterResources, validate config.Validate) (*confi
 		BGPExtras:       fromK8s.BGPExtras,
 	}
 
-	cfg, err := config.For(resources, validate)
+	cfg, err := config.For(resources, validate, opts)
 	return cfg, err
 }
 

@@ -50,6 +50,7 @@ func TestParse(t *testing.T) {
 	tests := []struct {
 		desc string
 		crs  ClusterResources
+		opts ForOptions
 		want *Config
 	}{
 		{
@@ -2230,6 +2231,88 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "BGP Peer with secret ref and frrk8s secret passthrough skips resolution even when secret exists",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Port:    179,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "bgpsecret",
+								Namespace: "frr-k8s-external"},
+						},
+					},
+				},
+				PasswordSecrets: map[string]corev1.Secret{
+					"bgpsecret": {Type: corev1.SecretTypeBasicAuth, ObjectMeta: metav1.ObjectMeta{Name: "bgpsecret", Namespace: "metallb-system"},
+						Data: map[string][]byte{"password": []byte("shouldnotresolve")}},
+				},
+			},
+			opts: ForOptions{FRRK8sSecretPassthrough: true},
+			want: &Config{
+				Peers: map[string]*Peer{
+					"peer1": {
+						Name:          "peer1",
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						Port:          179,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						PasswordRef: corev1.SecretReference{
+							Name:      "bgpsecret",
+							Namespace: "frr-k8s-external",
+						},
+					},
+				},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "BGP Peer with secret ref and frrk8s secret passthrough",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Port:    179,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "bgpsecret",
+								Namespace: "frr-k8s-external"},
+						},
+					},
+				},
+			},
+			opts: ForOptions{FRRK8sSecretPassthrough: true},
+			want: &Config{
+				Peers: map[string]*Peer{
+					"peer1": {
+						Name:          "peer1",
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						Port:          179,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						PasswordRef: corev1.SecretReference{
+							Name:      "bgpsecret",
+							Namespace: "frr-k8s-external",
+						},
+					},
+				},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
 			desc: "Peer with non existing BFD Profile",
 			crs: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
@@ -3704,7 +3787,7 @@ func TestParse(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			got, err := For(test.crs, DontValidate)
+			got, err := For(test.crs, DontValidate, test.opts)
 			if err != nil && test.want != nil {
 				t.Errorf("%q: parse failed: %s", test.desc, err)
 				return
@@ -4376,7 +4459,7 @@ func TestServiceSelectors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			got, err := For(tt.crs, DontValidate)
+			got, err := For(tt.crs, DontValidate, ForOptions{})
 			if tt.wantErr != "" {
 				if err == nil {
 					t.Errorf("expected error containing %q, got nil", tt.wantErr)

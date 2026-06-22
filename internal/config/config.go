@@ -53,6 +53,14 @@ type ClusterResources struct {
 	BGPExtras       corev1.ConfigMap                  `json:"bgpextras"`
 }
 
+// ForOptions holds optional parameters for the For config parser.
+type ForOptions struct {
+	// FRRK8sSecretPassthrough skips resolving password secrets locally and passes
+	// the secret reference as-is to frr-k8s. Used when frr-k8s runs in a separate
+	// namespace and the secret is created there directly.
+	FRRK8sSecretPassthrough bool
+}
+
 // Config is a parsed MetalLB configuration.
 type Config struct {
 	// Routers that MetalLB should peer with.
@@ -240,7 +248,7 @@ func (p *Pools) IsEmpty(pool string) bool {
 }
 
 // Parse loads and validates a Config from bs.
-func For(resources ClusterResources, validate Validate) (*Config, error) {
+func For(resources ClusterResources, validate Validate, opts ForOptions) (*Config, error) {
 	err := validate(resources)
 	if err != nil {
 		return nil, err
@@ -253,7 +261,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		return nil, err
 	}
 
-	cfg.Peers, err = peersFor(resources, cfg.BFDProfiles)
+	cfg.Peers, err = peersFor(resources, cfg.BFDProfiles, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -287,10 +295,10 @@ func bfdProfilesFor(resources ClusterResources) (map[string]*BFDProfile, error) 
 	return res, nil
 }
 
-func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) (map[string]*Peer, error) {
+func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile, opts ForOptions) (map[string]*Peer, error) {
 	var res = make(map[string]*Peer)
 	for _, p := range resources.Peers {
-		peer, err := peerFromCR(p, resources.PasswordSecrets)
+		peer, err := peerFromCR(p, resources.PasswordSecrets, opts.FRRK8sSecretPassthrough)
 		if err != nil {
 			return nil, fmt.Errorf("parsing peer %s %w", p.Name, err)
 		}
@@ -387,7 +395,7 @@ func communitiesFromCrs(cs []metallbv1beta1.Community) (map[string]community.BGP
 	return communities, nil
 }
 
-func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secret) (*Peer, error) {
+func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secret, frrk8sSecretPassthrough bool) (*Peer, error) {
 	if p.Spec.MyASN == 0 {
 		return nil, errors.New("missing local ASN")
 	}
@@ -461,7 +469,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	}
 
 	secretPassword := ""
-	if p.Spec.PasswordSecret.Name != "" {
+	if p.Spec.PasswordSecret.Name != "" && !frrk8sSecretPassthrough {
 		secretPassword, err = passwordFromSecretForPeer(p, passwordSecrets)
 		if err != nil {
 			return nil, errors.Join(err, fmt.Errorf("failed to parse peer %s password secret", p.Name))

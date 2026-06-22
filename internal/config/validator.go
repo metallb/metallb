@@ -56,7 +56,7 @@ func (v *validator) Validate(resources ...client.ObjectList) error {
 		}
 	}
 	clusterResources = resetTransientErrorsFields(clusterResources)
-	_, err := For(clusterResources, v.validate)
+	_, err := For(clusterResources, v.validate, ForOptions{})
 	return err
 }
 
