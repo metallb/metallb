@@ -96,13 +96,29 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// We are the (sole) leader for this service.
 	var state *v1beta1.ServiceL2Status
-	for _, item := range serviceL2statuses.Items {
+	var observedStatus v1beta1.MetalLBServiceL2Status
+	for i := range serviceL2statuses.Items {
+		item := &serviceL2statuses.Items[i]
 		if item.Labels[LabelAnnounceNode] == r.NodeName && state == nil {
-			state = &item
+			// Reference the existing status by identity only. Reusing the listed
+			// object would carry its resourceVersion into the CreateOrPatch create
+			// path when the object is deleted concurrently (e.g. by another speaker
+			// that briefly became leader), failing with "resourceVersion should not
+			// be set on objects to be created" and flooding the API server with a
+			// create/delete reconcile loop (#3063). CreateOrPatch repopulates the
+			// object via Get before patching, so the observed status is kept
+			// separately for the no-op short-circuit below.
+			observedStatus = item.Status
+			state = &v1beta1.ServiceL2Status{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      item.Name,
+					Namespace: item.Namespace,
+				},
+			}
 			continue
 		}
 		// Delete statuses from other nodes / redundant statuses belonging to our node
-		if err := r.Delete(ctx, &item); err != nil && !errors.IsNotFound(err) {
+		if err := r.Delete(ctx, item); err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, err)
 		}
 	}
@@ -120,7 +136,7 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	desiredStatus := r.buildDesiredStatus(ipAdvS, serviceName, serviceNamespace)
-	if reflect.DeepEqual(state.Status, desiredStatus) {
+	if reflect.DeepEqual(observedStatus, desiredStatus) {
 		return ctrl.Result{}, nil
 	}
 
