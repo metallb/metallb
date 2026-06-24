@@ -96,27 +96,28 @@ type Client struct {
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
 type Config struct {
-	ProcessName            string
-	NodeName               string
-	PodName                string
-	MetricsPort            int
-	PprofBindAddress       string
-	HealthProbeBindAddress string
-	ReadEndpoints          bool
-	Logger                 log.Logger
-	Namespace              string
-	ValidateConfig         config.Validate
-	EnableWebhook          bool
-	TLSOpt                 func(*tls.Config)
-	DisableCertRotation    bool
-	MetricsCertDir         string
-	WebhookSecretName      string
-	CertDir                string
-	CertServiceName        string
-	LoadBalancerClass      string
-	WebhookWithHTTP2       bool
-	WithFRRK8s             bool
-	FRRK8sNamespace        string
+	ProcessName             string
+	NodeName                string
+	PodName                 string
+	MetricsPort             int
+	PprofBindAddress        string
+	HealthProbeBindAddress  string
+	ReadEndpoints           bool
+	Logger                  log.Logger
+	Namespace               string
+	ValidateConfig          config.Validate
+	EnableWebhook           bool
+	TLSOpt                  func(*tls.Config)
+	DisableCertRotation     bool
+	MetricsCertDir          string
+	WebhookSecretName       string
+	CertDir                 string
+	CertServiceName         string
+	LoadBalancerClass       string
+	WebhookWithHTTP2        bool
+	WithFRRK8s              bool
+	FRRK8sNamespace         string
+	FRRK8sSecretPassthrough bool
 	Listener
 	Layer2StatusChan    <-chan event.GenericEvent
 	Layer2StatusFetcher controllers.L2StatusFetcher
@@ -213,15 +214,16 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.ConfigChanged != nil {
 		if err = (&controllers.ConfigReconciler{
-			Client:          mgr.GetClient(),
-			ConfigStateName: configStateName,
-			Logger:          cfg.Logger,
-			Scheme:          mgr.GetScheme(),
-			Namespace:       cfg.Namespace,
-			ValidateConfig:  cfg.ValidateConfig,
-			Handler:         cfg.ConfigHandler,
-			ForceReload:     reload,
-			NodeName:        cfg.NodeName,
+			Client:                  mgr.GetClient(),
+			ConfigStateName:         configStateName,
+			Logger:                  cfg.Logger,
+			Scheme:                  mgr.GetScheme(),
+			Namespace:               cfg.Namespace,
+			ValidateConfig:          cfg.ValidateConfig,
+			Handler:                 cfg.ConfigHandler,
+			ForceReload:             reload,
+			NodeName:                cfg.NodeName,
+			FRRK8sSecretPassthrough: cfg.FRRK8sSecretPassthrough,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
 			return nil, errors.Join(err, errors.New("unable to create controller for config"))

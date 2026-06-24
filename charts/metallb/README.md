@@ -65,6 +65,7 @@ Kubernetes: `>= 1.19.0-0`
 | frrk8s.enabled | bool | `true` | If set, enables frrk8s as a backend. This is mutually exclusive to frr mode. |
 | frrk8s.external | bool | `false` | If true, uses an external frr-k8s installation instead of the bundled subchart. |
 | frrk8s.namespace | string | `""` | Namespace where external frr-k8s is installed (only used when external=true). |
+| frrk8s.secretPassthrough | bool | `false` | Pass BGP secret references to frr-k8s without resolving them. The secret must exist in the frr-k8s namespace. Only used when external=true. |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |

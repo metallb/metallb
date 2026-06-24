@@ -372,6 +372,9 @@ frrk8s:
   external: false
   # -- Namespace where external frr-k8s is installed (only used when external=true).
   namespace: ""
+  # -- Pass BGP secret references to frr-k8s without resolving them. The secret must
+  # exist in the frr-k8s namespace. Only used when external=true.
+  secretPassthrough: false
 
 # Values passed to the frr-k8s subchart (note the hyphen in "frr-k8s").
 # For all available options, see:

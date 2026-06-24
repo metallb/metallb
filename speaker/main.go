@@ -82,26 +82,27 @@ func main() {
 		bgpDebounceTimeoutMs = flag.String("bgp-debounce-timeout", os.Getenv("METALLB_BGP_DEBOUNCE_TIMEOUT"),
 			"BGP debounce timeout for FRR configuration reloads, in milliseconds. Only applies when METALLB_BGP_TYPE=frr. "+
 				"Can also be set via METALLB_BGP_DEBOUNCE_TIMEOUT. Default is 3000 ms. This feature is experimental.")
-		namespace           = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
-		_                   = flag.String("host", os.Getenv("METALLB_HOST"), "Deprecated: no longer used (metrics served via controller-runtime SecureServing)")
-		mlBindAddr          = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
-		mlBindPort          = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
-		mlLabels            = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
-		mlSecretKeyPath     = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
-		mlWANConfig         = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
-		myNode              = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
-		myPod               = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
-		port                = flag.Int("port", 9120, "HTTPS metrics listening port")
-		logLevel            = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		pprofBindAddress    = flag.String("pprof-bind-address", "", "Bind address for pprof endpoint (e.g. 127.0.0.1:6060). Empty disables pprof.")
-		healthProbePort     = flag.Int("health-probe-port", k8s.DefaultHealthProbePort, "Port for health probe endpoint")
-		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
-		ignoreLBExclude     = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
-		frrK8sNamespace     = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
-		tlsMinVersion       = flag.String("tls-min-version", "", "Minimum TLS version (VersionTLS12 or VersionTLS13). If empty, defaults to VersionTLS13.")
-		tlsCipherSuites     = flag.String("tls-cipher-suites", "", "Comma-separated list of TLS cipher suites. Only applies to TLS 1.2. If empty, uses Go defaults.")
-		tlsCurvePreferences = flag.String("tls-curve-preferences", "", "Comma-separated list of numeric CurveID values (see https://pkg.go.dev/crypto/tls#CurveID). If empty, uses Go defaults.")
-		metricsCertDir      = flag.String("metrics-cert-dir", "", "Directory containing tls.crt and tls.key for metrics TLS. If empty, auto-generated self-signed cert is used.")
+		namespace               = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
+		_                       = flag.String("host", os.Getenv("METALLB_HOST"), "Deprecated: no longer used (metrics served via controller-runtime SecureServing)")
+		mlBindAddr              = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlBindPort              = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
+		mlLabels                = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
+		mlSecretKeyPath         = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
+		mlWANConfig             = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
+		myNode                  = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		myPod                   = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
+		port                    = flag.Int("port", 9120, "HTTPS metrics listening port")
+		logLevel                = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
+		pprofBindAddress        = flag.String("pprof-bind-address", "", "Bind address for pprof endpoint (e.g. 127.0.0.1:6060). Empty disables pprof.")
+		healthProbePort         = flag.Int("health-probe-port", k8s.DefaultHealthProbePort, "Port for health probe endpoint")
+		loadBalancerClass       = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		ignoreLBExclude         = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
+		frrK8sNamespace         = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
+		frrK8sSecretPassthrough = flag.Bool("frrk8s-secret-passthrough", false, "pass BGP secret references to frr-k8s without resolving them, the secret must exist in the frr-k8s namespace")
+		tlsMinVersion           = flag.String("tls-min-version", "", "Minimum TLS version (VersionTLS12 or VersionTLS13). If empty, defaults to VersionTLS13.")
+		tlsCipherSuites         = flag.String("tls-cipher-suites", "", "Comma-separated list of TLS cipher suites. Only applies to TLS 1.2. If empty, uses Go defaults.")
+		tlsCurvePreferences     = flag.String("tls-curve-preferences", "", "Comma-separated list of numeric CurveID values (see https://pkg.go.dev/crypto/tls#CurveID). If empty, uses Go defaults.")
+		metricsCertDir          = flag.String("metrics-cert-dir", "", "Directory containing tls.crt and tls.key for metrics TLS. If empty, auto-generated self-signed cert is used.")
 	)
 
 	flag.Parse()
@@ -192,6 +193,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *frrK8sSecretPassthrough {
+		if bgpType != string(bgpFrrK8s) {
+			level.Error(logger).Log("op", "startup", "error", "--frrk8s-secret-passthrough requires METALLB_BGP_TYPE=frr-k8s")
+			os.Exit(1)
+		}
+		if *frrK8sNamespace == "" {
+			level.Error(logger).Log("op", "startup", "error", "--frrk8s-secret-passthrough requires --frrk8s-namespace to be set")
+			os.Exit(1)
+		}
+	}
+
 	if *frrK8sNamespace == "" { // if not set, assuming it runs under metallb
 		frrK8sNamespace = namespace
 	}
@@ -201,16 +213,17 @@ func main() {
 
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
-		MyNode:                 *myNode,
-		Namespace:              *namespace,
-		FRRK8sNamespace:        *frrK8sNamespace,
-		Logger:                 logger,
-		LogLevel:               logging.Level(*logLevel),
-		SList:                  sList,
-		bgpType:                bgpImplementation(bgpType),
-		InterfaceExcludeRegexp: interfacesToExclude,
-		IgnoreExcludeLB:        *ignoreLBExclude,
-		BGPDebounceTimeout:     bgpDebounceTimeout,
+		MyNode:                  *myNode,
+		Namespace:               *namespace,
+		FRRK8sNamespace:         *frrK8sNamespace,
+		FRRK8sSecretPassthrough: *frrK8sSecretPassthrough,
+		Logger:                  logger,
+		LogLevel:                logging.Level(*logLevel),
+		SList:                   sList,
+		bgpType:                 bgpImplementation(bgpType),
+		InterfaceExcludeRegexp:  interfacesToExclude,
+		IgnoreExcludeLB:         *ignoreLBExclude,
+		BGPDebounceTimeout:      bgpDebounceTimeout,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
 			l2StatusChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
 		},
@@ -255,10 +268,11 @@ func main() {
 			ConfigChanged:  ctrl.SetConfig,
 			NodeChanged:    ctrl.SetNode,
 		},
-		ValidateConfig:    validateConfig,
-		LoadBalancerClass: *loadBalancerClass,
-		WithFRRK8s:        listenFRRK8s,
-		FRRK8sNamespace:   *frrK8sNamespace,
+		ValidateConfig:          validateConfig,
+		LoadBalancerClass:       *loadBalancerClass,
+		WithFRRK8s:              listenFRRK8s,
+		FRRK8sNamespace:         *frrK8sNamespace,
+		FRRK8sSecretPassthrough: *frrK8sSecretPassthrough,
 
 		Layer2StatusChan:    l2StatusChan,
 		Layer2StatusFetcher: ctrl.layer2StatusFetchFunc,
@@ -300,12 +314,13 @@ type controller struct {
 }
 
 type controllerConfig struct {
-	MyNode          string
-	Namespace       string
-	FRRK8sNamespace string
-	Logger          log.Logger
-	LogLevel        logging.Level
-	SList           SpeakerList
+	MyNode                  string
+	Namespace               string
+	FRRK8sNamespace         string
+	FRRK8sSecretPassthrough bool
+	Logger                  log.Logger
+	LogLevel                logging.Level
+	SList                   SpeakerList
 
 	bgpType bgpImplementation
 
@@ -325,7 +340,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	secretHandling := SecretPassThrough
 	// FrrK8s mode and frr-k8s deployed in a separate namespace, we don't have
 	// permissions to write secrets there.
-	if cfg.Namespace != cfg.FRRK8sNamespace && cfg.bgpType == bgpFrrK8s {
+	if cfg.Namespace != cfg.FRRK8sNamespace && cfg.bgpType == bgpFrrK8s && !cfg.FRRK8sSecretPassthrough {
 		secretHandling = SecretConvert
 	}
 

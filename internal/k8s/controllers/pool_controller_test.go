@@ -139,7 +139,7 @@ func TestPoolController(t *testing.T) {
 				t.Fatalf("test %s failed to create fake client: %v", test.desc, err)
 			}
 
-			expectedCfg, err := metallbcfg.For(resources, metallbcfg.DontValidate)
+			expectedCfg, err := metallbcfg.For(resources, metallbcfg.DontValidate, metallbcfg.ForOptions{})
 			if err != nil && test.validResources {
 				t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
 			}
