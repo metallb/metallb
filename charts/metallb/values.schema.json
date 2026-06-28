@@ -206,7 +206,8 @@
               "items": {
                 "type": "object"
               }
-            }
+            },
+            "tlsConfig": { "type": "object" }
           }
         },
         "serviceMonitor": {

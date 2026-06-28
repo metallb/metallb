@@ -84,6 +84,10 @@ prometheus:
     #   replacement: $1
     #   action: replace
 
+    # optional tls configuration for the podMonitor endpoints.
+    tlsConfig:
+      insecureSkipVerify: true
+
   # Prometheus Operator ServiceMonitors. To be used as an alternative
   # to podMonitor, supports secure metrics.
   serviceMonitor:
