@@ -82,6 +82,7 @@ Kubernetes: `>= 1.19.0-0`
 | prometheus.podMonitor.jobLabel | string | `"app.kubernetes.io/name"` |  |
 | prometheus.podMonitor.metricRelabelings | list | `[]` |  |
 | prometheus.podMonitor.relabelings | list | `[]` |  |
+| prometheus.podMonitor.tlsConfig.insecureSkipVerify | bool | `true` |  |
 | prometheus.prometheusRule.additionalLabels | object | `{}` |  |
 | prometheus.prometheusRule.addressPoolExhausted.enabled | bool | `true` |  |
 | prometheus.prometheusRule.addressPoolExhausted.excludePools | string | `""` |  |
