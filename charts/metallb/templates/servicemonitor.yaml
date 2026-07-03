@@ -64,11 +64,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  {{- if or .Values.prometheus.scrapeAnnotations .Values.prometheus.serviceMonitor.speaker.annotations }}
   annotations:
+    {{- if .Values.prometheus.scrapeAnnotations }}
     prometheus.io/scrape: "true"
     prometheus.io/scheme: "https"
-  {{- if .Values.prometheus.serviceMonitor.speaker.annotations }}
+    {{- end }}
+    {{- if .Values.prometheus.serviceMonitor.speaker.annotations }}
 {{ toYaml .Values.prometheus.serviceMonitor.speaker.annotations | indent 4 }}
+    {{- end }}
   {{- end }}
   labels:
     name: {{ template "metallb.fullname" . }}-speaker-monitor-service
@@ -139,11 +143,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  {{- if or .Values.prometheus.scrapeAnnotations .Values.prometheus.serviceMonitor.controller.annotations }}
   annotations:
+    {{- if .Values.prometheus.scrapeAnnotations }}
     prometheus.io/scrape: "true"
     prometheus.io/scheme: "https"
-  {{- if .Values.prometheus.serviceMonitor.controller.annotations }}
+    {{- end }}
+    {{- if .Values.prometheus.serviceMonitor.controller.annotations }}
 {{ toYaml .Values.prometheus.serviceMonitor.controller.annotations | indent 4 }}
+    {{- end }}
   {{- end }}
   labels:
     name: {{ template "metallb.fullname" . }}-controller-monitor-service
