@@ -71,7 +71,7 @@ metadata:
     prometheus.io/scheme: "https"
     {{- end }}
     {{- if .Values.prometheus.serviceMonitor.speaker.annotations }}
-{{ toYaml .Values.prometheus.serviceMonitor.speaker.annotations | indent 4 }}
+    {{- toYaml .Values.prometheus.serviceMonitor.speaker.annotations | nindent 4 }}
     {{- end }}
   {{- end }}
   labels:
@@ -150,7 +150,7 @@ metadata:
     prometheus.io/scheme: "https"
     {{- end }}
     {{- if .Values.prometheus.serviceMonitor.controller.annotations }}
-{{ toYaml .Values.prometheus.serviceMonitor.controller.annotations | indent 4 }}
+    {{- toYaml .Values.prometheus.serviceMonitor.controller.annotations | nindent 4 }}
     {{- end }}
   {{- end }}
   labels:
