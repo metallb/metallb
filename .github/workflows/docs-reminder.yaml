@@ -1,0 +1,63 @@
+name: Docs Reminder
+
+# Non-blocking reminder for contributors and reviewers: when a pull request is
+# classified as "/kind feature" (see classify.yaml) but does not touch the
+# website/ documentation, surface a warning so new features don't ship without
+# their docs counterpart. Fixes: https://github.com/metallb/metallb/issues/2663
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+# Least privilege; read-only so this also works for pull requests from forks.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  docs-reminder:
+    runs-on: ubuntu-22.04
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - name: Remind to document feature PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Guard everything: this is a non-blocking reminder and must never
+            // fail the build, even on a transient GitHub API error (issue #2663).
+            try {
+              const body = context.payload.pull_request.body || "";
+              // MetalLB classifies PRs with "/kind <type>" in the body (see classify.yaml).
+              // The negative lookbehind ignores quoted ("> /kind ...") occurrences.
+              const kindMatch = body.match(/(?<!> )\/kind (\w+)/);
+              const kind = kindMatch ? kindMatch[1] : "";
+              if (kind !== "feature") {
+                core.info(`PR kind is "${kind || "unset"}"; docs reminder only applies to feature PRs.`);
+                return;
+              }
+
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                per_page: 100,
+              });
+              const touchesDocs = files.some((f) => f.filename.startsWith("website/"));
+              if (touchesDocs) {
+                core.info("Feature PR updates website/ docs.");
+                return;
+              }
+
+              const msg =
+                "This PR is marked `/kind feature` but does not update the `website/` " +
+                "documentation. If this feature is user-facing, please add or update the " +
+                "relevant docs under `website/content/` in this PR. This is a non-blocking " +
+                "reminder (see issue #2663).";
+              core.warning(msg, { title: "Feature PR missing documentation" });
+              await core.summary
+                .addHeading("Documentation reminder", 3)
+                .addRaw(msg)
+                .write();
+            } catch (error) {
+              // Downgrade any failure to an informational log so the check stays green.
+              core.info(`docs-reminder check skipped: ${error.message}`);
+            }
