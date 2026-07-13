@@ -263,6 +263,8 @@ speaker:
   # -- Speaker log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none`
   logLevel: info
   tolerateMaster: true
+  # -- Whether to enable host networking for the speaker pods. Layer 2 mode requires this to be true.
+  hostNetwork: true
   memberlist:
     # --  When enabled: false, the speaker pods must run on all nodes
     enabled: true
