@@ -307,6 +307,10 @@
               },
               "required": [ "type" ]
             },
+            "revisionHistoryLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
             "command" : {
               "type": "string"
             },
@@ -374,6 +378,10 @@
                 }
               },
               "required": [ "type" ]
+            },
+            "revisionHistoryLimit": {
+              "type": "integer",
+              "minimum": 0
             },
             "runtimeClassName": {
               "type": "string"
