@@ -344,6 +344,14 @@ speaker:
       pullPolicy:
     metricsPort: 9121
     resources: {}
+    # -- Path to the tini binary inside the FRR container. Override this
+    # when using an FRR image (e.g. Docker Hardened Images) that places
+    # tini at a different location.
+    tiniPath: /sbin/tini
+    # -- Path to the docker-start script inside the FRR container. Override
+    # this when using an FRR image (e.g. Docker Hardened Images) that places
+    # docker-start at a different location.
+    dockerStartPath: /usr/lib/frr/docker-start
 
   reloader:
     resources: {}
