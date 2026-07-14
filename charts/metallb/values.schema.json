@@ -394,7 +394,9 @@
                 "image": { "$ref": "#/definitions/component/properties/image" },
                 "metricsPort": { "type": "integer" },
                 "secureMetricsPort": { "type": "integer" },
-                "resources:": { "type": "object" }
+                "resources:": { "type": "object" },
+                "tiniPath": { "type": "string" },
+                "dockerStartPath": { "type": "string" }
               },
               "required": [ "enabled" ]
             },

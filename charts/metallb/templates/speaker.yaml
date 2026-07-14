@@ -445,9 +445,9 @@ spec:
           - name: frr-lib
             mountPath: /var/lib/frr
         command:
-          - /bin/sh
-          - -c
-          - /sbin/tini -- /usr/lib/frr/docker-start
+          - {{ .Values.speaker.frr.tiniPath | quote }}
+          - --
+          - {{ .Values.speaker.frr.dockerStartPath | quote }}
         {{- with .Values.speaker.frr.resources }}
         resources:
           {{- toYaml . | nindent 12 }}

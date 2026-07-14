@@ -124,12 +124,14 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.enabled | bool | `true` |  |
 | speaker.excludeInterfaces.enabled | bool | `true` |  |
 | speaker.extraContainers | list | `[]` |  |
+| speaker.frr.dockerStartPath | string | `"/usr/lib/frr/docker-start"` | Path to the docker-start script inside the FRR container. Override this when using an FRR image (e.g. Docker Hardened Images) that places docker-start at a different location. |
 | speaker.frr.enabled | bool | `false` |  |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"quay.io/frrouting/frr"` |  |
 | speaker.frr.image.tag | string | `"10.5.3"` |  |
 | speaker.frr.metricsPort | int | `9121` |  |
 | speaker.frr.resources | object | `{}` |  |
+| speaker.frr.tiniPath | string | `"/sbin/tini"` | Path to the tini binary inside the FRR container. Override this when using an FRR image (e.g. Docker Hardened Images) that places tini at a different location. |
 | speaker.frrMetrics.resources | object | `{}` |  |
 | speaker.ignoreExcludeLB | bool | `false` |  |
 | speaker.image.pullPolicy | string | `nil` |  |
