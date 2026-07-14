@@ -131,6 +131,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.frr.metricsPort | int | `9121` |  |
 | speaker.frr.resources | object | `{}` |  |
 | speaker.frrMetrics.resources | object | `{}` |  |
+| speaker.hostNetwork | bool | `true` | Whether to enable host networking for the speaker pods |
 | speaker.ignoreExcludeLB | bool | `false` |  |
 | speaker.image.pullPolicy | string | `nil` |  |
 | speaker.image.repository | string | `"quay.io/metallb/speaker"` |  |
