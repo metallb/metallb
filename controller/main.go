@@ -158,7 +158,7 @@ func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.Syn
 
 func main() {
 	var (
-		port                = flag.Int("port", 9120, "HTTPS listening port for Prometheus metrics")
+		port                = flag.Int("port", 9120, "HTTPS listening port for Prometheus metrics; set to 0 to disable metrics")
 		namespace           = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
 		mlSecret            = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
 		deployName          = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
