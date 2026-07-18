@@ -131,6 +131,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.frr.image.tag | string | `"10.5.3"` |  |
 | speaker.frr.metricsPort | int | `9121` |  |
 | speaker.frr.resources | object | `{}` |  |
+| speaker.frr.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"add":["NET_ADMIN","NET_RAW","SYS_ADMIN","NET_BIND_SERVICE"]},"readOnlyRootFilesystem":true}` | Security context for the FRR container. |
 | speaker.frr.tiniPath | string | `"/sbin/tini"` | Path to the tini binary inside the FRR container. Override this when using an FRR image (e.g. Docker Hardened Images) that places tini at a different location. |
 | speaker.frrMetrics.resources | object | `{}` |  |
 | speaker.ignoreExcludeLB | bool | `false` |  |
