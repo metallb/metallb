@@ -419,15 +419,10 @@ spec:
         {{- end }}
       {{- if .Values.speaker.frr.enabled }}
       - name: frr
+        {{- if .Values.speaker.frr.securityContext }}
         securityContext:
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            add:
-            - NET_ADMIN
-            - NET_RAW
-            - SYS_ADMIN
-            - NET_BIND_SERVICE
+          {{- toYaml .Values.speaker.frr.securityContext | nindent 10 }}
+        {{- end }}
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
         {{- if .Values.speaker.frr.image.pullPolicy }}
         imagePullPolicy: {{ .Values.speaker.frr.image.pullPolicy }}
