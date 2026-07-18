@@ -396,7 +396,8 @@
                 "secureMetricsPort": { "type": "integer" },
                 "resources:": { "type": "object" },
                 "tiniPath": { "type": "string" },
-                "dockerStartPath": { "type": "string" }
+                "dockerStartPath": { "type": "string" },
+                "securityContext": { "type": "object" }
               },
               "required": [ "enabled" ]
             },
