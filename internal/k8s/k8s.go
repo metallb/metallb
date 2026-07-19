@@ -80,6 +80,13 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+func metricsBindAddress(port int) string {
+	if port == 0 {
+		return "0"
+	}
+	return fmt.Sprintf("0.0.0.0:%d", port)
+}
+
 // Client watches a Kubernetes cluster and translates events into
 // Controller method calls.
 type Client struct {
@@ -150,7 +157,7 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	metricsOpts := metricsserver.Options{
-		BindAddress:    fmt.Sprintf("0.0.0.0:%d", cfg.MetricsPort),
+		BindAddress:    metricsBindAddress(cfg.MetricsPort),
 		SecureServing:  true,
 		FilterProvider: filters.WithAuthenticationAndAuthorization,
 		CertDir:        cfg.MetricsCertDir,
