@@ -766,6 +766,24 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "invalid interface with newline",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peer1",
+							Namespace: "metallb-system",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:     42,
+							ASN:       142,
+							Interface: "eth0\nrouter bgp 666",
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "invalid keepalivetime larger than holdtime",
 			crs: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
