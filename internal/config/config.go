@@ -468,12 +468,23 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		return nil, fmt.Errorf("can not have both password and secret ref set in peer config %q/%q", p.Namespace, p.Name)
 	}
 
+	if strings.ContainsAny(p.Spec.Password, "\n\r") {
+		return nil, fmt.Errorf("password for peer %q/%q contains invalid characters", p.Namespace, p.Name)
+	}
+
 	secretPassword := ""
 	if p.Spec.PasswordSecret.Name != "" && !frrk8sSecretPassthrough {
 		secretPassword, err = passwordFromSecretForPeer(p, passwordSecrets)
 		if err != nil {
 			return nil, errors.Join(err, fmt.Errorf("failed to parse peer %s password secret", p.Name))
 		}
+		if strings.ContainsAny(secretPassword, "\n\r") {
+			return nil, fmt.Errorf("password secret for peer %q/%q contains invalid characters", p.Namespace, p.Name)
+		}
+	}
+
+	if strings.ContainsAny(p.Spec.VRFName, "\n\r") {
+		return nil, fmt.Errorf("VRF name for peer %q/%q contains invalid characters", p.Namespace, p.Name)
 	}
 
 	var connectTime *time.Duration
