@@ -1,9 +1,10 @@
 name: Docs Reminder
 
-# Non-blocking reminder for contributors and reviewers: when a pull request is
-# classified as "/kind feature" (see classify.yaml) but does not touch the
-# website/ documentation, surface a warning so new features don't ship without
-# their docs counterpart. Fixes: https://github.com/metallb/metallb/issues/2663
+# Reminder for contributors and reviewers: when a pull request is classified
+# as "/kind feature" (see classify.yaml) but does not touch the website/
+# documentation, fail this job so it's clearly visible. This check is not a
+# required status check, so it does not block merging — it's only a visible
+# reminder. Fixes: https://github.com/metallb/metallb/issues/2663
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
@@ -22,8 +23,9 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Guard everything: this is a non-blocking reminder and must never
-            // fail the build, even on a transient GitHub API error (issue #2663).
+            // Guard everything so a transient GitHub API error doesn't fail the
+            // build (issue #2663). A missing-docs finding below is still allowed
+            // to fail this job — it's just not a required status check.
             try {
               const body = context.payload.pull_request.body || "";
               // MetalLB classifies PRs with "/kind <type>" in the body (see classify.yaml).
@@ -50,13 +52,13 @@ jobs:
               const msg =
                 "This PR is marked `/kind feature` but does not update the `website/` " +
                 "documentation. If this feature is user-facing, please add or update the " +
-                "relevant docs under `website/content/` in this PR. This is a non-blocking " +
-                "reminder (see issue #2663).";
-              core.warning(msg, { title: "Feature PR missing documentation" });
+                "relevant docs under `website/content/` in this PR. This check is not " +
+                "required, so it does not block merging (see issue #2663).";
               await core.summary
                 .addHeading("Documentation reminder", 3)
                 .addRaw(msg)
                 .write();
+              core.setFailed(msg);
             } catch (error) {
               // Downgrade any failure to an informational log so the check stays green.
               core.info(`docs-reminder check skipped: ${error.message}`);
