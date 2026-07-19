@@ -419,6 +419,10 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		return nil, fmt.Errorf("peer has both Address and Interface specified")
 	}
 
+	if strings.ContainsAny(p.Spec.Interface, "\n\r") {
+		return nil, fmt.Errorf("interface for peer %q/%q contains invalid characters", p.Namespace, p.Name)
+	}
+
 	holdTime, keepaliveTime, err := parseTimers(p.Spec.HoldTime, p.Spec.KeepaliveTime)
 	if err != nil {
 		return nil, fmt.Errorf("invalid BGPPeer timers: %w", err)
