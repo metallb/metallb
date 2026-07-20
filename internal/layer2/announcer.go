@@ -326,7 +326,10 @@ func (a *Announce) AnnounceName(name string) bool {
 func (a *Announce) GetStatus(meta types.NamespacedName) []IPAdvertisement {
 	a.RLock()
 	defer a.RUnlock()
-	return a.ips[meta.String()]
+	advs := a.ips[meta.String()]
+	status := make([]IPAdvertisement, len(advs))
+	copy(status, advs)
+	return status
 }
 
 // GetInterfaces returns current interfaces list.
