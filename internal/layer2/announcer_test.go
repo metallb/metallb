@@ -4,8 +4,10 @@ package layer2
 
 import (
 	"net"
+	"sync"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -61,4 +63,44 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 	if announce.ipRefcnt["192.168.1.20"] != 2 {
 		t.Fatalf("ip 192.168.1.20 has not 2 refcnt: %d", announce.ipRefcnt["192.168.1.20"])
 	}
+}
+
+func Test_GetStatus_ConcurrentSetBalancer(t *testing.T) {
+	const iterations = 2000
+	announce := &Announce{
+		ips:      map[string][]IPAdvertisement{},
+		ipRefcnt: map[string]int{},
+		spamCh:   make(chan IPAdvertisement, 2*iterations+16),
+	}
+
+	name := types.NamespacedName{Namespace: "ns", Name: "svc"}
+	announce.SetBalancer(name.String(), IPAdvertisement{
+		ip:            net.IPv4(192, 168, 1, 20),
+		interfaces:    sets.New("eth0"),
+		allInterfaces: false,
+	})
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Same IP so SetBalancer overrides the existing advertisement in place.
+			announce.SetBalancer(name.String(), IPAdvertisement{
+				ip:            net.IPv4(192, 168, 1, 20),
+				interfaces:    sets.New("eth1"),
+				allInterfaces: false,
+			})
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			for _, adv := range announce.GetStatus(name) {
+				_ = adv.interfaces.Len()
+				_ = adv.ip.String()
+			}
+		}
+	}()
+	wg.Wait()
 }
