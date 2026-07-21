@@ -108,7 +108,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	// evaluates the same candidate set and the election is deterministic.
 	speakerMap := c.speakersForAds(l, name, adsForService, nodes)
 	availableNodes := nodesWithActiveSpeakers(speakerMap)
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal {
 		availableNodes = nodesWithEndpoint(eps, speakerMap)
 	}
 

@@ -93,7 +93,7 @@ func TestUsableNodesEPSlicesWithSpeakerlistDisabled(t *testing.T) {
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  "LoadBalancer",
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 		},
 		Status: statusAssigned("10.20.30.1"),
 	}
@@ -418,7 +418,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -469,7 +469,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -520,7 +520,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -572,7 +572,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -623,7 +623,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -674,14 +674,14 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.2"),
 				},
@@ -758,14 +758,14 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.2"),
 				},
@@ -842,14 +842,14 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.2"),
 				},
@@ -926,7 +926,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -990,7 +990,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1050,7 +1050,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1110,7 +1110,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1170,7 +1170,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1343,7 +1343,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 		balancer            string
 		L2Advertisements    []*config.L2Advertisement
 		eps                 map[string][]discovery.EndpointSlice
-		trafficPolicy       v1.ServiceExternalTrafficPolicyType
+		trafficPolicy       v1.ServiceExternalTrafficPolicy
 		excludeFromLB       []string
 		ignoreExcludeFromLB bool
 		c1ExpectedResult    map[string]string
@@ -1354,7 +1354,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			balancer:         "test1",
 			eps:              epsOn("iris1"),
 			L2Advertisements: advertisementOnIris1,
-			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyCluster,
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
@@ -1367,7 +1367,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			balancer:         "test1",
 			eps:              epsOn("iris1"),
 			L2Advertisements: advertisementSplit,
-			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeLocal,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyLocal,
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
@@ -1380,7 +1380,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			balancer:         "test1",
 			eps:              epsOn("iris1"),
 			L2Advertisements: advertisementsForBoth,
-			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyCluster,
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
 			},
@@ -1393,7 +1393,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			balancer:         "test1",
 			eps:              epsOnBothNodes,
 			L2Advertisements: advertisementOnIris1,
-			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyCluster,
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
@@ -1406,7 +1406,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			balancer:         "test1",
 			eps:              epsOn("iris1"),
 			L2Advertisements: advertisementOnIris2,
-			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeLocal,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyLocal,
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "noMatchingAdvertisement",
 			},
@@ -1419,7 +1419,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			balancer:         "test1",
 			eps:              epsOn("iris1"),
 			L2Advertisements: advertisementsForBoth,
-			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyCluster,
 			excludeFromLB:    []string{"iris2"},
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "",
@@ -1433,7 +1433,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			balancer:         "test1",
 			eps:              epsOn("iris1"),
 			L2Advertisements: advertisementsForBoth,
-			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyCluster,
 			excludeFromLB:    []string{"iris1"},
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
@@ -1447,7 +1447,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			balancer:         "test1",
 			eps:              epsOn("iris1"),
 			L2Advertisements: advertisementsForBoth,
-			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyCluster,
 			excludeFromLB:    []string{"iris1", "iris2"},
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
@@ -1461,7 +1461,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			balancer:         "test1",
 			eps:              epsOn("iris1"),
 			L2Advertisements: advertisementsForBoth,
-			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeLocal,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyLocal,
 			excludeFromLB:    []string{"iris1", "iris2"},
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "",
@@ -1650,7 +1650,7 @@ func TestClusterPolicy(t *testing.T) {
 			},
 			Spec: v1.ServiceSpec{
 				Type:                  "LoadBalancer",
-				ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 			},
 			Status: statusAssigned(ip),
 		}
@@ -1660,7 +1660,7 @@ func TestClusterPolicy(t *testing.T) {
 			},
 			Spec: v1.ServiceSpec{
 				Type:                  "LoadBalancer",
-				ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+				ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 			},
 			Status: statusAssigned(ip),
 		}
@@ -1739,7 +1739,7 @@ func TestL2ServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -1761,7 +1761,7 @@ func TestL2ServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -1783,7 +1783,7 @@ func TestL2ServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -1808,7 +1808,7 @@ func TestL2ServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -1892,7 +1892,7 @@ func TestL2SharedIPWithServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -1914,7 +1914,7 @@ func TestL2SharedIPWithServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -1936,7 +1936,7 @@ func TestL2SharedIPWithServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -1959,7 +1959,7 @@ func TestL2SharedIPWithServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -1986,7 +1986,7 @@ func TestL2SharedIPWithServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -2138,7 +2138,7 @@ func TestL2ElectionConsistentButAdsPerNode(t *testing.T) {
 		},
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 		},
 		Status: statusAssigned("10.20.30.1"),
 	}
@@ -2257,7 +2257,7 @@ func TestL2NoMatchingAdForServiceAndNode(t *testing.T) {
 		},
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 		},
 		Status: statusAssigned("10.20.30.1"),
 	}
@@ -2349,7 +2349,7 @@ func TestL2ServiceSelectorFiltersCandidateNodes(t *testing.T) {
 		},
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 		},
 		Status: statusAssigned("10.20.30.1"),
 	}
@@ -2361,7 +2361,7 @@ func TestL2ServiceSelectorFiltersCandidateNodes(t *testing.T) {
 		},
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 		},
 		Status: statusAssigned("10.20.30.1"),
 	}
@@ -2661,7 +2661,7 @@ func TestShouldAnnouncePreferredNode(t *testing.T) {
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:                  "LoadBalancer",
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},

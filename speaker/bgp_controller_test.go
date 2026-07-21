@@ -1414,7 +1414,7 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 
 		balancer            string
 		eps                 map[string][]discovery.EndpointSlice
-		trafficPolicy       v1.ServiceExternalTrafficPolicyType
+		trafficPolicy       v1.ServiceExternalTrafficPolicy
 		excludeFromLB       []string
 		ignoreExcludeFromLB bool
 		c1ExpectedResult    map[string]string
@@ -1424,7 +1424,7 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 			desc:          "One service, endpoint on iris1, no selector, both excluded, both should not announce",
 			balancer:      "test1",
 			eps:           epsOn("iris1"),
-			trafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			trafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 			excludeFromLB: []string{"iris1", "iris2"},
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "nodeLabeledExcludeBalancers",
@@ -1437,7 +1437,7 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 			desc:          "One service, endpoint on iris1, no selector, etplocal, ignore excludelb, both should announce",
 			balancer:      "test1",
 			eps:           epsOn("iris1"),
-			trafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			trafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 			excludeFromLB: []string{"iris1", "iris2"},
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "",
@@ -2241,7 +2241,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -2265,7 +2265,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -2289,7 +2289,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -2316,7 +2316,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -2346,7 +2346,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
@@ -2378,7 +2378,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:                  v1.ServiceTypeLoadBalancer,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},

@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -93,7 +93,7 @@ type Client struct {
 	logger log.Logger
 
 	client           *kubernetes.Clientset
-	events           record.EventRecorder
+	events           events.EventRecorder
 	mgr              manager.Manager
 	validateConfig   config.Validate
 	ForceSync        func()
@@ -184,7 +184,7 @@ func New(cfg *Config) (*Client, error) {
 		return nil, fmt.Errorf("creating Kubernetes client: %s", err)
 	}
 
-	recorder := mgr.GetEventRecorderFor(cfg.ProcessName)
+	recorder := mgr.GetEventRecorder(cfg.ProcessName)
 
 	reloadChan := make(chan event.GenericEvent)
 	reload := func() {
@@ -493,12 +493,12 @@ func (c *Client) UpdateStatus(svc *corev1.Service) error {
 
 // Infof logs an informational event about svc to the Kubernetes cluster.
 func (c *Client) Infof(svc *corev1.Service, kind, msg string, args ...interface{}) {
-	c.events.Eventf(svc, corev1.EventTypeNormal, kind, msg, args...)
+	c.events.Eventf(svc, nil, corev1.EventTypeNormal, kind, kind, msg, args...)
 }
 
 // Errorf logs an error event about svc to the Kubernetes cluster.
 func (c *Client) Errorf(svc *corev1.Service, kind, msg string, args ...interface{}) {
-	c.events.Eventf(svc, corev1.EventTypeWarning, kind, msg, args...)
+	c.events.Eventf(svc, nil, corev1.EventTypeWarning, kind, kind, msg, args...)
 }
 
 func webhookServer(cfg *Config) webhook.Server {

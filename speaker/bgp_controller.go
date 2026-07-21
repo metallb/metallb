@@ -192,7 +192,7 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 		return false
 	}
 
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(epSlices, filterNode) {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal && !hasHealthyEndpoint(epSlices, filterNode) {
 		return "noLocalEndpoints"
 	} else if !hasHealthyEndpoint(epSlices, func(toFilter *string) bool { return false }) {
 		return "noEndpoints"
