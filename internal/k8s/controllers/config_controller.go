@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -32,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -345,7 +347,11 @@ func (r *ConfigReconciler) reportCondition(ctx context.Context, conditionErr err
 		},
 	}
 
-	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("configReconciler"), client.ForceOwnership); err != nil {
+	data, err := json.Marshal(configStatus)
+	if err != nil {
+		return fmt.Errorf("marshal %s/%s: %w", r.Namespace, r.ConfigStateName, err)
+	}
+	if err := r.Status().Patch(ctx, configStatus, client.RawPatch(types.ApplyPatchType, data), client.FieldOwner("configReconciler"), client.ForceOwnership); err != nil {
 		return fmt.Errorf("patch %s/%s: %w", r.Namespace, r.ConfigStateName, err)
 	}
 

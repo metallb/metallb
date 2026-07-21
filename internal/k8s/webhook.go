@@ -3,14 +3,18 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/open-policy-agent/cert-controller/pkg/rotator"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/webhooks/webhookv1beta1"
 	"go.universe.tf/metallb/internal/k8s/webhooks/webhookv1beta2"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
@@ -92,8 +96,30 @@ func enableWebhook(mgr manager.Manager, validate config.Validate, namespace stri
 		return err
 	}
 
-	// Register conversion webhook manually since we are not directly handling the types.
-	mgr.GetWebhookServer().Register("/convert", conversion.NewWebhookHandler(mgr.GetScheme()))
+	// Register conversion webhook for BGPPeer v1beta1 <-> v1beta2.
+	registry := conversion.NewRegistry()
+	bgpPeerConverter, err := conversion.NewHubSpokeConverter(&metallbv1beta2.BGPPeer{},
+		conversion.NewSpokeConverter(&metallbv1beta1.BGPPeer{},
+			func(ctx context.Context, src *metallbv1beta2.BGPPeer, dst *metallbv1beta1.BGPPeer) error {
+				return dst.ConvertFrom(src)
+			},
+			func(ctx context.Context, src *metallbv1beta1.BGPPeer, dst *metallbv1beta2.BGPPeer) error {
+				return src.ConvertTo(dst)
+			},
+		),
+	)(mgr.GetScheme())
+	if err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create BGPPeer conversion converter")
+		return err
+	}
+	if err := registry.RegisterConverter(
+		schema.GroupKind{Group: metallbv1beta2.GroupVersion.Group, Kind: "BGPPeer"},
+		bgpPeerConverter,
+	); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to register BGPPeer converter")
+		return err
+	}
+	mgr.GetWebhookServer().Register("/convert", conversion.NewWebhookHandler(mgr.GetScheme(), registry))
 
 	return nil
 }
