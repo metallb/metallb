@@ -111,8 +111,26 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		},
 	}
 
+	var observedStatus v1beta1.MetalLBServiceBGPStatus
 	if len(serviceBGPStatuses.Items) > 0 {
-		state = &serviceBGPStatuses.Items[0]
+		// Reference the existing status by identity only. Reusing the listed
+		// object would carry its resourceVersion into the CreateOrPatch create
+		// path when the object is deleted concurrently (e.g. by another speaker
+		// that briefly became leader), failing with "resourceVersion should not
+		// be set on objects to be created" and flooding the API server with a
+		// create/delete reconcile loop (#3063). CreateOrPatch repopulates the
+		// object via Get before patching, so the observed status is kept
+		// separately for the no-op short-circuit below.
+		// The field index key embeds the node (indexFor), so every listed item
+		// already belongs to this node - Items[0] is the status we own.
+		existing := &serviceBGPStatuses.Items[0]
+		observedStatus = existing.Status
+		state = &v1beta1.ServiceBGPStatus{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      existing.Name,
+				Namespace: existing.Namespace,
+			},
+		}
 	}
 
 	desiredStatus := v1beta1.MetalLBServiceBGPStatus{
@@ -122,7 +140,7 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Peers:            sets.List(peers),
 	}
 
-	if reflect.DeepEqual(state.Status, desiredStatus) {
+	if reflect.DeepEqual(observedStatus, desiredStatus) {
 		return ctrl.Result{}, nil
 	}
 
