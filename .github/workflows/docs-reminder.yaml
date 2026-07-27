@@ -28,9 +28,11 @@ jobs:
             // to fail this job — it's just not a required status check.
             try {
               const body = context.payload.pull_request.body || "";
-              // MetalLB classifies PRs with "/kind <type>" in the body (see classify.yaml).
-              // The negative lookbehind ignores quoted ("> /kind ...") occurrences.
-              const kindMatch = body.match(/(?<!> )\/kind (\w+)/);
+              // MetalLB classifies PRs with a "/kind <type>" line in the body (see
+              // classify.yaml and the PR template). Anchoring to the start of a line
+              // avoids matching "/kind" mentions inside prose or code spans elsewhere
+              // in the description.
+              const kindMatch = body.match(/^\/kind (\w+)/m);
               const kind = kindMatch ? kindMatch[1] : "";
               if (kind !== "feature") {
                 core.info(`PR kind is "${kind || "unset"}"; docs reminder only applies to feature PRs.`);
