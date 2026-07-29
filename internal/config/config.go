@@ -503,7 +503,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		EBGPMultiHop:           p.Spec.EBGPMultiHop,
 		VRF:                    p.Spec.VRFName,
 		DualStackAddressFamily: p.Spec.DualStackAddressFamily,
-		DisableMP:              p.Spec.DisableMP,
+		DisableMP:              p.Spec.DisableMP, //nolint:staticcheck // SA1019: intentionally using deprecated field for translation
 		LocalASN:               p.Spec.LocalASN,
 	}, nil
 }
@@ -880,12 +880,12 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 		ad.AggregationLength = int(*crdAd.Spec.AggregationLength) // TODO CRD cast
 	}
 	if ad.AggregationLength > 32 {
-		return nil, fmt.Errorf("invalid aggregation length %q for IPv4", ad.AggregationLength)
+		return nil, fmt.Errorf("invalid aggregation length %d for IPv4", ad.AggregationLength)
 	}
 	if crdAd.Spec.AggregationLengthV6 != nil {
 		ad.AggregationLengthV6 = int(*crdAd.Spec.AggregationLengthV6) // TODO CRD cast
 		if ad.AggregationLengthV6 > 128 {
-			return nil, fmt.Errorf("invalid aggregation length %q for IPv6", ad.AggregationLengthV6)
+			return nil, fmt.Errorf("invalid aggregation length %d for IPv6", ad.AggregationLengthV6)
 		}
 	}
 
