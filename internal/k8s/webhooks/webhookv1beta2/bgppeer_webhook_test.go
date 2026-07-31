@@ -151,6 +151,73 @@ func TestValidateBGPPeer(t *testing.T) {
 	}
 }
 
+// TestValidateBGPPeerCreateWithDisableMP verifies that the disableMP deprecation
+// warning does not skip the namespace check nor the cluster validation.
+func TestValidateBGPPeerCreateWithDisableMP(t *testing.T) {
+	MetalLBNamespace = testNamespace
+	Logger = log.NewNopLogger()
+
+	toRestorePeers := GetExistingBGPPeers
+	GetExistingBGPPeers = func() (*v1beta2.BGPPeerList, error) {
+		return &v1beta2.BGPPeerList{}, nil
+	}
+	toRestoreNodes := getExistingNodes
+	getExistingNodes = func() (*corev1.NodeList, error) {
+		return &corev1.NodeList{}, nil
+	}
+	toRestoreValidator := Validator
+	defer func() {
+		GetExistingBGPPeers = toRestorePeers
+		getExistingNodes = toRestoreNodes
+		Validator = toRestoreValidator
+	}()
+
+	tests := []struct {
+		desc         string
+		namespace    string
+		failValidate bool
+		expectErr    bool
+		expectWarn   bool
+	}{
+		{
+			desc:       "valid peer is admitted with the deprecation warning",
+			namespace:  testNamespace,
+			expectWarn: true,
+		},
+		{
+			desc:      "peer in a different namespace is rejected",
+			namespace: "default",
+			expectErr: true,
+		},
+		{
+			desc:         "peer failing cluster validation is rejected",
+			namespace:    testNamespace,
+			failValidate: true,
+			expectErr:    true,
+		},
+	}
+	for _, test := range tests {
+		mock := &mockValidator{forceError: test.failValidate}
+		Validator = mock
+		warning, err := validatePeerCreate(&v1beta2.BGPPeer{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-peer",
+				Namespace: test.namespace,
+			},
+			Spec: v1beta2.BGPPeerSpec{DisableMP: true},
+		})
+		if test.expectErr && err == nil {
+			t.Fatalf("test %s failed, expecting error", test.desc)
+		}
+		if !test.expectErr && err != nil {
+			t.Fatalf("test %s failed, unexpected error %v", test.desc, err)
+		}
+		if test.expectWarn && warning == "" {
+			t.Fatalf("test %s failed, expecting the deprecation warning", test.desc)
+		}
+	}
+}
+
 // TestValidateBGPPeerPassesNodesToValidator verifies that validatePeerCreate and
 // validatePeerUpdate forward the node list to the validator so that
 // DiscardNativeOnly can perform nodeSelector overlap checks.
