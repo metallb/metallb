@@ -12,7 +12,6 @@ on:
 # Least privilege; read-only so this also works for pull requests from forks.
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   docs-reminder:
@@ -23,37 +22,20 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       contains(github.event.pull_request.labels.*.name, 'kind/feature')
     steps:
-      - name: Remind to document feature PRs
-        uses: actions/github-script@v7
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          script: |
-            // Guard everything so a transient GitHub API error doesn't fail the
-            // build (issue #2663). A missing-docs finding below is still allowed
-            // to fail this job — it's just not a required status check.
-            try {
-              const files = await github.paginate(github.rest.pulls.listFiles, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number,
-                per_page: 100,
-              });
-              const touchesDocs = files.some((f) => f.filename.startsWith("website/"));
-              if (touchesDocs) {
-                core.info("Feature PR updates website/ docs.");
-                return;
-              }
-
-              const msg =
-                "This PR is labeled `kind/feature` but does not update the `website/` " +
-                "documentation. If this feature is user-facing, please add or update the " +
-                "relevant docs under `website/content/` in this PR. This check is not " +
-                "required, so it does not block merging (see issue #2663).";
-              await core.summary
-                .addHeading("Documentation reminder", 3)
-                .addRaw(msg)
-                .write();
-              core.setFailed(msg);
-            } catch (error) {
-              // Downgrade any failure to an informational log so the check stays green.
-              core.info(`docs-reminder check skipped: ${error.message}`);
-            }
+          fetch-depth: 0
+      - name: Remind to document feature PRs
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+          if git diff --name-only "$BASE"..."$HEAD" | grep -q '^website/'; then
+            echo "Feature PR updates website/ docs."
+            exit 0
+          fi
+          MSG="This PR is labeled \`kind/feature\` but does not update the \`website/\` documentation. If this feature is user-facing, please add or update the relevant docs under \`website/content/\` in this PR. This check is not required, so it does not block merging (see issue #2663)."
+          echo "### Documentation reminder" >> "$GITHUB_STEP_SUMMARY"
+          echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::$MSG"
+          exit 1
