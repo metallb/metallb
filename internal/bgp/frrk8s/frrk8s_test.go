@@ -1017,3 +1017,29 @@ func TestSingleSessionWithInterface(t *testing.T) {
 
 	testCheckConfigFile(t)
 }
+
+func TestSingleSessionWithLocalASN(t *testing.T) {
+	sessionManager := newTestSessionManager(t)
+	l := log.NewNopLogger()
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			LocalASN:      300,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  false,
+			SessionName:   "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
