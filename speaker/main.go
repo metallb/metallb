@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"os/signal"
@@ -66,6 +67,10 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 const (
 	excludeL2ConfigPath    = "/etc/metallb/excludel2.yaml"
 	defaultDebounceTimeout = 3 * time.Second
+	// Cap the gratuitous ARP interval well below the time.Duration overflow
+	// point (max ~9.2e9 seconds for an int64 ns duration) while still
+	// allowing any sensible value.
+	maxGratuitousARPInterval = math.MaxInt32
 )
 
 // Service offers methods to mutate a Kubernetes service object.
@@ -77,6 +82,18 @@ type service interface {
 
 func main() {
 	crmetrics.Registry.MustRegister(announcing)
+
+	// Resolve env-var default for gratuitous ARP interval before flag.Parse
+	// so an explicit --gratuitous-arp-interval=0 can override a non-zero env.
+	gratuitousARPDefault := 0
+	if envVal := os.Getenv("METALLB_GRATUITOUS_ARP_INTERVAL"); envVal != "" {
+		parsed, err := strconv.Atoi(envVal)
+		if err != nil || parsed < 0 || parsed > maxGratuitousARPInterval {
+			fmt.Fprintf(os.Stderr, "invalid METALLB_GRATUITOUS_ARP_INTERVAL value %q, must be a non-negative integer number of seconds <= %d\n", envVal, maxGratuitousARPInterval)
+			os.Exit(1)
+		}
+		gratuitousARPDefault = parsed
+	}
 
 	var (
 		bgpDebounceTimeoutMs = flag.String("bgp-debounce-timeout", os.Getenv("METALLB_BGP_DEBOUNCE_TIMEOUT"),
@@ -103,6 +120,8 @@ func main() {
 		tlsCipherSuites         = flag.String("tls-cipher-suites", "", "Comma-separated list of TLS cipher suites. Only applies to TLS 1.2. If empty, uses Go defaults.")
 		tlsCurvePreferences     = flag.String("tls-curve-preferences", "", "Comma-separated list of numeric CurveID values (see https://pkg.go.dev/crypto/tls#CurveID). If empty, uses Go defaults.")
 		metricsCertDir          = flag.String("metrics-cert-dir", "", "Directory containing tls.crt and tls.key for metrics TLS. If empty, auto-generated self-signed cert is used.")
+		gratuitousARPInterval   = flag.Int("gratuitous-arp-interval", gratuitousARPDefault, "Interval in seconds for periodic gratuitous ARP/NDP announcements. "+
+			"0 disables periodic announcements. Can also be set via METALLB_GRATUITOUS_ARP_INTERVAL.")
 	)
 
 	flag.Parse()
@@ -140,6 +159,12 @@ func main() {
 		bgpDebounceTimeout = time.Duration(parsed) * time.Millisecond
 	}
 	level.Debug(logger).Log("msg", "using BGP debounce timeout", "milliseconds", bgpDebounceTimeout.Milliseconds())
+
+	if *gratuitousARPInterval < 0 || *gratuitousARPInterval > maxGratuitousARPInterval {
+		level.Error(logger).Log("msg", "invalid --gratuitous-arp-interval value, must be a non-negative integer number of seconds within bound", "provided", *gratuitousARPInterval, "max", maxGratuitousARPInterval)
+		os.Exit(1)
+	}
+	garpInterval := time.Duration(*gratuitousARPInterval) * time.Second
 
 	if bgpType == "frr" {
 		level.Warn(logger).Log("op", "startup", "msg", "The FRR mode is deprecated and will be removed in a future release. Please migrate to the frr-k8s mode, which is now the default BGP backend. See https://metallb.io/concepts/bgp/#frr-k8s-mode for details.")
@@ -224,6 +249,7 @@ func main() {
 		InterfaceExcludeRegexp:  interfacesToExclude,
 		IgnoreExcludeLB:         *ignoreLBExclude,
 		BGPDebounceTimeout:      bgpDebounceTimeout,
+		GratuitousARPInterval:   garpInterval,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
 			l2StatusChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
 		},
@@ -332,6 +358,7 @@ type controllerConfig struct {
 	InterfaceExcludeRegexp       *regexp.Regexp
 	IgnoreExcludeLB              bool
 	BGPDebounceTimeout           time.Duration
+	GratuitousARPInterval        time.Duration
 	Layer2StatusChange           func(types.NamespacedName)
 	BGPAdsChangedCallback        func(string)
 }
@@ -364,7 +391,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 
 	layer2StatusFetcher := func(types.NamespacedName) []layer2.IPAdvertisement { return nil }
 	if !cfg.DisableLayer2 {
-		a, err := layer2.New(cfg.Logger, cfg.InterfaceExcludeRegexp)
+		a, err := layer2.New(cfg.Logger, cfg.InterfaceExcludeRegexp, cfg.GratuitousARPInterval)
 		layer2StatusFetcher = a.GetStatus
 		if err != nil {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
