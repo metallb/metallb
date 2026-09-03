@@ -788,6 +788,96 @@ var _ = ginkgo.Describe("L2", func() {
 		},
 			ginkgo.Entry("IPV4 - Checking service", "ipv4"),
 			ginkgo.Entry("IPV6 - Checking service", "ipv6"))
+
+		ginkgo.It("periodic-gratuitous-arp - should increase gratuitous sent counter over time", func() {
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "l2-periodic-garp-test",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								IPV4ServiceRange,
+								IPV6ServiceRange},
+						},
+					},
+				},
+				L2Advs: []metallbv1beta1.L2Advertisement{emptyL2Advertisement},
+			}
+
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "periodic-garp-svc",
+				service.TrafficPolicyCluster)
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				Expect(err).NotTo(HaveOccurred())
+			}()
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+
+			Eventually(func() error {
+				return mac.RequestAddressResolution(ingressIP, executor.Host)
+			}, 2*time.Minute, 1*time.Second).Should(Not(HaveOccurred()))
+
+			ginkgo.By("checking connectivity to its external VIP")
+			Eventually(func() error {
+				return service.ValidateL2(svc)
+			}, 2*time.Minute, 1*time.Second).Should(Not(HaveOccurred()))
+
+			ginkgo.By("identifying the announcing speaker and taking an initial GARP counter reading")
+			var advSpeaker *corev1.Pod
+			var initialCount float64
+
+			Eventually(func() error {
+				advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+				if err != nil {
+					return err
+				}
+				sp, ok := speakerPods[advNode.Name]
+				if !ok {
+					return fmt.Errorf("could not find speaker pod on announcing node %s", advNode.Name)
+				}
+				advSpeaker = sp
+
+				speakerMetrics, err := metrics.ForPod(cs, promPod, advSpeaker, metallb.Namespace)
+				if err != nil {
+					return err
+				}
+				err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1),
+					"metallb_layer2_gratuitous_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
+				if err != nil {
+					return err
+				}
+				initialCount, err = metrics.CounterValue("metallb_layer2_gratuitous_sent",
+					map[string]string{"ip": ingressIP}, speakerMetrics)
+				return err
+			}, 2*time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
+
+			ginkgo.By("waiting for the periodic GARP counter to increase")
+			// The speaker is deployed with --gratuitous-arp-interval=5, so we
+			// wait long enough for at least one extra periodic tick.
+			Eventually(func() error {
+				speakerMetrics, err := metrics.ForPod(cs, promPod, advSpeaker, metallb.Namespace)
+				if err != nil {
+					return err
+				}
+				current, err := metrics.CounterValue("metallb_layer2_gratuitous_sent",
+					map[string]string{"ip": ingressIP}, speakerMetrics)
+				if err != nil {
+					return err
+				}
+				if current <= initialCount {
+					return fmt.Errorf("gratuitous_sent counter did not increase: initial=%.0f current=%.0f", initialCount, current)
+				}
+				return nil
+			}, 30*time.Second, 5*time.Second).ShouldNot(HaveOccurred())
+		})
 	})
 
 	ginkgo.DescribeTable("validate requesting a specific address pool for Loadbalancer service", func(ipRange *string, autoAssign bool) {

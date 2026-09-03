@@ -288,6 +288,9 @@ spec:
         {{- if .Values.speaker.bgpDebounceTimeout }}
         - --bgp-debounce-timeout={{ .Values.speaker.bgpDebounceTimeout }}
         {{- end }}
+        {{- if .Values.speaker.gratuitousARPInterval }}
+        - --gratuitous-arp-interval={{ .Values.speaker.gratuitousARPInterval }}
+        {{- end }}
         {{- if .Values.frrk8s.external }}
         - --frrk8s-namespace={{ required "namespace is required when frrk8s is external" .Values.frrk8s.namespace }}
         {{- if .Values.frrk8s.secretPassthrough }}

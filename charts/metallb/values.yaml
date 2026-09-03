@@ -275,6 +275,8 @@ speaker:
   ignoreExcludeLB: false
   # --  BGP debounce timeout for FRR configuration reloads, in milliseconds. Only applies when BGP type is frr. Default (when unset) is 3000 ms. This feature is experimental
   bgpDebounceTimeout: null
+  # -- Interval in seconds for periodic gratuitous ARP/NDP announcements. 0 (default) disables periodic announcements.
+  gratuitousARPInterval: null
 
   image:
     repository: quay.io/metallb/speaker

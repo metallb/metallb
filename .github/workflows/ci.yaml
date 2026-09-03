@@ -233,6 +233,7 @@ jobs:
           WITH_VRF="--with-vrf"
           FOCUS=""
           FRRK8S_NAMESPACE=""
+          if [ "${{ matrix.deployment }}" == "manifests" ]; then SKIP="$SKIP|periodic-gratuitous-arp"; fi
           if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|FRR-MODE|FRRK8S-MODE|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
