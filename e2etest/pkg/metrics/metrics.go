@@ -157,6 +157,18 @@ func CounterForLabels(metricName string, labels map[string]string, metrics map[s
 	})
 }
 
+// CounterValue returns the raw counter value for the given metric across all scraped pods.
+func CounterValue(metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) (float64, error) {
+	for _, m := range allMetrics {
+		v, err := CounterForLabels(metricName, labels, m)
+		if err != nil {
+			continue
+		}
+		return float64(v), nil
+	}
+	return 0, fmt.Errorf("metric %s not found", metricName)
+}
+
 func GreaterOrEqualThan(min int) func(value int) error {
 	return func(value int) error {
 		if value < min {
