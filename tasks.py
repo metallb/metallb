@@ -23,7 +23,7 @@ from invoke.exceptions import Exit, UnexpectedExit
 LICENSE_PATH = os.path.join("dev-env", "deepcopy_header.txt")
 
 all_binaries = set(["controller", "speaker", "configmaptocrs"])
-all_architectures = set(["amd64", "arm", "arm64", "ppc64le", "s390x"])
+all_architectures = set(["amd64", "arm", "arm64", "riscv64", "ppc64le", "s390x"])
 default_network = "kind"
 extra_network = "network2"
 controller_gen_version = "v0.19.0"
