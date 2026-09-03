@@ -129,23 +129,13 @@ func ValidateGaugeValueCompare(check func(int) error, metricName string, labels 
 
 // ValidateCounterValue checks that the value related to the given metric is at most the expectedMax value.
 func ValidateCounterValue(check func(int) error, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) error {
-	var err error
-	var value int
-	found := false
-	for _, m := range allMetrics {
-		value, err = CounterForLabels(metricName, labels, m)
-		if err != nil {
-			continue
-		}
-		found = true
-		err := check(value)
-		if err != nil {
-			return fmt.Errorf("invalid value %d for %s, %w", value, metricName, err)
-		}
+	value, err := CounterValue(metricName, labels, allMetrics)
+	if err != nil {
+		return err
 	}
-
-	if !found {
-		return fmt.Errorf("metric %s not found", metricName)
+	v := int(value)
+	if err := check(v); err != nil {
+		return fmt.Errorf("invalid value %d for %s, %w", v, metricName, err)
 	}
 	return nil
 }
@@ -155,6 +145,44 @@ func CounterForLabels(metricName string, labels map[string]string, metrics map[s
 	return metricForLabels(metricName, labels, metrics, func(m *dto.Metric) int {
 		return int(m.GetCounter().GetValue())
 	})
+}
+
+// CounterValue returns the raw counter value for the given metric across all scraped pods.
+func CounterValue(metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) (float64, error) {
+	for _, m := range allMetrics {
+		v, err := counterValueForLabels(metricName, labels, m)
+		if err != nil {
+			continue
+		}
+		return v, nil
+	}
+	return 0, fmt.Errorf("metric %s not found", metricName)
+}
+
+// counterValueForLabels retrieves the counter value as float64, preserving fractional
+// values and avoiding truncation from int conversion.
+func counterValueForLabels(metricName string, labels map[string]string, metrics map[string]*dto.MetricFamily) (float64, error) {
+	mf, ok := metrics[metricName]
+	if !ok {
+		return 0, fmt.Errorf("metric %s not in metrics", metricName)
+	}
+	for _, m := range mf.GetMetric() {
+		toMatch := len(labels)
+		for _, l := range m.GetLabel() {
+			v, ok := labels[l.GetName()]
+			if !ok {
+				continue
+			}
+			if v != l.GetValue() {
+				continue
+			}
+			toMatch--
+		}
+		if toMatch == 0 {
+			return m.GetCounter().GetValue(), nil
+		}
+	}
+	return 0, fmt.Errorf("label %s not found in metrics for %s", labels, metricName)
 }
 
 func GreaterOrEqualThan(min int) func(value int) error {
