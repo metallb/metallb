@@ -307,6 +307,10 @@
               },
               "required": [ "type" ]
             },
+            "revisionHistoryLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
             "command" : {
               "type": "string"
             },
@@ -375,6 +379,10 @@
               },
               "required": [ "type" ]
             },
+            "revisionHistoryLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
             "runtimeClassName": {
               "type": "string"
             },
@@ -394,7 +402,10 @@
                 "image": { "$ref": "#/definitions/component/properties/image" },
                 "metricsPort": { "type": "integer" },
                 "secureMetricsPort": { "type": "integer" },
-                "resources:": { "type": "object" }
+                "resources:": { "type": "object" },
+                "tiniPath": { "type": "string" },
+                "dockerStartPath": { "type": "string" },
+                "securityContext": { "type": "object" }
               },
               "required": [ "enabled" ]
             },
