@@ -25,6 +25,7 @@
                                         "172.16.1.10/24"
                                     ]
                                 },
+                                "nextHop": {},
                                 "withLocalPref": [
                                     {
                                         "prefixes": [
