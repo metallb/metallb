@@ -49,6 +49,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.readinessProbe.successThreshold | int | `1` |  |
 | controller.readinessProbe.timeoutSeconds | int | `1` |  |
 | controller.resources | object | `{}` |  |
+| controller.revisionHistoryLimit | int | `10` |  |
 | controller.runtimeClassName | string | `""` |  |
 | controller.securityContext.fsGroup | int | `65534` |  |
 | controller.securityContext.runAsNonRoot | bool | `true` |  |
@@ -124,12 +125,15 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.enabled | bool | `true` |  |
 | speaker.excludeInterfaces.enabled | bool | `true` |  |
 | speaker.extraContainers | list | `[]` |  |
+| speaker.frr.dockerStartPath | string | `"/usr/lib/frr/docker-start"` | Path to the docker-start script inside the FRR container. Override this when using an FRR image (e.g. Docker Hardened Images) that places docker-start at a different location. |
 | speaker.frr.enabled | bool | `false` |  |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"quay.io/frrouting/frr"` |  |
 | speaker.frr.image.tag | string | `"10.5.3"` |  |
 | speaker.frr.metricsPort | int | `9121` |  |
 | speaker.frr.resources | object | `{}` |  |
+| speaker.frr.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"add":["NET_ADMIN","NET_RAW","SYS_ADMIN","NET_BIND_SERVICE"]},"readOnlyRootFilesystem":true}` | Security context for the FRR container. |
+| speaker.frr.tiniPath | string | `"/sbin/tini"` | Path to the tini binary inside the FRR container. Override this when using an FRR image (e.g. Docker Hardened Images) that places tini at a different location. |
 | speaker.frrMetrics.resources | object | `{}` |  |
 | speaker.ignoreExcludeLB | bool | `false` |  |
 | speaker.image.pullPolicy | string | `nil` |  |
@@ -163,6 +167,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.readinessProbe.timeoutSeconds | int | `1` |  |
 | speaker.reloader.resources | object | `{}` |  |
 | speaker.resources | object | `{}` |  |
+| speaker.revisionHistoryLimit | int | `10` |  |
 | speaker.runtimeClassName | string | `""` |  |
 | speaker.securityContext | object | `{}` |  |
 | speaker.serviceAccount.annotations | object | `{}` |  |
