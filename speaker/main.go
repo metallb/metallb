@@ -91,7 +91,7 @@ func main() {
 		mlWANConfig             = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
 		myNode                  = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
 		myPod                   = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
-		port                    = flag.Int("port", 9120, "HTTPS metrics listening port")
+		port                    = flag.Int("port", 9120, "HTTPS metrics listening port; set to 0 to disable metrics")
 		logLevel                = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		pprofBindAddress        = flag.String("pprof-bind-address", "", "Bind address for pprof endpoint (e.g. 127.0.0.1:6060). Empty disables pprof.")
 		healthProbePort         = flag.Int("health-probe-port", k8s.DefaultHealthProbePort, "Port for health probe endpoint")

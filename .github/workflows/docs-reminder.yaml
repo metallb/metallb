@@ -1,0 +1,41 @@
+name: Docs Reminder
+
+# Reminder for contributors and reviewers: when a pull request is labeled
+# "kind/feature" (see classify.yaml) but does not touch the website/
+# documentation, fail this job so it's clearly visible. This check is not a
+# required status check, so it does not block merging — it's only a visible
+# reminder. Fixes: https://github.com/metallb/metallb/issues/2663
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+# Least privilege; read-only so this also works for pull requests from forks.
+permissions:
+  contents: read
+
+jobs:
+  docs-reminder:
+    runs-on: ubuntu-22.04
+    # classify.yaml is the single source of truth for PR kind; check its
+    # kind/feature label directly instead of re-deriving it from the PR body.
+    if: >
+      github.actor != 'dependabot[bot]' &&
+      contains(github.event.pull_request.labels.*.name, 'kind/feature')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remind to document feature PRs
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+          if git diff --name-only "$BASE"..."$HEAD" | grep -q '^website/'; then
+            echo "Feature PR updates website/ docs."
+            exit 0
+          fi
+          MSG="This PR is labeled \`kind/feature\` but does not update the \`website/\` documentation. If this feature is user-facing, please add or update the relevant docs under \`website/content/\` in this PR. This check is not required, so it does not block merging (see issue #2663)."
+          echo "### Documentation reminder" >> "$GITHUB_STEP_SUMMARY"
+          echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::$MSG"
+          exit 1
