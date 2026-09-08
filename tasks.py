@@ -1155,7 +1155,7 @@ def lint(ctx, env="container"):
         )
     elif env == "host":
         run(
-            "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v{}".format(
+            "go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v{}".format(
                 version
             )
         )
