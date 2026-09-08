@@ -579,8 +579,31 @@ var _ = ginkgo.Describe("BGP", func() {
 		// no-prepend replace-as", so the external FRR container must expect
 		// localASN as MetalLB's remote-as for the session to come up.
 		localASN := uint32(64520)
+		// peerASN is used for iBGP containers to make the peer's ASN different
+		// from both metalLBASN (so it's treated as eBGP, allowing localASN) and
+		// from localASN (FRR rejects local-as equal to remote-as).
+		peerASN := uint32(64530)
 
 		ginkgo.By("configure peer with localASN")
+
+		// For iBGP containers, update router ASN to peerASN before creating BGPPeers.
+		// This ensures the peer is treated as eBGP (required for localASN) and avoids
+		// FRR's restriction that local-as cannot equal remote-as. A container is iBGP
+		// when its router ASN equals the neighbor (MetalLB) ASN, which covers both the
+		// default containers (metalLBASN) and the VRF containers (metalLBASNVRF).
+		// Save original values to restore after the test.
+		originalASNs := make(map[string]uint32)
+		for _, c := range FRRContainers {
+			originalASNs[c.Name] = c.RouterConfig.ASN
+			if c.RouterConfig.ASN == c.NeighborConfig.ASN {
+				c.RouterConfig.ASN = peerASN
+			}
+		}
+		defer func() {
+			for _, c := range FRRContainers {
+				c.RouterConfig.ASN = originalASNs[c.Name]
+			}
+		}()
 
 		resources := config.Resources{
 			Peers: metallb.PeersForContainers(FRRContainers, ipFamily, func(p *metallbv1beta2.BGPPeer) {
@@ -611,7 +634,9 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 	},
 		ginkgo.Entry("FRR-MODE IPV4", ipfamily.IPv4),
-		ginkgo.Entry("FRR-MODE IPV6", ipfamily.IPv6))
+		ginkgo.Entry("FRR-MODE IPV6", ipfamily.IPv6),
+		ginkgo.Entry("FRRK8S-MODE IPV4", ipfamily.IPv4),
+		ginkgo.Entry("FRRK8S-MODE IPV6", ipfamily.IPv6))
 
 	ginkgo.DescribeTable("validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
@@ -1319,92 +1344,92 @@ var _ = ginkgo.Describe("BGP", func() {
 				[]metallbv1beta1.Community{}))
 
 		ginkgo.It("IPV4 - overlapping bgp advertisements union communities for the same prefix", func() {
-				const (
-					communityA = "65000:100"
-					communityB = "65000:200"
-				)
-				ipFamily := ipfamily.IPv4
-				poolAddresses := []string{v4PoolAddresses}
+			const (
+				communityA = "65000:100"
+				communityB = "65000:200"
+			)
+			ipFamily := ipfamily.IPv4
+			poolAddresses := []string{v4PoolAddresses}
 
-				resources := config.Resources{
-					Pools: []metallbv1beta1.IPAddressPool{
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "bgp-overlap-pool"},
-							Spec: metallbv1beta1.IPAddressPoolSpec{
-								Addresses: poolAddresses,
-							},
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "bgp-overlap-pool"},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: poolAddresses,
 						},
 					},
-					Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
-					BGPAdvs: []metallbv1beta1.BGPAdvertisement{
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-a"},
-							Spec: metallbv1beta1.BGPAdvertisementSpec{
-								Communities:    []string{communityA},
-								IPAddressPools: []string{"bgp-overlap-pool"},
-							},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-b"},
-							Spec: metallbv1beta1.BGPAdvertisementSpec{
-								Communities:    []string{communityB},
-								IPAddressPools: []string{"bgp-overlap-pool"},
-							},
+				},
+				Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-a"},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							Communities:    []string{communityA},
+							IPAddressPools: []string{"bgp-overlap-pool"},
 						},
 					},
-				}
-
-				for _, c := range FRRContainers {
-					err := frrcontainer.PairWithNodes(cs, c, ipFamily)
-					Expect(err).NotTo(HaveOccurred())
-				}
-
-				err := ConfigUpdater.Update(resources)
-				Expect(err).NotTo(HaveOccurred())
-
-				for _, c := range FRRContainers {
-					validateFRRPeeredWithAllNodes(cs, c, ipFamily)
-				}
-
-				serviceIP, err := config.GetIPFromRangeByIndex(poolAddresses[0], 0)
-				Expect(err).NotTo(HaveOccurred())
-
-				svc, jig := testservice.CreateWithBackend(cs, testNamespace, "svc-ovlp-comm",
-					func(s *corev1.Service) {
-						s.Spec.LoadBalancerIP = serviceIP
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-b"},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							Communities:    []string{communityB},
+							IPAddressPools: []string{"bgp-overlap-pool"},
+						},
 					},
-					testservice.TrafficPolicyCluster)
-				Expect(svc).NotTo(BeNil())
-				Expect(jig).NotTo(BeNil())
-				defer testservice.Delete(cs, svc)
+				},
+			}
 
-				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			for _, c := range FRRContainers {
+				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
 				Expect(err).NotTo(HaveOccurred())
+			}
 
-				for _, c := range FRRContainers {
-					validateService(svc, allNodes.Items, c)
-				}
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
 
-				for _, c := range FRRContainers {
-					Eventually(func() error {
-						routesA, err := frr.RoutesForCommunity(c, communityA, ipFamily)
-						if err != nil {
-							return err
-						}
-						if _, ok := routesA[serviceIP]; !ok {
-							return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityA, c.Name)
-						}
+			for _, c := range FRRContainers {
+				validateFRRPeeredWithAllNodes(cs, c, ipFamily)
+			}
 
-						routesB, err := frr.RoutesForCommunity(c, communityB, ipFamily)
-						if err != nil {
-							return err
-						}
-						if _, ok := routesB[serviceIP]; !ok {
-							return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityB, c.Name)
-						}
-						return nil
-					}, 1*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
-				}
+			serviceIP, err := config.GetIPFromRangeByIndex(poolAddresses[0], 0)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc, jig := testservice.CreateWithBackend(cs, testNamespace, "svc-ovlp-comm",
+				func(s *corev1.Service) {
+					s.Spec.LoadBalancerIP = serviceIP
+				},
+				testservice.TrafficPolicyCluster)
+			Expect(svc).NotTo(BeNil())
+			Expect(jig).NotTo(BeNil())
+			defer testservice.Delete(cs, svc)
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, c := range FRRContainers {
+				validateService(svc, allNodes.Items, c)
+			}
+
+			for _, c := range FRRContainers {
+				Eventually(func() error {
+					routesA, err := frr.RoutesForCommunity(c, communityA, ipFamily)
+					if err != nil {
+						return err
+					}
+					if _, ok := routesA[serviceIP]; !ok {
+						return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityA, c.Name)
+					}
+
+					routesB, err := frr.RoutesForCommunity(c, communityB, ipFamily)
+					if err != nil {
+						return err
+					}
+					if _, ok := routesB[serviceIP]; !ok {
+						return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityB, c.Name)
+					}
+					return nil
+				}, 1*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
+			}
 		})
 	})
 
