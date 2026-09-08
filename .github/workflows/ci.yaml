@@ -159,7 +159,7 @@ jobs:
           fi
 
       - name: Helm doc generate
-        uses: docker://jnorwood/helm-docs:v1.10.0
+        uses: docker://jnorwood/helm-docs:v1.14.2
 
       - name: Check if  docs are different
         run: |
@@ -382,7 +382,7 @@ jobs:
 
       - name: Deploy MetalLB
         run: |
-          inv dev-env -b frr --with-prometheus --no-build-images --node-img kindest/node:v1.27.1@sha256:b7d12ed662b873bd8510879c1846e87c7e676a79fefc93e17b2a52989d3ff42b
+          inv dev-env -b frr --with-prometheus --no-build-images --node-img kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
 
       - name: E2E
         run: |

@@ -26,16 +26,16 @@ all_binaries = set(["controller", "speaker", "configmaptocrs"])
 all_architectures = set(["amd64", "arm", "arm64", "ppc64le", "s390x"])
 default_network = "kind"
 extra_network = "network2"
-controller_gen_version = "v0.19.0"
+controller_gen_version = "v0.22.0"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
 kind_path = os.path.join(build_path, "kind")
 ginkgo_path = os.path.join(build_path, "bin", "ginkgo")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
 yq_path = os.path.join(build_path, "bin", "yq")
-kubectl_version = "v1.31.0"
-kind_version = "v0.24.0"
-yq_version = "v4.45.1"
+kubectl_version = "v1.34.0"
+kind_version = "v0.30.0"
+yq_version = "v4.53.6"
 
 
 def _check_architectures(architectures):
@@ -380,7 +380,7 @@ def validate_kind_version():
     # If kind is not installed, this first command will raise an UnexpectedExit
     # exception, and inv will exit at this point making it clear running "kind"
     # failed.
-    min_version = "0.9.0"
+    min_version = "0.24.0"
 
     try:
         raw = run("kind version", echo=True)
@@ -1084,7 +1084,7 @@ def bumprelease(ctx, version, previous_version):
 def test(ctx):
     """Run unit tests."""
     envtest_asset_dir = os.getcwd() + "/dev-env/unittest"
-    k8s_version = "1.27.1"
+    k8s_version = "1.34.0"
     run(
         "{}/setup-envtest.sh {}".format(envtest_asset_dir, envtest_asset_dir), echo=True
     )
@@ -1143,7 +1143,7 @@ def lint(ctx, env="container"):
     convenient to install the golangci-lint binaries on the host. This can be
     achieved by running `inv lint --env host`.
     """
-    version = "2.11.4"
+    version = "2.13.2"
     golangci_cmd = "golangci-lint run --timeout 10m0s ./..."
 
     if env == "container":
@@ -1177,7 +1177,7 @@ def helmdocs(ctx, env="container"):
     convenient to install the helm-docs binaries on the host. This can be
     achieved by running `inv helmdocs --env host`.
     """
-    version = "1.10.0"
+    version = "1.14.2"
     cmd = "helm-docs"
 
     if env == "container":
