@@ -15,6 +15,7 @@
 | Vendor | Nokia EDA | 2024 | [link](https://docs.eda.dev) | MetalLB implements the LoadBalancer controller role in the Nokia Event Driven Automation (EDA) product|
 | End-user | Kiratech S.p.A. | 2022 | [link](https://www.kiratech.it/) | MetalLB is the LoadBalancer reference technology in our training courses laboratories, which are [public and published under MIT license](https://github.com/kiratech/labs) |
 | End-user | Westnet | 2023 | [link](https://www.westnet.ie/) | We use MetalLB as the LoadBalancer for our in-house and public-facing applications, built on a self-hosted [Talos Linux](https://talos.dev) cluster |
+| Vendor | DaoCloud | 2021 | [link](https://www.daocloud.io) | MetalLB is integrated into DaoCloud Enterprise (DCE), providing LoadBalancer services for Kubernetes clusters on bare metal |
 
 
 ### Adopter Types
