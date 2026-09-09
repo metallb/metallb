@@ -193,7 +193,7 @@ func metricForLabels(metricName string, labels map[string]string, metrics map[st
 }
 
 func metricsFromString(metrics string) (map[string]*dto.MetricFamily, error) {
-	var parser expfmt.TextParser
+	parser := expfmt.NewTextParser(model.UTF8Validation)
 	mf, err := parser.TextToMetricFamilies(strings.NewReader(metrics))
 	if err != nil {
 		return nil, errors.Join(err, fmt.Errorf("failed to parse metrics %s", metrics))
