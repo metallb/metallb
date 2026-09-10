@@ -188,7 +188,7 @@ func TestValidate(t *testing.T) {
 				Peers: []v1beta2.BGPPeer{
 					{
 						Spec: v1beta2.BGPPeerSpec{
-							DisableMP: true,
+							DisableMP: true, //nolint:staticcheck // kept for backwards compatibility
 						},
 					},
 				},

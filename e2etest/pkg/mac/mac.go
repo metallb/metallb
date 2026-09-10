@@ -80,18 +80,9 @@ func MatchNode(nodes []corev1.Node, mac net.HardwareAddr, exec executor.Executor
 			continue
 		}
 
-		ip := routes.Ipv4Re.FindString(r)
-		if ip == "" {
-			ip = routes.Ipv6Re.FindString(r)
-		}
-
-		if ip == "" {
-			continue
-		}
-
-		netIP := net.ParseIP(ip)
+		netIP := routes.ParseIPToken(r)
 		if netIP == nil {
-			return nil, fmt.Errorf("failed to convert %s to net.IP", ip)
+			continue
 		}
 
 		if n, ok := nodesIPs[netIP.String()]; ok {

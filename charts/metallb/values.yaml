@@ -80,7 +80,7 @@ prometheus:
     # - sourceLabels: [__meta_kubernetes_pod_node_name]
     #   separator: ;
     #   regex: ^(.*)$
-    #   target_label: nodename
+    #   targetLabel: nodename
     #   replacement: $1
     #   action: replace
 
@@ -131,7 +131,7 @@ prometheus:
     # - sourceLabels: [__meta_kubernetes_pod_node_name]
     #   separator: ;
     #   regex: ^(.*)$
-    #   target_label: nodename
+    #   targetLabel: nodename
     #   replacement: $1
     #   action: replace
 
