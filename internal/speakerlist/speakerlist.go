@@ -101,7 +101,8 @@ func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, lab
 		level.Warn(logger).Log("op", "startup", "warning", "no ml-secret-key set, memberlist traffic will not be encrypted")
 	} else {
 		sha := sha256.New()
-		memberListConfig.SecretKey = sha.Sum([]byte(secret))[:32]
+		sha.Write([]byte(secret))
+		memberListConfig.SecretKey = sha.Sum(nil)
 	}
 
 	// This channel is used by the Rejoin() method which runs on k8s node
