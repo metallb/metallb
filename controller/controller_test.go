@@ -66,12 +66,14 @@ func statusAssigned(ips []string) v1.ServiceStatus {
 type testK8S struct {
 	updateService       *v1.Service
 	updateServiceStatus *v1.ServiceStatus
+	updatedSvc          *v1.Service
 	loggedWarning       bool
 	t                   *testing.T
 }
 
 func (s *testK8S) UpdateStatus(svc *v1.Service) error {
 	s.updateServiceStatus = &svc.Status
+	s.updatedSvc = svc
 	return nil
 }
 
@@ -87,6 +89,7 @@ func (s *testK8S) Errorf(_ *v1.Service, evtType string, msg string, args ...inte
 func (s *testK8S) reset() {
 	s.updateService = nil
 	s.updateServiceStatus = nil
+	s.updatedSvc = nil
 	s.loggedWarning = false
 }
 
@@ -1146,6 +1149,112 @@ func TestControllerMutation(t *testing.T) {
 			tests[x], tests[nx] = tests[nx], tests[x]
 		}
 		t.Logf("Shuffled test cases")
+	}
+}
+
+func TestControllerRemovesDeprecatedManagedAnnotation(t *testing.T) {
+	k := &testK8S{t: t}
+	c := &controller{
+		ips:    allocator.New(noopCallback),
+		client: k,
+	}
+	pools := &config.Pools{ByName: map[string]*config.Pool{
+		"pool1": {
+			Name:       "pool1",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+		},
+	}}
+	l := log.NewNopLogger()
+	if c.SetPools(l, pools) == controllers.SyncStateError {
+		t.Fatalf("SetPools failed")
+	}
+
+	// A service allocated by an older MetalLB version still carries the
+	// deprecated managed annotation. After reconcile the controller must drop
+	// it and keep only the current metallb.io managed annotation, instead of
+	// leaving both on the service. See issue #2642.
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				DeprecatedAnnotationIPAllocateFromPool: "pool1",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Type:       "LoadBalancer",
+			ClusterIPs: []string{"1.2.3.4"},
+		},
+		Status: statusAssigned([]string{"1.2.3.0"}),
+	}
+
+	if c.SetBalancer(l, "test", svc, []discovery.EndpointSlice{}) == controllers.SyncStateError {
+		t.Fatalf("SetBalancer returned error")
+	}
+
+	if k.updatedSvc == nil {
+		t.Fatalf("controller did not update the service")
+	}
+	if _, ok := k.updatedSvc.Annotations[DeprecatedAnnotationIPAllocateFromPool]; ok {
+		t.Errorf("deprecated managed annotation %q was not removed, got annotations: %v",
+			DeprecatedAnnotationIPAllocateFromPool, k.updatedSvc.Annotations)
+	}
+	if got := k.updatedSvc.Annotations[AnnotationIPAllocateFromPool]; got != "pool1" {
+		t.Errorf("current managed annotation %q = %q, want %q",
+			AnnotationIPAllocateFromPool, got, "pool1")
+	}
+}
+
+func TestControllerClearsDeprecatedManagedAnnotation(t *testing.T) {
+	k := &testK8S{t: t}
+	c := &controller{
+		ips:    allocator.New(noopCallback),
+		client: k,
+	}
+	pools := &config.Pools{ByName: map[string]*config.Pool{
+		"pool1": {
+			Name:       "pool1",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+		},
+	}}
+	l := log.NewNopLogger()
+	if c.SetPools(l, pools) == controllers.SyncStateError {
+		t.Fatalf("SetPools failed")
+	}
+
+	// A service that is no longer a LoadBalancer still carries the deprecated
+	// managed annotation from an older MetalLB version. When the controller
+	// clears the service state it must drop the deprecated annotation too,
+	// otherwise the service keeps falsely advertising a pool allocation.
+	// See issue #2642.
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				DeprecatedAnnotationIPAllocateFromPool: "pool1",
+				AnnotationIPAllocateFromPool:           "pool1",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Type:       "ClusterIP",
+			ClusterIPs: []string{"1.2.3.4"},
+		},
+		Status: statusAssigned([]string{"1.2.3.0"}),
+	}
+
+	if c.SetBalancer(l, "test", svc, []discovery.EndpointSlice{}) == controllers.SyncStateError {
+		t.Fatalf("SetBalancer returned error")
+	}
+
+	if k.updatedSvc == nil {
+		t.Fatalf("controller did not update the service")
+	}
+	if _, ok := k.updatedSvc.Annotations[DeprecatedAnnotationIPAllocateFromPool]; ok {
+		t.Errorf("deprecated managed annotation %q was not cleared, got annotations: %v",
+			DeprecatedAnnotationIPAllocateFromPool, k.updatedSvc.Annotations)
+	}
+	if _, ok := k.updatedSvc.Annotations[AnnotationIPAllocateFromPool]; ok {
+		t.Errorf("current managed annotation %q was not cleared, got annotations: %v",
+			AnnotationIPAllocateFromPool, k.updatedSvc.Annotations)
 	}
 }
 
