@@ -2610,7 +2610,7 @@ spec:
           defaultMode: 420
           secretName: memberlist
       - configMap:
-          defaultMode: 256
+          defaultMode: 292
           name: metallb-excludel2
         name: metallb-excludel2
       - configMap:
