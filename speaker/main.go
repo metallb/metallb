@@ -255,12 +255,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var validateConfig config.Validate
-	if bgpType == "native" {
-		validateConfig = config.DiscardFRROnly
-	} else {
-		validateConfig = config.DiscardNativeOnly
-	}
+	validateConfig := config.ValidationFor(bgpType)
 
 	listenFRRK8s := bgpType == string(bgpFrrK8s)
 	client, err := k8s.New(&k8s.Config{

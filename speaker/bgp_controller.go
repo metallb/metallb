@@ -336,7 +336,8 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 					IP:   lbIP.Mask(m),
 					Mask: m,
 				},
-				LocalPref: adCfg.LocalPref,
+				LocalPref:     adCfg.LocalPref,
+				AsPathPrepend: adCfg.AsPathPrepend,
 			}
 			if len(adCfg.Peers) > 0 {
 				ad.Peers = make([]string, 0, len(adCfg.Peers))
@@ -543,6 +544,10 @@ func checkBGPAdvConflicts(ads []*config.BGPAdvertisement, pool *config.Pool) err
 			if !config.BGPAdvertisementsHaveCompatibleLocalPref(ad1, ad2, pool) {
 				return fmt.Errorf("advertisements '%s' and '%s' have conflicting LOCAL_PREF (%d vs %d)",
 					ad1.Name, ad2.Name, ad1.LocalPref, ad2.LocalPref)
+			}
+			if !config.BGPAdvertisementsHaveCompatibleAsPathPrepend(ad1, ad2, pool) {
+				return fmt.Errorf("advertisements '%s' and '%s' have conflicting as-path prepend (%d vs %d)",
+					ad1.Name, ad2.Name, ad1.AsPathPrepend, ad2.AsPathPrepend)
 			}
 		}
 	}

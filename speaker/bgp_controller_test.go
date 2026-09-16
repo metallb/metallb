@@ -73,6 +73,9 @@ func sortAds(ads map[string][]*bgp.Advertisement) {
 			if a.LocalPref != b.LocalPref {
 				return a.LocalPref < b.LocalPref
 			}
+			if a.AsPathPrepend != b.AsPathPrepend {
+				return a.AsPathPrepend < b.AsPathPrepend
+			}
 			if len(a.Communities) != len(b.Communities) {
 				return len(a.Communities) < len(b.Communities)
 			}
@@ -685,6 +688,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							{
 								AggregationLength: 32,
 								LocalPref:         100,
+								AsPathPrepend:     3,
 								Communities: func() map[community.BGPCommunity]bool {
 									community1, _ := community.New("0:1234")
 									community2, _ := community.New("0:2345")
@@ -727,8 +731,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix:    ipnet("10.20.30.1/32"),
-						LocalPref: 100,
+						Prefix:        ipnet("10.20.30.1/32"),
+						LocalPref:     100,
+						AsPathPrepend: 3,
 						Communities: func() []community.BGPCommunity {
 							community1, _ := community.New("0:1234")
 							community2, _ := community.New("0:2345")
@@ -2202,6 +2207,30 @@ func TestCheckBGPAdvConflicts(t *testing.T) {
 				{Name: "ad2", AggregationLength: 32, LocalPref: 200, Nodes: map[string]bool{"nodeA": true}, Peers: []string{}},
 			},
 			expectError: true,
+		},
+		{
+			desc: "No conflict - same as-path prepend",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, AsPathPrepend: 3, Nodes: map[string]bool{"nodeA": true}},
+				{Name: "ad2", AggregationLength: 32, AsPathPrepend: 3, Nodes: map[string]bool{"nodeA": true}},
+			},
+			expectError: false,
+		},
+		{
+			desc: "Conflict - different as-path prepend, same node",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, AsPathPrepend: 3, Nodes: map[string]bool{"nodeA": true}},
+				{Name: "ad2", AggregationLength: 32, AsPathPrepend: 5, Nodes: map[string]bool{"nodeA": true}},
+			},
+			expectError: true,
+		},
+		{
+			desc: "No conflict - different as-path prepend, different nodes",
+			ads: []*config.BGPAdvertisement{
+				{Name: "ad1", AggregationLength: 32, AsPathPrepend: 3, Nodes: map[string]bool{"nodeA": true}},
+				{Name: "ad2", AggregationLength: 32, AsPathPrepend: 5, Nodes: map[string]bool{"nodeB": true}},
+			},
+			expectError: false,
 		},
 	}
 

@@ -728,3 +728,70 @@ func hostNode(hostname string) corev1.Node {
 		Labels: map[string]string{"kubernetes.io/hostname": hostname},
 	}}
 }
+
+func TestAsPathPrependBackendValidation(t *testing.T) {
+	tests := []struct {
+		desc         string
+		mode         string
+		prependCount uint8
+		mustFail     bool
+	}{
+		{
+			desc:         "no AS-Path prepending, native backend",
+			mode:         "native",
+			prependCount: 0,
+			mustFail:     false,
+		},
+		{
+			desc:         "no AS-Path prepending, frr backend",
+			mode:         "frr",
+			prependCount: 0,
+			mustFail:     false,
+		},
+		{
+			desc:         "no AS-Path prepending, frr-k8s backend",
+			mode:         "frr-k8s",
+			prependCount: 0,
+			mustFail:     false,
+		},
+		{
+			desc:         "AS-Path prepending configured, native backend",
+			mode:         "native",
+			prependCount: 3,
+			mustFail:     true,
+		},
+		{
+			desc:         "AS-Path prepending configured, frr backend",
+			mode:         "frr",
+			prependCount: 3,
+			mustFail:     true,
+		},
+		{
+			desc:         "AS-Path prepending configured, frr-k8s backend",
+			mode:         "frr-k8s",
+			prependCount: 3,
+			mustFail:     false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			config := ClusterResources{
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend: test.prependCount,
+						},
+					},
+				},
+			}
+			err := ValidationFor(test.mode)(config)
+			if test.mustFail && err == nil {
+				t.Fatalf("Expected error for %s", test.desc)
+			}
+			if !test.mustFail && err != nil {
+				t.Fatalf("Not expected error %s for %s", err, test.desc)
+			}
+		})
+	}
+}
