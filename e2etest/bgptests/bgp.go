@@ -1318,6 +1318,86 @@ var _ = ginkgo.Describe("BGP", func() {
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}))
 
+		ginkgo.DescribeTable("BGP advertisement with AS-Path Prepend", func(ipFamily ipfamily.Family, poolAddresses []string) {
+			const prependCount = 3
+
+			advertisement := metallbv1beta1.BGPAdvertisement{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "adv-aspath-prepend",
+					Namespace: ConfigUpdater.Namespace(),
+				},
+				Spec: metallbv1beta1.BGPAdvertisementSpec{
+					AsPathPrepend:  prependCount,
+					IPAddressPools: []string{"bgp-test"},
+				},
+			}
+
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: poolAddresses,
+						},
+					},
+				},
+				Peers:   metallb.PeersForContainers(FRRContainers, ipFamily),
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{advertisement},
+			}
+
+			for _, c := range FRRContainers {
+				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, c := range FRRContainers {
+				validateFRRPeeredWithAllNodes(cs, c, ipFamily)
+			}
+
+			serviceIP, err := config.GetIPFromRangeByIndex(poolAddresses[0], 1)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc, _ := testservice.CreateWithBackend(cs, testNamespace, "bgp-adv-aspath-svc", func(svc *corev1.Service) {
+				svc.Spec.LoadBalancerIP = serviceIP
+			}, testservice.TrafficPolicyCluster)
+			defer testservice.Delete(cs, svc)
+
+			ginkgo.By("Validate AS-Path Prepend length received on FRR containers")
+			for _, c := range FRRContainers {
+				Eventually(func() error {
+					// Prepending is evaluated on eBGP peers
+					if !strings.Contains(c.Name, "ibgp") {
+						asPath, err := frr.AsPathForPrefix(c, serviceIP, ipFamily)
+						if err != nil {
+							return err
+						}
+
+						expectedLength := int(advertisement.Spec.AsPathPrepend) + 1
+						if len(asPath) != expectedLength {
+							return fmt.Errorf("%s %s not matching length of AS-Path, expected %d got %d", c.Name, serviceIP, expectedLength, len(asPath))
+						}
+
+						// Verify every ASN in the path matches the configured local ASN for this specific peering session
+						expectedAsn := fmt.Sprint(c.NeighborConfig.ASN)
+						for i, asn := range asPath {
+							if fmt.Sprint(asn) != expectedAsn {
+								return fmt.Errorf("%s %s AS-Path contains unexpected ASN at index %d: %v (expected %s)", c.Name, serviceIP, i, asn, expectedAsn)
+							}
+						}
+					}
+
+					return nil
+				}, 1*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
+
+			}
+
+		},
+			ginkgo.Entry("FRRK8S-MODE IPV4", ipfamily.IPv4, []string{v4PoolAddresses}),
+			ginkgo.Entry("FRRK8S-MODE IPV6", ipfamily.IPv6, []string{v6PoolAddresses}))
+
 		ginkgo.It("IPV4 - overlapping bgp advertisements union communities for the same prefix", func() {
 				const (
 					communityA = "65000:100"

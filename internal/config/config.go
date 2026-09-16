@@ -206,6 +206,10 @@ type BGPAdvertisement struct {
 	// Value of the LOCAL_PREF BGP path attribute. Used only when
 	// advertising to IBGP peers (i.e. Peer.MyASN == Peer.ASN).
 	LocalPref uint32
+	// Specifies the number of times to prepend the ASN to the AS-path
+	// on outgoing BGP updates, artificially lengthening the path for traffic
+	// engineering. Optional, defaults to 0 (no prepending).
+	AsPathPrepend uint8
 	// Value of the COMMUNITIES path attribute.
 	Communities map[community.BGPCommunity]bool
 	// The map of nodes allowed for this advertisement
@@ -874,6 +878,7 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 		AggregationLengthV6: 128,
 		LocalPref:           0,
 		Communities:         map[community.BGPCommunity]bool{},
+		AsPathPrepend:       0,
 	}
 
 	if crdAd.Spec.AggregationLength != nil {
@@ -890,6 +895,7 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 	}
 
 	ad.LocalPref = crdAd.Spec.LocalPref
+	ad.AsPathPrepend = crdAd.Spec.AsPathPrepend
 
 	if len(crdAd.Spec.Peers) > 0 {
 		ad.Peers = make([]string, 0, len(crdAd.Spec.Peers))
@@ -990,7 +996,7 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 		}
 	}
 
-	// Do not verify that BGP ADVs set a unique local preference value when service selectors are used,
+	// Do not verify that BGP ADVs set a unique local preference and as path prepend values when service selectors are used,
 	// because in that case we don't know which services will be advertised via this advertisement.
 	if len(adv.ServiceSelectors) > 0 {
 		return nil
@@ -1004,6 +1010,11 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 				"already set for the same type of BGP update. Check existing BGP advertisements "+
 				"with common pools and aggregation lengths", adv.LocalPref, bgpAdv.LocalPref)
 		}
+		if !BGPAdvertisementsHaveCompatibleAsPathPrepend(adv, bgpAdv, pool) {
+			return fmt.Errorf("invalid as path prepend %d: as path prepend %d was "+
+				"already set for the same type of BGP update. Check existing BGP advertisements "+
+				"with common pools and aggregation lengths", adv.AsPathPrepend, bgpAdv.AsPathPrepend)
+		}
 	}
 
 	return nil
@@ -1012,36 +1023,36 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 // BGPAdvertisementsHaveCompatibleLocalPref checks if two BGP advertisements have compatible local preferences,
 // assuming both target at least one shared service.
 func BGPAdvertisementsHaveCompatibleLocalPref(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
-	if newAdv.LocalPref == adv.LocalPref {
-		return true
-	}
+	return newAdv.LocalPref == adv.LocalPref || !bgpAdvertisementsOverlap(newAdv, adv, pool)
+}
 
+// BGPAdvertisementsHaveCompatibleAsPathPrepend checks if two BGP advertisements have compatible as path prepend,
+// assuming both target at least one shared service.
+func BGPAdvertisementsHaveCompatibleAsPathPrepend(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+	return newAdv.AsPathPrepend == adv.AsPathPrepend || !bgpAdvertisementsOverlap(newAdv, adv, pool)
+}
+
+// bgpAdvertisementsOverlap reports whether two advertisements can produce the
+// same BGP update (same prefix length, shared peer, and shared node).
+func bgpAdvertisementsOverlap(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+	// BGP ADVs with different aggregation length don't overlap
 	if isAggrLengthDifferent(newAdv, adv, pool) {
-		return true
+		return false
 	}
-
-	// BGP ADVs with different set of BGP peers do not collide.
-	if len(newAdv.Peers) != 0 && len(adv.Peers) != 0 {
-		equalPeer := false
-		for _, peer := range newAdv.Peers {
-			if slices.Contains(adv.Peers, peer) {
-				equalPeer = true
-				break
-			}
-		}
-		if !equalPeer {
+	// BGP ADVs with different set of BGP peers don't overlap
+	if len(newAdv.Peers) != 0 && len(adv.Peers) != 0 &&
+		!slices.ContainsFunc(newAdv.Peers, func(p string) bool { return slices.Contains(adv.Peers, p) }) {
+		return false
+	}
+	// BGP ADVs with same aggregation length or common BGP peers,
+	// which have common nodes do overlap
+	for node := range newAdv.Nodes {
+		if adv.Nodes[node] {
 			return true
 		}
 	}
 
-	// BGP ADVs with different set of nodes do not collide.
-	for node := range newAdv.Nodes {
-		if _, ok := adv.Nodes[node]; ok {
-			return false
-		}
-	}
-
-	return true
+	return false
 }
 
 func isAggrLengthDifferent(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
