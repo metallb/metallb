@@ -26,6 +26,7 @@
                                         "172.16.1.11/24"
                                     ]
                                 },
+                                "nextHop": {},
                                 "withCommunity": [
                                     {
                                         "prefixes": [

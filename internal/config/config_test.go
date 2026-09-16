@@ -3730,7 +3730,7 @@ func TestParse(t *testing.T) {
 							MyASN:     42,
 							ASN:       142,
 							Address:   "1.2.3.4",
-							DisableMP: true,
+							DisableMP: true, //nolint:staticcheck // kept for backwards compatibility
 						},
 					},
 				},

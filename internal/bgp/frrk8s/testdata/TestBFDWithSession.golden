@@ -21,7 +21,8 @@
                             "ebgpMultiHop": true,
                             "bfdProfile": "foo",
                             "toAdvertise": {
-                                "allowed": {}
+                                "allowed": {},
+                                "nextHop": {}
                             },
                             "toReceive": {
                                 "allowed": {}
