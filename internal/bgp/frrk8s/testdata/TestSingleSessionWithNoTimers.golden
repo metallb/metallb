@@ -15,7 +15,8 @@
                             "port": 179,
                             "passwordSecret": {},
                             "toAdvertise": {
-                                "allowed": {}
+                                "allowed": {},
+                                "nextHop": {}
                             },
                             "toReceive": {
                                 "allowed": {}

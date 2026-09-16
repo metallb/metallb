@@ -19,7 +19,8 @@
                             "holdTime": "1s",
                             "keepaliveTime": "1s",
                             "toAdvertise": {
-                                "allowed": {}
+                                "allowed": {},
+                                "nextHop": {}
                             },
                             "toReceive": {
                                 "allowed": {}
@@ -40,7 +41,8 @@
                             "holdTime": "1s",
                             "keepaliveTime": "1s",
                             "toAdvertise": {
-                                "allowed": {}
+                                "allowed": {},
+                                "nextHop": {}
                             },
                             "toReceive": {
                                 "allowed": {}
