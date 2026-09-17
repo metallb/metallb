@@ -177,6 +177,12 @@ If you are using MetalLB with a kubernetes version that enforces [pod security a
     pod-security.kubernetes.io/warn: privileged
 ```
 
+The labels can also be applied to an already-deployed namespace:
+
+```bash
+kubectl label namespace metallb-system pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged
+```
+
 {{% /notice %}}
 
 {{% notice note %}}
