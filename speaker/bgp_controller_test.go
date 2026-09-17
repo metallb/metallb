@@ -195,6 +195,7 @@ func (f *fakeSession) Set(ads ...*bgp.Advertisement) error {
 type testK8S struct {
 	loggedWarning bool
 	events        map[string]int
+	eventMsgs     map[string][]string
 	t             *testing.T
 }
 
@@ -205,8 +206,10 @@ func (s *testK8S) UpdateStatus(svc *v1.Service) error {
 func (s *testK8S) Infof(_ *v1.Service, evtType string, msg string, args ...interface{}) {
 	if s.events == nil {
 		s.events = map[string]int{}
+		s.eventMsgs = map[string][]string{}
 	}
 	s.events[evtType]++
+	s.eventMsgs[evtType] = append(s.eventMsgs[evtType], fmt.Sprintf(msg, args...))
 	s.t.Logf("k8s Info event %q: %s", evtType, fmt.Sprintf(msg, args...))
 }
 
