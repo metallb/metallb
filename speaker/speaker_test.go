@@ -159,6 +159,82 @@ func TestLoadBalancerCreation(t *testing.T) {
 	}
 }
 
+func TestNodeAssignedEventOnlyOnChange(t *testing.T) {
+	var l2MockHandler = &MockProtocol{
+		protocol:       config.Layer2,
+		shouldAnnounce: true,
+	}
+
+	var bgpMockHandler = &MockProtocol{
+		protocol:       config.BGP,
+		shouldAnnounce: false,
+	}
+	c := mockNewController(l2MockHandler, bgpMockHandler, t)
+	client := c.client.(*testK8S)
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "eventsvc",
+		},
+		Spec: v1.ServiceSpec{
+			Type:                  "LoadBalancer",
+			ExternalTrafficPolicy: "Cluster",
+		},
+		Status: statusAssigned("10.20.30.5"),
+	}
+
+	cfg := &config.Config{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
+			"default": {
+				CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+			},
+		}},
+	}
+
+	if state := c.SetConfig(logger, cfg); state != controllers.SyncStateReprocessAll {
+		t.Fatalf("Set config failed")
+	}
+
+	setBalancer := func(desc string) {
+		t.Helper()
+		if state := c.SetBalancer(logger, "eventsvc", svc, []discovery.EndpointSlice{}); state != controllers.SyncStateSuccess {
+			t.Fatalf("%s: set balancer failed", desc)
+		}
+	}
+	expectEvents := func(desc string, want int) {
+		t.Helper()
+		if got := client.events["nodeAssigned"]; got != want {
+			t.Fatalf("%s: expected %d nodeAssigned events, got %d", desc, want, got)
+		}
+	}
+
+	// The first announcement from this node must emit the event.
+	setBalancer("first announcement")
+	expectEvents("first announcement", 1)
+
+	// Reconciles that do not change the announcement must not emit it again. This
+	// is the steady state of a service whose endpoints are rewritten on a timer by
+	// an external controller.
+	for i := 0; i < 5; i++ {
+		setBalancer("repeated reconcile")
+	}
+	expectEvents("repeated reconcile", 1)
+
+	// A change of the announced IPs is a real transition and must emit again.
+	svc.Status = statusAssigned("10.20.30.6")
+	setBalancer("changed load balancer ip")
+	expectEvents("changed load balancer ip", 2)
+
+	// Losing and then regaining the announcement is a real transition too.
+	l2MockHandler.shouldAnnounce = false
+	setBalancer("withdrawn")
+	expectEvents("withdrawn", 2)
+
+	l2MockHandler.shouldAnnounce = true
+	setBalancer("announced again")
+	expectEvents("announced again", 3)
+}
+
 type MockProtocol struct {
 	config               *config.Config
 	protocol             config.Proto
