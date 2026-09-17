@@ -116,7 +116,7 @@ spec:
           defaultMode: 420
       - name: metallb-excludel2
         configMap:
-          defaultMode: 256
+          defaultMode: 292
           name: metallb-excludel2
       - name: memberlist-config
         configMap:

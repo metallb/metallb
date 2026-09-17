@@ -127,7 +127,7 @@ func mustMarshal(m encoding.BinaryMarshaler) []byte {
 	return b
 }
 
-func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.UDPConn, func()) {
+func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpClient, *net.UDPConn, func()) {
 	pc, err := net.ListenPacket("udp", "localhost:0")
 	if err != nil {
 		t.Fatalf("failed to listen UDP: %s", err)
@@ -145,7 +145,7 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.
 	// Find any interface that has a hardware address. We don't care
 	// which one, we just need something to satisfy the various
 	// interfaces.
-	var a *arpResponder
+	var a *arpClient
 	for _, intf := range intfs {
 		if intf.HardwareAddr == nil {
 			continue
@@ -157,7 +157,7 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.
 			t.Fatalf("failed to create ARP client: %s", err)
 		}
 
-		a = &arpResponder{
+		a = &arpClient{
 			logger:       log.NewNopLogger(),
 			hardwareAddr: intf.HardwareAddr,
 			conn:         c,
