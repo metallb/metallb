@@ -4,6 +4,7 @@ package main
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/go-kit/log"
@@ -156,6 +157,118 @@ func TestLoadBalancerCreation(t *testing.T) {
 	}
 	if c.announced[config.Layer2]["testsvc"] {
 		t.Fatal("no handlers, ip is announced in l2")
+	}
+}
+
+func TestNodeAssignedEventOnlyOnChange(t *testing.T) {
+	var l2MockHandler = &MockProtocol{
+		protocol:       config.Layer2,
+		shouldAnnounce: true,
+	}
+
+	var bgpMockHandler = &MockProtocol{
+		protocol:       config.BGP,
+		shouldAnnounce: false,
+	}
+	c := mockNewController(l2MockHandler, bgpMockHandler, t)
+	client := c.client.(*testK8S)
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "eventsvc",
+		},
+		Spec: v1.ServiceSpec{
+			Type:                  "LoadBalancer",
+			ExternalTrafficPolicy: "Cluster",
+		},
+		Status: statusAssigned("10.20.30.5"),
+	}
+
+	cfg := &config.Config{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
+			"default": {
+				CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+			},
+		}},
+	}
+
+	if state := c.SetConfig(logger, cfg); state != controllers.SyncStateReprocessAll {
+		t.Fatalf("Set config failed")
+	}
+
+	setBalancer := func(desc string) {
+		t.Helper()
+		if state := c.SetBalancer(logger, "eventsvc", svc, []discovery.EndpointSlice{}); state != controllers.SyncStateSuccess {
+			t.Fatalf("%s: set balancer failed", desc)
+		}
+	}
+	expectEvents := func(desc string, want int) {
+		t.Helper()
+		if got := client.events["nodeAssigned"]; got != want {
+			t.Fatalf("%s: expected %d nodeAssigned events, got %d", desc, want, got)
+		}
+	}
+
+	// The first announcement from this node must emit the event.
+	setBalancer("first announcement")
+	expectEvents("first announcement", 1)
+
+	// Reconciles that do not change the announcement must not emit it again. This
+	// is the steady state of a service whose endpoints are rewritten on a timer by
+	// an external controller.
+	for i := 0; i < 5; i++ {
+		setBalancer("repeated reconcile")
+	}
+	expectEvents("repeated reconcile", 1)
+
+	// A change of the announced IPs is a real transition and must emit again.
+	svc.Status = statusAssigned("10.20.30.6")
+	setBalancer("changed load balancer ip")
+	expectEvents("changed load balancer ip", 2)
+
+	// Losing and then regaining the announcement is a real transition too.
+	l2MockHandler.shouldAnnounce = false
+	setBalancer("withdrawn")
+	expectEvents("withdrawn", 2)
+
+	l2MockHandler.shouldAnnounce = true
+	setBalancer("announced again")
+	expectEvents("announced again", 3)
+
+	// Ownership moves to a different speaker: the node losing the announcement
+	// withdraws it and stays quiet, and the node taking over emits its own event
+	// naming itself.
+	var otherL2MockHandler = &MockProtocol{
+		protocol:       config.Layer2,
+		shouldAnnounce: true,
+	}
+
+	var otherBGPMockHandler = &MockProtocol{
+		protocol:       config.BGP,
+		shouldAnnounce: false,
+	}
+	other := mockNewController(otherL2MockHandler, otherBGPMockHandler, t)
+	other.myNode = "othernode"
+	otherClient := other.client.(*testK8S)
+
+	if state := other.SetConfig(logger, cfg); state != controllers.SyncStateReprocessAll {
+		t.Fatalf("other node: set config failed")
+	}
+
+	l2MockHandler.shouldAnnounce = false
+	setBalancer("ownership moved away")
+	expectEvents("ownership moved away", 3)
+
+	for i := 0; i < 3; i++ {
+		if state := other.SetBalancer(logger, "eventsvc", svc, []discovery.EndpointSlice{}); state != controllers.SyncStateSuccess {
+			t.Fatalf("other node: set balancer failed")
+		}
+	}
+	if got := otherClient.events["nodeAssigned"]; got != 1 {
+		t.Fatalf("ownership moved to other node: expected 1 nodeAssigned event, got %d", got)
+	}
+	if msg := otherClient.eventMsgs["nodeAssigned"][0]; !strings.Contains(msg, `"othernode"`) {
+		t.Fatalf("ownership moved to other node: event does not name the new node: %s", msg)
 	}
 }
 
