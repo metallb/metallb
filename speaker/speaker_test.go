@@ -4,6 +4,7 @@ package main
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/go-kit/log"
@@ -233,6 +234,42 @@ func TestNodeAssignedEventOnlyOnChange(t *testing.T) {
 	l2MockHandler.shouldAnnounce = true
 	setBalancer("announced again")
 	expectEvents("announced again", 3)
+
+	// Ownership moves to a different speaker: the node losing the announcement
+	// withdraws it and stays quiet, and the node taking over emits its own event
+	// naming itself.
+	var otherL2MockHandler = &MockProtocol{
+		protocol:       config.Layer2,
+		shouldAnnounce: true,
+	}
+
+	var otherBGPMockHandler = &MockProtocol{
+		protocol:       config.BGP,
+		shouldAnnounce: false,
+	}
+	other := mockNewController(otherL2MockHandler, otherBGPMockHandler, t)
+	other.myNode = "othernode"
+	otherClient := other.client.(*testK8S)
+
+	if state := other.SetConfig(logger, cfg); state != controllers.SyncStateReprocessAll {
+		t.Fatalf("other node: set config failed")
+	}
+
+	l2MockHandler.shouldAnnounce = false
+	setBalancer("ownership moved away")
+	expectEvents("ownership moved away", 3)
+
+	for i := 0; i < 3; i++ {
+		if state := other.SetBalancer(logger, "eventsvc", svc, []discovery.EndpointSlice{}); state != controllers.SyncStateSuccess {
+			t.Fatalf("other node: set balancer failed")
+		}
+	}
+	if got := otherClient.events["nodeAssigned"]; got != 1 {
+		t.Fatalf("ownership moved to other node: expected 1 nodeAssigned event, got %d", got)
+	}
+	if msg := otherClient.eventMsgs["nodeAssigned"][0]; !strings.Contains(msg, `"othernode"`) {
+		t.Fatalf("ownership moved to other node: event does not name the new node: %s", msg)
+	}
 }
 
 type MockProtocol struct {
