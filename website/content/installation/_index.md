@@ -112,6 +112,11 @@ are mainly used by our CI, but they might not be compatible to your Prometheus d
 
 {{% /notice %}}
 
+The Prometheus manifests do not include MetalLB alert rules. The Helm chart can create the built-in rules as a `PrometheusRule` when
+[`prometheus.prometheusRule.enabled`](https://github.com/metallb/metallb/blob/main/charts/metallb/values.yaml) is set to `true`; it defaults to `false`.
+This resource requires the Prometheus Operator's `PrometheusRule` custom resource definition. For a manifest-based installation, create your own
+`PrometheusRule` or adapt the [chart's rule template](https://github.com/metallb/metallb/blob/main/charts/metallb/templates/prometheusrules.yaml).
+
 ## Installation with kustomize
 
 You can install MetalLB with
