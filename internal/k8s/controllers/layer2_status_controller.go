@@ -96,9 +96,17 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// We are the (sole) leader for this service.
 	var state *v1beta1.ServiceL2Status
+	var observedStatus v1beta1.MetalLBServiceL2Status
 	for _, item := range serviceL2statuses.Items {
 		if item.Labels[LabelAnnounceNode] == r.NodeName && state == nil {
-			state = &item
+			// avoid carrying a stale resourceVersion into CreateOrPatch
+			observedStatus = item.Status
+			state = &v1beta1.ServiceL2Status{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      item.Name,
+					Namespace: item.Namespace,
+				},
+			}
 			continue
 		}
 		// Delete statuses from other nodes / redundant statuses belonging to our node
@@ -120,7 +128,7 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	desiredStatus := r.buildDesiredStatus(ipAdvS, serviceName, serviceNamespace)
-	if reflect.DeepEqual(state.Status, desiredStatus) {
+	if reflect.DeepEqual(observedStatus, desiredStatus) {
 		return ctrl.Result{}, nil
 	}
 

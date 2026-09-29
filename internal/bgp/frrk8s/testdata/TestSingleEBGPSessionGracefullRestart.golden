@@ -20,7 +20,8 @@
                             "keepaliveTime": "1s",
                             "enableGracefulRestart": true,
                             "toAdvertise": {
-                                "allowed": {}
+                                "allowed": {},
+                                "nextHop": {}
                             },
                             "toReceive": {
                                 "allowed": {}

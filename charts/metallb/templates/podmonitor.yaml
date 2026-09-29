@@ -23,12 +23,21 @@ spec:
     matchNames:
     - {{ .Release.Namespace }}
   podMetricsEndpoints:
-  - port: monitoring
+  - port: {{ template "metrics.exposedportname" . }}
+    honorLabels: true
     path: /metrics
-    scheme: https
+    scheme: "https"
+    authorization:
+      credentials:
+        name: {{ template "metallb.fullname" . }}-metrics-token
+        key: token
     {{- if .Values.prometheus.podMonitor.interval }}
     interval: {{ .Values.prometheus.podMonitor.interval }}
     {{- end }}
+{{- if .Values.prometheus.podMonitor.tlsConfig }}
+    tlsConfig:
+{{- toYaml .Values.prometheus.podMonitor.tlsConfig | nindent 6 }}
+{{- end }}
 {{- if .Values.prometheus.podMonitor.metricRelabelings }}
     metricRelabelings:
 {{- toYaml .Values.prometheus.podMonitor.metricRelabelings | nindent 4 }}
@@ -63,12 +72,45 @@ spec:
     matchNames:
     - {{ .Release.Namespace }}
   podMetricsEndpoints:
-  - port: monitoring
+  - port: {{ template "metrics.exposedportname" . }}
+    honorLabels: true
     path: /metrics
-    scheme: https
+    scheme: "https"
+    authorization:
+      credentials:
+        name: {{ template "metallb.fullname" . }}-metrics-token
+        key: token
     {{- if .Values.prometheus.podMonitor.interval }}
     interval: {{ .Values.prometheus.podMonitor.interval }}
     {{- end }}
+{{- if .Values.prometheus.podMonitor.tlsConfig }}
+    tlsConfig:
+{{- toYaml .Values.prometheus.podMonitor.tlsConfig | nindent 6 }}
+{{- end }}
+{{- if .Values.prometheus.podMonitor.metricRelabelings }}
+    metricRelabelings:
+{{- toYaml .Values.prometheus.podMonitor.metricRelabelings | nindent 4 }}
+{{- end }}
+{{- if .Values.prometheus.podMonitor.relabelings }}
+    relabelings:
+{{- toYaml .Values.prometheus.podMonitor.relabelings | nindent 4 }}
+{{- end }}
+{{- if .Values.speaker.frr.enabled }}
+  - port: {{ template "metrics.exposedfrrportname" . }}
+    honorLabels: true
+    path: /metrics
+    scheme: "https"
+    authorization:
+      credentials:
+        name: {{ template "metallb.fullname" . }}-metrics-token
+        key: token
+    {{- if .Values.prometheus.podMonitor.interval }}
+    interval: {{ .Values.prometheus.podMonitor.interval }}
+    {{- end }}
+{{- if .Values.prometheus.podMonitor.tlsConfig }}
+    tlsConfig:
+{{- toYaml .Values.prometheus.podMonitor.tlsConfig | nindent 6 }}
+{{- end }}
 {{- if .Values.prometheus.podMonitor.metricRelabelings }}
     metricRelabelings:
 {{- toYaml .Values.prometheus.podMonitor.metricRelabelings | nindent 4 }}
@@ -78,8 +120,56 @@ spec:
 {{- toYaml .Values.prometheus.podMonitor.relabelings | nindent 4 }}
 {{- end }}
 {{- end }}
+{{- end }}
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ template "metallb.fullname" . }}-metrics-reader
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ template "metallb.fullname" . }}-metrics-token
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/service-account.name: {{ template "metallb.fullname" . }}-metrics-reader
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "metallb.fullname" . }}-metrics-reader
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+rules:
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ template "metallb.fullname" . }}-metrics-reader
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "metallb.fullname" . }}-metrics-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ template "metallb.fullname" . }}-metrics-reader
+    namespace: {{ .Release.Namespace }}
 {{- if .Values.prometheus.rbacPrometheus }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

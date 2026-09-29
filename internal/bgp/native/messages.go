@@ -206,7 +206,7 @@ func readOpen(r io.Reader) (*openResult, error) {
 		return nil, fmt.Errorf("wrong BGP version")
 	}
 	if open.HoldTime != 0 && open.HoldTime < 3 {
-		return nil, fmt.Errorf("invalid hold time %q, must be 0 or >=3s", open.HoldTime)
+		return nil, fmt.Errorf("invalid hold time %d, must be 0 or >=3s", open.HoldTime)
 	}
 
 	ret := &openResult{

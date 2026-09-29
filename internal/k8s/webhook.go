@@ -93,7 +93,7 @@ func enableWebhook(mgr manager.Manager, validate config.Validate, namespace stri
 	}
 
 	// Register conversion webhook manually since we are not directly handling the types.
-	mgr.GetWebhookServer().Register("/convert", conversion.NewWebhookHandler(mgr.GetScheme()))
+	mgr.GetWebhookServer().Register("/convert", conversion.NewWebhookHandler(mgr.GetScheme(), conversion.NewRegistry()))
 
 	return nil
 }

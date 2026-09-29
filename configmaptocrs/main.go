@@ -97,7 +97,7 @@ func generate(w io.Writer, origin string) error {
 	}
 
 	log.Println("Checking the resources are parsed correctly")
-	_, err = config.For(resources, config.DontValidate)
+	_, err = config.For(resources, config.DontValidate, config.ForOptions{})
 	if err != nil {
 		return err
 	}

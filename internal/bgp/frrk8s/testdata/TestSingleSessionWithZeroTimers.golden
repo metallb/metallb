@@ -17,7 +17,8 @@
                             "holdTime": "0s",
                             "keepaliveTime": "0s",
                             "toAdvertise": {
-                                "allowed": {}
+                                "allowed": {},
+                                "nextHop": {}
                             },
                             "toReceive": {
                                 "allowed": {}

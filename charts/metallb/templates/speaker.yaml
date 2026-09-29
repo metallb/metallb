@@ -8,6 +8,10 @@
 {{- fail "frrk8s.enabled frrk8s.external are mutually exclusive!" }}
 {{- end }}
 
+{{- if and (or .Values.frrk8s.enabled .Values.frrk8s.external) (not .Values.speaker.enabled) }}
+{{- fail "frrk8s requires speaker to be enabled. Set frrk8s.enabled=false when disabling speaker." }}
+{{- end }}
+
 {{- if and (not .Values.speaker.memberlist.enabled) .Values.speaker.nodeSelector }}
 {{- fail "nodeSelector must be empty when memberlist is disabled" }}
 {{- end }}
@@ -134,6 +138,7 @@ spec:
   {{- if .Values.speaker.updateStrategy }}
   updateStrategy: {{- toYaml .Values.speaker.updateStrategy | nindent 4 }}
   {{- end }}
+  revisionHistoryLimit: {{ .Values.speaker.revisionHistoryLimit }}
   selector:
     matchLabels:
       {{- include "metallb.selectorLabels" . | nindent 6 }}
@@ -189,7 +194,7 @@ spec:
       {{- if .Values.speaker.excludeInterfaces.enabled }}
         - name: metallb-excludel2
           configMap:
-            defaultMode: 256
+            defaultMode: 292
             name: metallb-excludel2
       {{- end }}
         - name: memberlist-config
@@ -267,6 +272,7 @@ spec:
         {{- end }}
         args:
         - --port={{ .Values.prometheus.metricsPort }}
+        - --health-probe-port={{ .Values.speaker.livenessProbe.port }}
         {{- with .Values.speaker.logLevel }}
         - --log-level={{ . }}
         {{- end }}
@@ -282,8 +288,14 @@ spec:
         {{- if .Values.speaker.bgpDebounceTimeout }}
         - --bgp-debounce-timeout={{ .Values.speaker.bgpDebounceTimeout }}
         {{- end }}
+        {{- if .Values.speaker.gratuitousARPInterval }}
+        - --gratuitous-arp-interval={{ .Values.speaker.gratuitousARPInterval }}
+        {{- end }}
         {{- if .Values.frrk8s.external }}
         - --frrk8s-namespace={{ required "namespace is required when frrk8s is external" .Values.frrk8s.namespace }}
+        {{- if .Values.frrk8s.secretPassthrough }}
+        - --frrk8s-secret-passthrough
+        {{- end }}
         {{- end }}
         {{- if .Values.tls.cipherSuites }}
         - --tls-cipher-suites={{ .Values.tls.cipherSuites }}
@@ -411,15 +423,10 @@ spec:
         {{- end }}
       {{- if .Values.speaker.frr.enabled }}
       - name: frr
+        {{- if .Values.speaker.frr.securityContext }}
         securityContext:
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            add:
-            - NET_ADMIN
-            - NET_RAW
-            - SYS_ADMIN
-            - NET_BIND_SERVICE
+          {{- toYaml .Values.speaker.frr.securityContext | nindent 10 }}
+        {{- end }}
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
         {{- if .Values.speaker.frr.image.pullPolicy }}
         imagePullPolicy: {{ .Values.speaker.frr.image.pullPolicy }}
@@ -437,9 +444,9 @@ spec:
           - name: frr-lib
             mountPath: /var/lib/frr
         command:
-          - /bin/sh
-          - -c
-          - /sbin/tini -- /usr/lib/frr/docker-start
+          - {{ .Values.speaker.frr.tiniPath | quote }}
+          - --
+          - {{ .Values.speaker.frr.dockerStartPath | quote }}
         {{- with .Values.speaker.frr.resources }}
         resources:
           {{- toYaml . | nindent 12 }}

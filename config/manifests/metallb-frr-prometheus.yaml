@@ -11,7 +11,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: bfdprofiles.metallb.io
 spec:
   group: metallb.io
@@ -132,7 +132,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: bgpadvertisements.metallb.io
 spec:
   group: metallb.io
@@ -413,7 +413,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: bgppeers.metallb.io
 spec:
   conversion:
@@ -616,6 +616,7 @@ spec:
                 default: false
                 description: |-
                   To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.
+
                   Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily.
                 type: boolean
               dualStackAddressFamily:
@@ -799,7 +800,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: communities.metallb.io
 spec:
   group: metallb.io
@@ -864,7 +865,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: configurationstates.metallb.io
 spec:
   group: metallb.io
@@ -998,7 +999,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: ipaddresspools.metallb.io
 spec:
   group: metallb.io
@@ -1236,7 +1237,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: l2advertisements.metallb.io
 spec:
   group: metallb.io
@@ -1409,10 +1410,88 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              preferredNodeSelectors:
+                description: |-
+                  PreferredNodeSelectors allows specifying soft node preferences for L2
+                  leader election. Nodes matching these selectors receive a higher score
+                  and are preferred as the announcing node. If no preferred node is
+                  available, any eligible node (per NodeSelectors) can announce.
+                  Modeled after Kubernetes PreferredSchedulingTerm.
+                items:
+                  description: |-
+                    PreferredNodeSelector expresses a weighted soft preference for nodes.
+                    This follows the Kubernetes PreferredSchedulingTerm pattern where Weight
+                    controls relative priority and Preference selects matching nodes.
+                  properties:
+                    preference:
+                      description: |-
+                        Preference selects the nodes that receive this weight. An empty
+                        selector matches every node. Preferences only apply to nodes
+                        already eligible under the advertisement's NodeSelectors.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    weight:
+                      description: |-
+                        Weight associated with matching the corresponding preference,
+                        in the range 1-100. Higher weights rank the node higher in the
+                        L2 leader election. Weights from selectors that both match a
+                        node sum together.
+                      format: int32
+                      maximum: 100
+                      minimum: 1
+                      type: integer
+                  required:
+                  - preference
+                  - weight
+                  type: object
+                type: array
               serviceSelectors:
                 description: |-
                   ServiceSelectors limits the set of services that will be advertised via this advertisement.
                   If empty, all services from the selected pools are advertised.
+                  Services matching the selectors cannot use the allow-shared-ip annotation.
                 items:
                   description: |-
                     A label selector is a label query over a set of resources. The result of matchLabels and
@@ -1477,7 +1556,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: servicebgpstatuses.metallb.io
 spec:
   group: metallb.io
@@ -1563,7 +1642,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: servicel2statuses.metallb.io
 spec:
   group: metallb.io
@@ -2629,7 +2708,7 @@ spec:
           defaultMode: 420
           secretName: memberlist
       - configMap:
-          defaultMode: 256
+          defaultMode: 292
           name: metallb-excludel2
         name: metallb-excludel2
       - configMap:

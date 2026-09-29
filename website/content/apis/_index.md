@@ -310,7 +310,7 @@ _Appears in:_
 | `ipAddressPoolSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | A selector for the IPAddressPools which would get advertised via this advertisement.<br />If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools. |
 | `nodeSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops. |
 | `interfaces` _string array_ | A list of interfaces to announce from. The LB IP will be announced only from these interfaces.<br />If the field is not set, we advertise from all the interfaces on the host. |
-| `serviceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | ServiceSelectors limits the set of services that will be advertised via this advertisement.<br />If empty, all services from the selected pools are advertised. |
+| `serviceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | ServiceSelectors limits the set of services that will be advertised via this advertisement.<br />If empty, all services from the selected pools are advertised.<br />Services matching the selectors cannot use the allow-shared-ip annotation. |
 
 
 

@@ -194,6 +194,8 @@ func (f *fakeSession) Set(ads ...*bgp.Advertisement) error {
 // to do to k8s.
 type testK8S struct {
 	loggedWarning bool
+	events        map[string]int
+	eventMsgs     map[string][]string
 	t             *testing.T
 }
 
@@ -202,6 +204,12 @@ func (s *testK8S) UpdateStatus(svc *v1.Service) error {
 }
 
 func (s *testK8S) Infof(_ *v1.Service, evtType string, msg string, args ...interface{}) {
+	if s.events == nil {
+		s.events = map[string]int{}
+		s.eventMsgs = map[string][]string{}
+	}
+	s.events[evtType]++
+	s.eventMsgs[evtType] = append(s.eventMsgs[evtType], fmt.Sprintf(msg, args...))
 	s.t.Logf("k8s Info event %q: %s", evtType, fmt.Sprintf(msg, args...))
 }
 
@@ -1414,7 +1422,7 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 
 		balancer            string
 		eps                 map[string][]discovery.EndpointSlice
-		trafficPolicy       v1.ServiceExternalTrafficPolicyType
+		trafficPolicy       v1.ServiceExternalTrafficPolicy
 		excludeFromLB       []string
 		ignoreExcludeFromLB bool
 		c1ExpectedResult    map[string]string
@@ -1617,6 +1625,22 @@ func TestPasswordForSession(t *testing.T) {
 			name: "FRR-K8s BGP with secret password, passthrough",
 			cfg: &config.Peer{
 				SecretPassword: "my-secret-password",
+				PasswordRef: v1.SecretReference{
+					Name:      "my-secret",
+					Namespace: "my-namespace",
+				},
+			},
+			bgpType:        bgpFrrK8s,
+			secretHandling: SecretPassThrough,
+			expectedPass:   "",
+			expectedRef: v1.SecretReference{
+				Name:      "my-secret",
+				Namespace: "my-namespace",
+			},
+		},
+		{
+			name: "FRR-K8s BGP with unresolved secret ref, passthrough",
+			cfg: &config.Peer{
 				PasswordRef: v1.SecretReference{
 					Name:      "my-secret",
 					Namespace: "my-namespace",
@@ -2044,7 +2068,7 @@ func TestCheckBGPAdvConflicts(t *testing.T) {
 				Spec:       metallbv1beta1.IPAddressPoolSpec{Addresses: []string{"10.20.30.0/24"}},
 			},
 		},
-	}, config.DontValidate)
+	}, config.DontValidate, config.ForOptions{})
 	if err != nil {
 		t.Fatalf("failed to create config: %v", err)
 	}
@@ -2393,7 +2417,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 						Spec:       metallbv1beta1.IPAddressPoolSpec{Addresses: []string{"10.20.30.0/24"}},
 					},
 				},
-			}, config.DontValidate)
+			}, config.DontValidate, config.ForOptions{})
 			if err != nil {
 				t.Fatalf("failed to create config: %v", err)
 			}

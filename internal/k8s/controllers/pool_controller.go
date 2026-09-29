@@ -89,7 +89,7 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 
 	level.Debug(r.Logger).Log("controller", "PoolReconciler", "metallb CRs", dumpClusterResources(&resources))
 
-	cfg, err := toConfig(resources, r.ValidateConfig)
+	cfg, err := toConfig(resources, r.ValidateConfig, config.ForOptions{})
 	if err != nil {
 		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "error", "failed to parse the configuration", "error", err)
@@ -199,7 +199,7 @@ func (r *PoolReconciler) reportCondition(ctx context.Context, conditionErr error
 		},
 	}
 
-	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("poolReconciler"), client.ForceOwnership); err != nil {
+	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("poolReconciler"), client.ForceOwnership); err != nil { //nolint:staticcheck // TODO: migrate to client.Client.Apply()
 		return fmt.Errorf("patch %s/%s: %w", r.Namespace, r.ConfigStateName, err)
 	}
 

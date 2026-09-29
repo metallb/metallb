@@ -18,10 +18,6 @@ import (
 // Curve preferences are specified as comma-separated numeric CurveID values
 // (see https://pkg.go.dev/crypto/tls#CurveID), matching the Kubernetes
 // --tls-curve-preferences flag format (kubernetes/kubernetes#137115).
-//
-// Returns an error if cipher suites are specified with TLS 1.3 minimum, since
-// Go's TLS 1.3 does not allow configuring cipher suites -- all TLS 1.3
-// ciphers are always enabled. See: https://github.com/golang/go/issues/29349
 func OptFor(cipherSuites, curvePreferences, minVersion string) (func(*tls.Config), error) {
 	ciphers, err := parseCipherSuites(cipherSuites)
 	if err != nil {
@@ -34,9 +30,6 @@ func OptFor(cipherSuites, curvePreferences, minVersion string) (func(*tls.Config
 	minVer, err := parseTLSVersion(minVersion)
 	if err != nil {
 		return nil, fmt.Errorf("parsing tls-min-version: %w", err)
-	}
-	if ciphers != nil && minVer == tls.VersionTLS13 {
-		return nil, fmt.Errorf("cipher suites cannot be configured with TLS 1.3")
 	}
 	return func(cfg *tls.Config) {
 		if ciphers != nil {

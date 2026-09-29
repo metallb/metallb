@@ -48,7 +48,7 @@ func DiscardFRROnly(c ClusterResources) error {
 		if p.Spec.EnableGracefulRestart {
 			return fmt.Errorf("peer %s has EnableGracefulRestart flag set on native bgp mode", p.Spec.Address)
 		}
-		if p.Spec.DisableMP {
+		if p.Spec.DisableMP { //nolint:staticcheck // SA1019: validating deprecated field for backward compat
 			return fmt.Errorf("peer %s has disable MP flag set on native bgp mode", p.Spec.Address)
 		}
 		if p.Spec.DualStackAddressFamily {

@@ -137,6 +137,7 @@ type BGPPeerSpec struct {
 	// Add future BGP configuration here
 
 	// To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.
+	//
 	// Deprecated: DisableMP is deprecated in favor of dualStackAddressFamily.
 	// +optional
 	// +kubebuilder:default:=false

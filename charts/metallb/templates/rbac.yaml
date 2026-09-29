@@ -77,6 +77,7 @@ rules:
   resources: ["frrconfigurations"]
   verbs: ["get", "list", "watch","create","update","delete"]
 {{- end }}
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -115,7 +116,6 @@ rules:
 - apiGroups: ["metallb.io"]
   resources: ["servicebgpstatuses","servicebgpstatuses/status"]
   verbs: ["*"]
-{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -192,6 +192,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: {{ template "metallb.fullname" . }}:speaker
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -208,7 +209,6 @@ subjects:
   name: {{ template "metallb.controller.serviceAccountName" . }}
 - kind: ServiceAccount
   name: {{ include "metallb.speaker.serviceAccountName" . }}
-{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

@@ -189,7 +189,7 @@ func TestConversionIsStable(t *testing.T) {
 		Namespaces:      namespaces,
 	}
 
-	firstConfig, err := toConfig(resources, config.DontValidate)
+	firstConfig, err := toConfig(resources, config.DontValidate, config.ForOptions{})
 
 	if err != nil {
 		t.Fatalf("conversion failed, err %v", err)
@@ -209,7 +209,7 @@ func TestConversionIsStable(t *testing.T) {
 		shuffleObjects(resources.Nodes)
 		shuffleObjects(resources.Namespaces)
 
-		config, err := toConfig(resources, config.DontValidate)
+		config, err := toConfig(resources, config.DontValidate, config.ForOptions{})
 
 		if err != nil {
 			t.Fatalf("conversion failed, seed %d, %v", seed, err)
