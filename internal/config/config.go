@@ -1097,6 +1097,10 @@ func ParseCIDR(cidr string) ([]*net.IPNet, error) {
 		return nil, fmt.Errorf("invalid IP range %q: invalid end IP %q", cidr, fs[1])
 	}
 
+	if (start.To4() == nil) != (end.To4() == nil) {
+		return nil, fmt.Errorf("invalid IP range %q: start and end IPs must be the same family", cidr)
+	}
+
 	if bytes.Compare(start, end) > 0 {
 		return nil, fmt.Errorf("invalid IP range %q: start IP %q is after the end IP %q", cidr, start, end)
 	}
