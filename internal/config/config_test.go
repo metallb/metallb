@@ -3783,6 +3783,35 @@ func TestParse(t *testing.T) {
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
+		{
+			desc: "aggregation length different panic",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "0"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"::-0.0.0.0"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref:      4,
+							IPAddressPools: []string{"0"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv2"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"0"},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
 	}
 
 	for _, test := range tests {
