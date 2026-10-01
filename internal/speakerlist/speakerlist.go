@@ -100,8 +100,7 @@ func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, lab
 	if secret == "" {
 		level.Warn(logger).Log("op", "startup", "warning", "no ml-secret-key set, memberlist traffic will not be encrypted")
 	} else {
-		sha := sha256.New()
-		memberListConfig.SecretKey = sha.Sum([]byte(secret))[:32]
+		memberListConfig.SecretKey = secretKeyFor(secret)
 	}
 
 	// This channel is used by the Rejoin() method which runs on k8s node
@@ -124,6 +123,12 @@ func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, lab
 	sl.ml = ml
 
 	return &sl, nil
+}
+
+// secretKeyFor derives memberlist's 32 byte AES key from the configured secret.
+func secretKeyFor(secret string) []byte {
+	key := sha256.Sum256([]byte(secret))
+	return key[:]
 }
 
 // Start initializes the SpeakerList. This functions must be called before using
