@@ -854,6 +854,94 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "invalid interface with carriage return",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peer1",
+							Namespace: "metallb-system",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:     42,
+							ASN:       142,
+							Interface: "eth0\rrouter bgp 666",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "invalid password with carriage return",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peer1",
+							Namespace: "metallb-system",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:    42,
+							ASN:      142,
+							Address:  "1.2.3.4",
+							Password: "password\r",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "invalid password secret with carriage return",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peer1",
+							Namespace: "metallb-system",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     142,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{
+								Name:      "bgpsecret",
+								Namespace: "metallb-system",
+							},
+						},
+					},
+				},
+				PasswordSecrets: map[string]corev1.Secret{
+					"bgpsecret": {
+						Type: corev1.SecretTypeBasicAuth,
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bgpsecret",
+							Namespace: "metallb-system",
+						},
+						Data: map[string][]byte{"password": []byte("nopass\r")},
+					},
+				},
+			},
+		},
+		{
+			desc: "invalid VRF name with carriage return",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "peer1",
+							Namespace: "metallb-system",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     142,
+							Address: "1.2.3.4",
+							VRFName: "vrf\r",
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "invalid keepalivetime larger than holdtime",
 			crs: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
