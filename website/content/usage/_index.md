@@ -11,47 +11,9 @@ MetalLB attaches informational events to the services that it's
 controlling. If your LoadBalancer is misbehaving, run `kubectl
 describe service <service name>` and check the event log.
 
-## Migrating legacy Service annotations
-
-The `metallb.universe.tf/` annotation prefix is deprecated in favor of
-`metallb.io/`. The annotations themselves remain supported: for example,
-`metallb.io/address-pool` still requests an address pool, and
-`metallb.io/allow-shared-ip` still enables IP sharing. You do not need to
-replace these annotations with CRD selectors to migrate the prefix.
-
-For annotations you set on a Service, replace the key and keep the value:
-
-| Legacy annotation | Current annotation |
-| --- | --- |
-| `metallb.universe.tf/address-pool` | `metallb.io/address-pool` |
-| `metallb.universe.tf/loadBalancerIPs` | `metallb.io/loadBalancerIPs` |
-| `metallb.universe.tf/allow-shared-ip` | `metallb.io/allow-shared-ip` |
-
-Update the Service manifest or the Helm values that supply these annotations
-so that a later deployment does not restore the legacy keys. For example,
-to migrate an existing Service that requests the `production-public-ips` pool:
-
-```sh
-kubectl annotate service nginx --overwrite \
-  metallb.io/address-pool=production-public-ips \
-  metallb.universe.tf/address-pool-
-```
-
-Remove the old key as well as adding the new one. MetalLB prefers the current
-key when both are present, but a remaining legacy key can still trigger a
-`deprecatedAnnotation` warning event.
-
-The `ip-allocated-from-pool` annotation is different: MetalLB writes it to
-record the pool used for an allocation. It is not a request to select a pool.
-Do not add it to your Service manifest; use `metallb.io/address-pool` to
-request a pool. Current versions of MetalLB write
-`metallb.io/ip-allocated-from-pool` and remove the legacy managed key during
-normal Service convergence. If an older installation leaves
-`metallb.universe.tf/ip-allocated-from-pool` behind, you can remove that key
-from the Service too.
-
-The legacy prefix remains supported for compatibility, but support may be
-removed in a future version. Use the current prefix in new configurations.
+The `metallb.universe.tf/` annotation prefix is deprecated; migrate to `metallb.io/` and remove the legacy keys to avoid warnings.
+The annotation features remain supported; switching to CRD selectors is not required.
+MetalLB manages `ip-allocated-from-pool`; request a pool with `metallb.io/address-pool`.
 
 ## Requesting specific IPs
 
