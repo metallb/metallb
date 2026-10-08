@@ -45,8 +45,8 @@ The `ip-allocated-from-pool` annotation is different: MetalLB writes it to
 record the pool used for an allocation. It is not a request to select a pool.
 Do not add it to your Service manifest; use `metallb.io/address-pool` to
 request a pool. Current versions of MetalLB write
-`metallb.io/ip-allocated-from-pool` and remove the legacy managed key when
-reconciling a Service. If an older installation leaves
+`metallb.io/ip-allocated-from-pool` and remove the legacy managed key during
+normal Service convergence. If an older installation leaves
 `metallb.universe.tf/ip-allocated-from-pool` behind, you can remove that key
 from the Service too.
 
