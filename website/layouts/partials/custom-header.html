@@ -1,0 +1,28 @@
+{{- if .Site.Params.showBanner }}
+<style type="text/css">
+  .announcement-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 1rem 0 0;
+    padding: 0.6rem 1rem;
+    border-radius: 4px;
+    background-color: var(--MENU-HEADER-BG-color);
+    color: #fff;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    text-decoration: none;
+  }
+  .announcement-banner:hover,
+  .announcement-banner:focus {
+    background-color: var(--MAIN-LINK-HOVER-color);
+    color: #fff;
+  }
+  @media print {
+    .announcement-banner {
+      display: none;
+    }
+  }
+</style>
+{{- end }}

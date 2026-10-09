@@ -11,6 +11,8 @@ theme = "hugo-theme-relearn"
     description = "MetalLB, bare metal load-balancer for Kubernetes"
     collapsibleMenu = true
     landingPageName = "<i class='fa-fw fas fa-home'></i> MetalLB (latest version)"
+    # Site-wide announcement banner; content lives in data/banner.yaml
+    showBanner = true
 
 [outputs]
 home = ['html', 'rss', 'search', 'searchpage']
