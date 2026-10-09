@@ -212,8 +212,8 @@ func TestValidateBGPPeerCreateWithDisableMP(t *testing.T) {
 		if !test.expectErr && err != nil {
 			t.Fatalf("test %s failed, unexpected error %v", test.desc, err)
 		}
-		if test.expectWarn && warning == "" {
-			t.Fatalf("test %s failed, expecting the deprecation warning", test.desc)
+		if gotWarn := warning != ""; gotWarn != test.expectWarn {
+			t.Fatalf("test %s failed, got warning %t, expecting %t", test.desc, gotWarn, test.expectWarn)
 		}
 	}
 }
