@@ -1343,7 +1343,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 		balancer            string
 		L2Advertisements    []*config.L2Advertisement
 		eps                 map[string][]discovery.EndpointSlice
-		trafficPolicy       v1.ServiceExternalTrafficPolicyType
+		trafficPolicy       v1.ServiceExternalTrafficPolicy
 		excludeFromLB       []string
 		ignoreExcludeFromLB bool
 		c1ExpectedResult    map[string]string

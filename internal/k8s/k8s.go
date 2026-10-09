@@ -184,7 +184,7 @@ func New(cfg *Config) (*Client, error) {
 		return nil, fmt.Errorf("creating Kubernetes client: %s", err)
 	}
 
-	recorder := mgr.GetEventRecorderFor(cfg.ProcessName)
+	recorder := mgr.GetEventRecorderFor(cfg.ProcessName) //nolint:staticcheck // TODO: migrate to GetEventRecorder
 
 	reloadChan := make(chan event.GenericEvent)
 	reload := func() {

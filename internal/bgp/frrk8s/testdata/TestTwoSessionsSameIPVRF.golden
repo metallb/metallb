@@ -20,7 +20,8 @@
                             "keepaliveTime": "1s",
                             "ebgpMultiHop": true,
                             "toAdvertise": {
-                                "allowed": {}
+                                "allowed": {},
+                                "nextHop": {}
                             },
                             "toReceive": {
                                 "allowed": {}
@@ -43,7 +44,8 @@
                             "keepaliveTime": "1s",
                             "ebgpMultiHop": true,
                             "toAdvertise": {
-                                "allowed": {}
+                                "allowed": {},
+                                "nextHop": {}
                             },
                             "toReceive": {
                                 "allowed": {}

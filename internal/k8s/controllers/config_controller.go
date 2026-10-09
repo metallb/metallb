@@ -345,7 +345,7 @@ func (r *ConfigReconciler) reportCondition(ctx context.Context, conditionErr err
 		},
 	}
 
-	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("configReconciler"), client.ForceOwnership); err != nil {
+	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("configReconciler"), client.ForceOwnership); err != nil { //nolint:staticcheck // TODO: migrate to client.Client.Apply()
 		return fmt.Errorf("patch %s/%s: %w", r.Namespace, r.ConfigStateName, err)
 	}
 
