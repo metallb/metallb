@@ -189,8 +189,9 @@ visit
 [https://v0.2--metallb.netlify.com](https://v0.2--metallb.netlify.com).
 
 When editing the website, you can preview your changes locally by
-installing [Hugo](https://gohugo.io/) and running `hugo server` from
-the `website` directory.
+running `inv preview-site`. This fetches the [Hugo](https://gohugo.io/)
+version the website is built with, if not already available, and
+serves a live preview at <http://localhost:1313>.
 
 ## Maintainers
 

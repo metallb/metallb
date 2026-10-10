@@ -33,6 +33,7 @@ kind_path = os.path.join(build_path, "kind")
 ginkgo_path = os.path.join(build_path, "bin", "ginkgo")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
 yq_path = os.path.join(build_path, "bin", "yq")
+hugo_path = os.path.join(build_path, "bin", "hugo")
 kubectl_version = "v1.34.0"
 kind_version = "v0.30.0"
 yq_version = "v4.53.6"
@@ -1502,6 +1503,25 @@ def generateapidocs(ctx):
 
 @task(
     help={
+        "port": "port the preview server listens on. Default 1313.",
+    }
+)
+def preview_site(ctx, port=1313):
+    """Serves a live preview of the website.
+
+    The hugo version used to build the published website is fetched
+    if not available locally.
+    """
+    fetch_hugo()
+    run(
+        "{} server --source website --port {}".format(hugo_path, port),
+        echo=True,
+        pty=True,
+    )
+
+
+@task(
+    help={
         "action": "The action to take to fix the uncommitted changes",
     }
 )
@@ -1618,6 +1638,39 @@ def fetch_yq():
         get_version_command,
         "yq (https://github.com/mikefarah/yq/) version ",
     )
+
+
+def hugo_version() -> str:
+    """Returns the hugo version Netlify builds the published website with."""
+    netlify_config = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "netlify.toml"
+    )
+    with open(netlify_config) as f:
+        match = re.search(r'HUGO_VERSION\s*=\s*"([^"]+)"', f.read())
+    if match is None:
+        raise Exit(message="HUGO_VERSION not found in {}".format(netlify_config))
+    return "v" + match.group(1)
+
+
+@cache
+def fetch_hugo():
+    version = hugo_version()
+    goos = run("go env GOOS", hide="out").stdout.strip()
+    goarch = run("go env GOARCH", hide="out").stdout.strip()
+    # hugo ships a single universal binary for macOS.
+    if goos == "darwin":
+        goarch = "universal"
+    archive = "hugo_{}_{}-{}.tar.gz".format(version.lstrip("v"), goos, goarch)
+    fetch_command = (
+        "mkdir -p {bin_dir} && curl -fL "
+        "https://github.com/gohugoio/hugo/releases/download/{version}/{archive} "
+        "| tar -xz -C {bin_dir} hugo".format(
+            bin_dir=os.path.dirname(hugo_path), version=version, archive=archive
+        )
+    )
+    # "hugo version" prints "hugo v<version>-<commit> <os/arch> BuildDate=...".
+    get_version_command = f"{hugo_path} version | cut -d- -f1"
+    fetch_dependency(hugo_path, version, fetch_command, get_version_command, "hugo v")
 
 
 def fetch_dependency(
