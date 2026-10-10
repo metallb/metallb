@@ -143,7 +143,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			}
 			err = ConfigUpdater.Update(resources)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("invalid aggregation length 26: prefix 28 in this pool is more specific than the aggregation length for addresses 1.1.1.0/28"))
+			Expect(err.Error()).To(ContainSubstring(`invalid aggregation length 26 in bgpadvertisement "adv-webhooks-test": prefix 28 in pool "pool-webhooks-test" is more specific than the aggregation length for addresses 1.1.1.0/28`))
 		})
 
 		ginkgo.It("Should reject serviceSelectors with non-default aggregationLength", func() {

@@ -985,8 +985,8 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 		// We reject if none of the cidrs are compatible with the aggregation length.
 		lowest := lowestMask(cidrs)
 		if maxLength < lowest {
-			return fmt.Errorf("invalid aggregation length %d: prefix %d in "+
-				"this pool is more specific than the aggregation length for addresses %s", adv.AggregationLength, lowest, addr)
+			return fmt.Errorf("invalid aggregation length %d in bgpadvertisement %q: prefix %d in "+
+				"pool %q is more specific than the aggregation length for addresses %s", maxLength, adv.Name, lowest, pool.Name, addr)
 		}
 	}
 
@@ -1000,9 +1000,10 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 			continue
 		}
 		if !BGPAdvertisementsHaveCompatibleLocalPref(adv, bgpAdv, pool) {
-			return fmt.Errorf("invalid local preference %d: local preferernce %d was "+
-				"already set for the same type of BGP update. Check existing BGP advertisements "+
-				"with common pools and aggregation lengths", adv.LocalPref, bgpAdv.LocalPref)
+			return fmt.Errorf("invalid local preference %d in bgpadvertisement %q: local preference %d was "+
+				"already set by bgpadvertisement %q for the same type of BGP update in pool %q. Check existing "+
+				"BGP advertisements with common pools and aggregation lengths",
+				adv.LocalPref, adv.Name, bgpAdv.LocalPref, bgpAdv.Name, pool.Name)
 		}
 	}
 
