@@ -4495,6 +4495,109 @@ func TestServiceSelectors(t *testing.T) {
 	}
 }
 
+func TestBGPAdvertisementIncompatibleWithPool(t *testing.T) {
+	tests := []struct {
+		desc    string
+		crs     ClusterResources
+		wantErr string
+	}{
+		{
+			desc: "ipv4 aggregation length more specific than the pool",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1.2.3.0/28"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: ptr.To[int32](26),
+						},
+					},
+				},
+			},
+			wantErr: `invalid aggregation length 26 in bgpadvertisement "adv1": prefix 28 in pool "pool1" ` +
+				"is more specific than the aggregation length for addresses 1.2.3.0/28",
+		},
+		{
+			desc: "ipv6 aggregation length more specific than the pool",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"2001:db8::/120"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLengthV6: ptr.To[int32](112),
+						},
+					},
+				},
+			},
+			wantErr: `invalid aggregation length 112 in bgpadvertisement "adv1": prefix 120 in pool "pool1" ` +
+				"is more specific than the aggregation length for addresses 2001:db8::/120",
+		},
+		{
+			desc: "different local pref for the same pool, peers and nodes",
+			crs: ClusterResources{
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"1.2.3.0/24"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"pool1"},
+							LocalPref:      100,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv2"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"pool1"},
+							LocalPref:      200,
+						},
+					},
+				},
+			},
+			wantErr: `invalid local preference 200 in bgpadvertisement "adv2": local preference 100 was ` +
+				`already set by bgpadvertisement "adv1" for the same type of BGP update in pool "pool1"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			_, err := For(tt.crs, DontValidate, ForOptions{})
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
 func TestL2AdvertisementFromCRPreferred(t *testing.T) {
 	edgeNodes := []corev1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: "edge-a", Labels: map[string]string{"role": "edge", "zone": "primary"}}},

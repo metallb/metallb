@@ -8,6 +8,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"go.universe.tf/metallb/api/v1beta1"
+	v1core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,8 +31,42 @@ func TestValidateIPAddressPool(t *testing.T) {
 		}, nil
 	}
 
+	bgpAdvs := &v1beta1.BGPAdvertisementList{
+		Items: []v1beta1.BGPAdvertisement{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-bgpadv",
+					Namespace: MetalLBTestNameSpace,
+				},
+				Spec: v1beta1.BGPAdvertisementSpec{
+					IPAddressPools: []string{"test-ippool"},
+				},
+			},
+		},
+	}
+	toRestoreBGPAdvs := getExistingBGPAdvs
+	getExistingBGPAdvs = func() (*v1beta1.BGPAdvertisementList, error) {
+		return bgpAdvs.DeepCopy(), nil
+	}
+
+	nodes := &v1core.NodeList{
+		Items: []v1core.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+			},
+		},
+	}
+	toRestoreNodes := getExistingNodes
+	getExistingNodes = func() (*v1core.NodeList, error) {
+		return nodes.DeepCopy(), nil
+	}
+
 	defer func() {
 		getExistingIPAddressPools = toRestoreIPAddressPools
+		getExistingBGPAdvs = toRestoreBGPAdvs
+		getExistingNodes = toRestoreNodes
 	}()
 
 	tests := []struct {
@@ -138,6 +173,17 @@ func TestValidateIPAddressPool(t *testing.T) {
 		}
 		if !cmp.Equal(test.expected, mock.ipAddressPools) {
 			t.Fatalf("test %s failed, %s", test.desc, cmp.Diff(test.expected, mock.ipAddressPools))
+		}
+		if test.expected == nil {
+			continue
+		}
+		// The existing BGPAdvertisements and nodes must be validated together
+		// with the pools, as advertisements are checked against the pools they select.
+		if !cmp.Equal(bgpAdvs, mock.bgpAdvs) {
+			t.Fatalf("test %s failed, %s", test.desc, cmp.Diff(bgpAdvs, mock.bgpAdvs))
+		}
+		if !cmp.Equal(nodes, mock.nodes) {
+			t.Fatalf("test %s failed, %s", test.desc, cmp.Diff(nodes, mock.nodes))
 		}
 	}
 }

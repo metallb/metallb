@@ -104,8 +104,21 @@ func validateIPAddressPoolCreate(ipAddress *v1beta1.IPAddressPool) error {
 		return err
 	}
 
+	// BGPAdvertisements are validated against the pools they select (e.g.
+	// the aggregation length against the pool's CIDRs), so they must be
+	// included regardless of which of the two is created first.
+	bgpAdvs, err := getExistingBGPAdvs()
+	if err != nil {
+		return err
+	}
+
+	nodes, err := getExistingNodes()
+	if err != nil {
+		return err
+	}
+
 	toValidate := ipAddressListWithUpdate(existingIPAddressPoolList, ipAddress)
-	err = Validator.Validate(toValidate)
+	err = Validator.Validate(toValidate, bgpAdvs, nodes)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "create", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
 		return err
@@ -122,8 +135,18 @@ func validateIPAddressPoolUpdate(ipAddress *v1beta1.IPAddressPool, _ *v1beta1.IP
 		return err
 	}
 
+	bgpAdvs, err := getExistingBGPAdvs()
+	if err != nil {
+		return err
+	}
+
+	nodes, err := getExistingNodes()
+	if err != nil {
+		return err
+	}
+
 	toValidate := ipAddressListWithUpdate(existingIPAddressPoolList, ipAddress)
-	err = Validator.Validate(toValidate)
+	err = Validator.Validate(toValidate, bgpAdvs, nodes)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "update", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
 		return err

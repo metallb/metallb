@@ -107,6 +107,53 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
 		})
+
+		ginkgo.It("Should recognize an IPAddressPool incompatible with an existing BGPAdvertisement", func() {
+			ginkgo.By("Creating BGPAdvertisement")
+			resources := config.Resources{
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "adv-webhooks-test",
+						},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							AggregationLength: ptr.To(int32(26)),
+							IPAddressPools:    []string{"pool-webhooks-test"},
+						},
+					},
+				},
+			}
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Creating IPAddressPool more specific than the aggregation length")
+			resources.Pools = []metallbv1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pool-webhooks-test",
+					},
+					Spec: metallbv1beta1.IPAddressPoolSpec{
+						Addresses: []string{
+							"1.1.1.0/28",
+						},
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(`invalid aggregation length 26 in bgpadvertisement "adv-webhooks-test": prefix 28 in pool "pool-webhooks-test" is more specific than the aggregation length for addresses 1.1.1.0/28`))
+
+			ginkgo.By("Creating IPAddressPool compatible with the aggregation length")
+			resources.Pools[0].Spec.Addresses = []string{"1.1.1.0/24"}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Updating IPAddressPool to be more specific than the aggregation length")
+			resources.Pools[0].Spec.Addresses = []string{"1.1.1.0/28"}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(`invalid aggregation length 26 in bgpadvertisement "adv-webhooks-test": prefix 28 in pool "pool-webhooks-test" is more specific than the aggregation length for addresses 1.1.1.0/28`))
+		})
 	})
 
 	ginkgo.Context("for BGPAdvertisement", func() {
@@ -143,7 +190,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			}
 			err = ConfigUpdater.Update(resources)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("invalid aggregation length 26: prefix 28 in this pool is more specific than the aggregation length for addresses 1.1.1.0/28"))
+			Expect(err.Error()).To(ContainSubstring(`invalid aggregation length 26 in bgpadvertisement "adv-webhooks-test": prefix 28 in pool "pool-webhooks-test" is more specific than the aggregation length for addresses 1.1.1.0/28`))
 		})
 
 		ginkgo.It("Should reject serviceSelectors with non-default aggregationLength", func() {
