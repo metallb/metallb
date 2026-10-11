@@ -4079,6 +4079,38 @@ func TestContainsAdvertisement(t *testing.T) {
 	}
 }
 
+func TestRouterIDValidation(t *testing.T) {
+	for _, tc := range []struct {
+		routerID string
+		valid    bool
+	}{
+		{routerID: "", valid: true},
+		{routerID: "192.0.2.1", valid: true},
+		{routerID: "::ffff:192.0.2.1", valid: true},
+		{routerID: "2001:db8::1", valid: false},
+		{routerID: "::", valid: false},
+		{routerID: "not-an-address", valid: false},
+	} {
+		t.Run(tc.routerID, func(t *testing.T) {
+			resources := ClusterResources{
+				Peers: []v1beta2.BGPPeer{{
+					ObjectMeta: metav1.ObjectMeta{Name: "peer"},
+					Spec: v1beta2.BGPPeerSpec{
+						MyASN:    64512,
+						ASN:      64513,
+						Address:  "192.0.2.2",
+						RouterID: tc.routerID,
+					},
+				}},
+			}
+			_, err := For(resources, DontValidate, ForOptions{})
+			if (err == nil) != tc.valid {
+				t.Fatalf("For() error = %v, want valid = %v", err, tc.valid)
+			}
+		})
+	}
+}
+
 func FuzzParseCIDR(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input string) {
 		_, _ = ParseCIDR(input)
