@@ -233,7 +233,7 @@ currently using it via the Operator, plan to migrate to `frr-k8s`:
 
 ```yaml
 - name: METALLB_BGP_TYPE
-  value: frr
+  value: frr-k8s
 ```
 
 {{% /notice %}}
