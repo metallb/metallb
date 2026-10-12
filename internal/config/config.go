@@ -438,8 +438,8 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	var routerID net.IP
 	if p.Spec.RouterID != "" {
 		routerID = net.ParseIP(p.Spec.RouterID)
-		if routerID == nil {
-			return nil, fmt.Errorf("invalid router ID %q", p.Spec.RouterID)
+		if routerID.To4() == nil {
+			return nil, fmt.Errorf("invalid router ID %q: must be an IPv4 address", p.Spec.RouterID)
 		}
 	}
 	src := net.ParseIP(p.Spec.SrcAddress)
