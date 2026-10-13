@@ -944,6 +944,11 @@ func parseTimers(ht, ka *metav1.Duration) (*time.Duration, *time.Duration, error
 		return nil, nil, nil
 	}
 
+	const maxHoldTime = 65535 * time.Second
+	if ka != nil && (ka.Duration < 0 || ka.Duration > maxHoldTime) {
+		return nil, nil, fmt.Errorf("invalid keepalive time %q: must be between 0 and 65535s", ka)
+	}
+
 	var holdTime *time.Duration
 	var keepaliveTime *time.Duration
 	if ht != nil && ka != nil {
@@ -960,8 +965,8 @@ func parseTimers(ht, ka *metav1.Duration) (*time.Duration, *time.Duration, error
 	}
 
 	rounded := time.Duration(int(holdTime.Seconds())) * time.Second
-	if rounded != 0 && rounded < 3*time.Second {
-		return nil, nil, fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
+	if *holdTime < 0 || *holdTime > maxHoldTime || (rounded != 0 && rounded < 3*time.Second) {
+		return nil, nil, fmt.Errorf("invalid hold time %q: must be 0 or between 3s and 65535s", *holdTime)
 	}
 
 	if *keepaliveTime > *holdTime {
