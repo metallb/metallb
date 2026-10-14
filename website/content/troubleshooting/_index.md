@@ -86,6 +86,8 @@ A given speaker won't advertise the service if:
 - the service has `externalTrafficPolicy=local` and there are no running endpoints on the speaker's node
 - there are no L2Advertisements / BGPAdvertisements matching the speaker node (if node selectors are specified)
 - the Kubernetes API reports "network not available" on the speaker's node
+- the speaker's node has the `node.kubernetes.io/exclude-from-external-load-balancers` label and the
+speaker does not run with `--ignore-exclude-lb` (see [below](#metallb-is-not-advertising-my-service-from-my-control-plane-nodes-or-from-my-single-node-cluster))
 
 ## MetalLB is not advertising my service from my control-plane nodes or from my single node cluster
 
