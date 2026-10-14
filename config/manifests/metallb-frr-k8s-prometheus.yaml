@@ -1202,6 +1202,325 @@ spec:
                           maximum: 4294967295
                           minimum: 0
                           type: integer
+                        evpn:
+                          description: EVPN specific configuration for the router.
+                          properties:
+                            advertiseSVI:
+                              description: AdvertiseSVI enables advertising the SVI
+                                IP/MAC as a type-2 route.
+                              type: boolean
+                            advertiseVNIs:
+                              allOf:
+                              - enum:
+                                - Disabled
+                                - All
+                              - enum:
+                                - Disabled
+                                - All
+                              description: |-
+                                AdvertiseVNIs controls how VNIs are advertised to EVPN neighbors.
+                                - "Disabled": No VNI advertisements
+                                - "All": Avertise all VNIs
+                                Note: Can only be provided for router instances with EVPN neighbors.
+                              type: string
+                            l2vnis:
+                              description: |-
+                                L2VNIs contains configuration for Layer 2 VNIs.
+                                Note: Can only be provided for router instances with EVPN neighbors.
+                              items:
+                                description: L2VNI represents a Layer 2 VNI configuration.
+                                properties:
+                                  exportRTs:
+                                    description: |-
+                                      ExportRTs is the list of route targets to export.
+                                      Format: A.B.C.D:MN|EF:OPQR|GHJK:MN (e.g., "65000:100", "192.0.2.1:100")
+                                    items:
+                                      description: |-
+                                        ExportRouteTarget defines a BGP Extended Community for route filtering on export.
+                                        Does NOT support wildcard matching (wildcards are only valid for import).
+                                      maxLength: 21
+                                      type: string
+                                      x-kubernetes-validations:
+                                      - message: RT must contain exactly one colon
+                                        rule: self.split(':').size() == 2
+                                      - message: RT global administrator must be either
+                                          an IPv4 address or a number
+                                        rule: self.split(':').size() != 2 || (isIP(self.split(':')[0])
+                                          || self.split(':')[0].matches('[0-9]+'))
+                                      - message: RT local administrator must be a
+                                          number
+                                        rule: self.split(':').size() != 2 || self.split(':')[1].matches('[0-9]+')
+                                      - message: RT with IPv4 global administrator
+                                          must have format A.B.C.D:MN where MN <=
+                                          65535
+                                        rule: self.split(':').size() != 2 || !self.split(':')[0].contains('.')
+                                          || (self.split(':')[1].matches('[0-9]+')
+                                          && uint(self.split(':')[1]) <= 65535u)
+                                      - message: RT with 4-byte ASN global administrator
+                                          must have format GHJK:MN where GHJK <= 4294967295
+                                          and MN <= 65535
+                                        rule: self.split(':').size() != 2 || self.split(':')[0].contains('.')
+                                          || !self.split(':')[0].matches('[0-9]+')
+                                          || !self.split(':')[1].matches('[0-9]+')
+                                          || uint(self.split(':')[0]) <= 65535u ||
+                                          uint(self.split(':')[1]) <= 65535u
+                                      - message: RT with 2-byte ASN global administrator
+                                          must have format EF:OPQR where EF <= 65535
+                                          and OPQR <= 4294967295
+                                        rule: self.split(':').size() != 2 || self.split(':')[0].contains('.')
+                                          || !self.split(':')[0].matches('[0-9]+')
+                                          || !self.split(':')[1].matches('[0-9]+')
+                                          || uint(self.split(':')[0]) > 65535u ||
+                                          uint(self.split(':')[1]) <= 4294967295u
+                                    maxItems: 100
+                                    type: array
+                                  importRTs:
+                                    description: |-
+                                      ImportRTs is the list of route targets to import.
+                                      Format: A.B.C.D:MN|EF:OPQR|GHJK:MN|*:MN|*:OPQR (e.g., "65000:100", "192.0.2.1:100", "*:100")
+                                    items:
+                                      description: |-
+                                        ImportRouteTarget defines a BGP Extended Community for route filtering on import.
+                                        Supports wildcard matching with "*" as the global administrator (e.g., "*:100").
+                                      maxLength: 21
+                                      type: string
+                                      x-kubernetes-validations:
+                                      - message: RT must contain exactly one colon
+                                        rule: self.split(':').size() == 2
+                                      - message: RT global administrator must be either
+                                          '*', an IPv4 address, or a number
+                                        rule: self.split(':').size() != 2 || (self.startsWith('*:')
+                                          || isIP(self.split(':')[0]) || self.split(':')[0].matches('[0-9]+'))
+                                      - message: RT local administrator must be a
+                                          number
+                                        rule: self.split(':').size() != 2 || self.split(':')[1].matches('[0-9]+')
+                                      - message: RT with wildcard global administrator
+                                          must have format *:OPQR where OPQR <= 4294967295
+                                        rule: self.split(':').size() != 2 || !self.startsWith('*:')
+                                          || (self.split(':')[1].matches('[0-9]+')
+                                          && uint(self.split(':')[1]) <= 4294967295u)
+                                      - message: RT with IPv4 global administrator
+                                          must have format A.B.C.D:MN where MN <=
+                                          65535
+                                        rule: self.split(':').size() != 2 || !self.split(':')[0].contains('.')
+                                          || (self.split(':')[1].matches('[0-9]+')
+                                          && uint(self.split(':')[1]) <= 65535u)
+                                      - message: RT with 4-byte ASN global administrator
+                                          must have format GHJK:MN where GHJK <= 4294967295
+                                          and MN <= 65535
+                                        rule: self.split(':').size() != 2 || self.startsWith('*:')
+                                          || self.split(':')[0].contains('.') || !self.split(':')[0].matches('[0-9]+')
+                                          || !self.split(':')[1].matches('[0-9]+')
+                                          || uint(self.split(':')[0]) <= 65535u ||
+                                          uint(self.split(':')[1]) <= 65535u
+                                      - message: RT with 2-byte ASN global administrator
+                                          must have format EF:OPQR where EF <= 65535
+                                          and OPQR <= 4294967295
+                                        rule: self.split(':').size() != 2 || self.startsWith('*:')
+                                          || self.split(':')[0].contains('.') || !self.split(':')[0].matches('[0-9]+')
+                                          || !self.split(':')[1].matches('[0-9]+')
+                                          || uint(self.split(':')[0]) > 65535u ||
+                                          uint(self.split(':')[1]) <= 4294967295u
+                                    maxItems: 100
+                                    type: array
+                                  rd:
+                                    description: |-
+                                      RD is the route distinguisher for this VNI.
+                                      Format: A.B.C.D:MN|EF:OPQR|GHJK:MN (e.g., "65000:100" or "192.0.2.1:100")
+                                    maxLength: 21
+                                    type: string
+                                    x-kubernetes-validations:
+                                    - message: RD must contain exactly one colon
+                                      rule: self.split(':').size() == 2
+                                    - message: RD global administrator must be either
+                                        an IPv4 address or a number
+                                      rule: self.split(':').size() != 2 || (isIP(self.split(':')[0])
+                                        || self.split(':')[0].matches('[0-9]+'))
+                                    - message: RD local administrator must be a number
+                                      rule: self.split(':').size() != 2 || self.split(':')[1].matches('[0-9]+')
+                                    - message: RD with IPv4 global administrator must
+                                        have format A.B.C.D:MN where MN <= 65535
+                                      rule: self.split(':').size() != 2 || !self.split(':')[0].contains('.')
+                                        || (self.split(':')[1].matches('[0-9]+') &&
+                                        uint(self.split(':')[1]) <= 65535u)
+                                    - message: RD with 4-byte ASN global administrator
+                                        must have format GHJK:MN where GHJK <= 4294967295
+                                        and MN <= 65535
+                                      rule: self.split(':').size() != 2 || self.split(':')[0].contains('.')
+                                        || !self.split(':')[0].matches('[0-9]+') ||
+                                        !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                        <= 65535u || uint(self.split(':')[1]) <= 65535u
+                                    - message: RD with 2-byte ASN global administrator
+                                        must have format EF:OPQR where EF <= 65535
+                                        and OPQR <= 4294967295
+                                      rule: self.split(':').size() != 2 || self.split(':')[0].contains('.')
+                                        || !self.split(':')[0].matches('[0-9]+') ||
+                                        !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                        > 65535u || uint(self.split(':')[1]) <= 4294967295u
+                                  vni:
+                                    description: VNI is the VXLAN Network Identifier
+                                      (1-16777215).
+                                    format: int32
+                                    maximum: 16777215
+                                    minimum: 1
+                                    type: integer
+                                required:
+                                - vni
+                                type: object
+                              maxItems: 10
+                              type: array
+                            l3vni:
+                              description: |-
+                                L3VNI contains configuration for the Layer 3 VNI.
+                                Note: Can only be provided for router instances with no neighbors.
+                                This is a temporary limitation until proper EVPN prefix filtering is implemented.
+                              properties:
+                                advertisePrefixes:
+                                  description: |-
+                                    AdvertisePrefixes controls which prefixes to advertise as EVPN type-5 routes.
+                                    - "unicast": advertise the unicast prefixes of the router.
+                                  items:
+                                    description: AdvertisePrefixType specifies a prefix
+                                      type to advertise as EVPN type-5 routes.
+                                    enum:
+                                    - unicast
+                                    type: string
+                                  maxItems: 1
+                                  minItems: 1
+                                  type: array
+                                exportRTs:
+                                  description: |-
+                                    ExportRTs is the list of route targets to export.
+                                    Format: A.B.C.D:MN|EF:OPQR|GHJK:MN (e.g., "65000:100", "192.0.2.1:100")
+                                  items:
+                                    description: |-
+                                      ExportRouteTarget defines a BGP Extended Community for route filtering on export.
+                                      Does NOT support wildcard matching (wildcards are only valid for import).
+                                    maxLength: 21
+                                    type: string
+                                    x-kubernetes-validations:
+                                    - message: RT must contain exactly one colon
+                                      rule: self.split(':').size() == 2
+                                    - message: RT global administrator must be either
+                                        an IPv4 address or a number
+                                      rule: self.split(':').size() != 2 || (isIP(self.split(':')[0])
+                                        || self.split(':')[0].matches('[0-9]+'))
+                                    - message: RT local administrator must be a number
+                                      rule: self.split(':').size() != 2 || self.split(':')[1].matches('[0-9]+')
+                                    - message: RT with IPv4 global administrator must
+                                        have format A.B.C.D:MN where MN <= 65535
+                                      rule: self.split(':').size() != 2 || !self.split(':')[0].contains('.')
+                                        || (self.split(':')[1].matches('[0-9]+') &&
+                                        uint(self.split(':')[1]) <= 65535u)
+                                    - message: RT with 4-byte ASN global administrator
+                                        must have format GHJK:MN where GHJK <= 4294967295
+                                        and MN <= 65535
+                                      rule: self.split(':').size() != 2 || self.split(':')[0].contains('.')
+                                        || !self.split(':')[0].matches('[0-9]+') ||
+                                        !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                        <= 65535u || uint(self.split(':')[1]) <= 65535u
+                                    - message: RT with 2-byte ASN global administrator
+                                        must have format EF:OPQR where EF <= 65535
+                                        and OPQR <= 4294967295
+                                      rule: self.split(':').size() != 2 || self.split(':')[0].contains('.')
+                                        || !self.split(':')[0].matches('[0-9]+') ||
+                                        !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                        > 65535u || uint(self.split(':')[1]) <= 4294967295u
+                                  maxItems: 100
+                                  type: array
+                                importRTs:
+                                  description: |-
+                                    ImportRTs is the list of route targets to import.
+                                    Format: A.B.C.D:MN|EF:OPQR|GHJK:MN|*:MN|*:OPQR (e.g., "65000:100", "192.0.2.1:100", "*:100")
+                                  items:
+                                    description: |-
+                                      ImportRouteTarget defines a BGP Extended Community for route filtering on import.
+                                      Supports wildcard matching with "*" as the global administrator (e.g., "*:100").
+                                    maxLength: 21
+                                    type: string
+                                    x-kubernetes-validations:
+                                    - message: RT must contain exactly one colon
+                                      rule: self.split(':').size() == 2
+                                    - message: RT global administrator must be either
+                                        '*', an IPv4 address, or a number
+                                      rule: self.split(':').size() != 2 || (self.startsWith('*:')
+                                        || isIP(self.split(':')[0]) || self.split(':')[0].matches('[0-9]+'))
+                                    - message: RT local administrator must be a number
+                                      rule: self.split(':').size() != 2 || self.split(':')[1].matches('[0-9]+')
+                                    - message: RT with wildcard global administrator
+                                        must have format *:OPQR where OPQR <= 4294967295
+                                      rule: self.split(':').size() != 2 || !self.startsWith('*:')
+                                        || (self.split(':')[1].matches('[0-9]+') &&
+                                        uint(self.split(':')[1]) <= 4294967295u)
+                                    - message: RT with IPv4 global administrator must
+                                        have format A.B.C.D:MN where MN <= 65535
+                                      rule: self.split(':').size() != 2 || !self.split(':')[0].contains('.')
+                                        || (self.split(':')[1].matches('[0-9]+') &&
+                                        uint(self.split(':')[1]) <= 65535u)
+                                    - message: RT with 4-byte ASN global administrator
+                                        must have format GHJK:MN where GHJK <= 4294967295
+                                        and MN <= 65535
+                                      rule: self.split(':').size() != 2 || self.startsWith('*:')
+                                        || self.split(':')[0].contains('.') || !self.split(':')[0].matches('[0-9]+')
+                                        || !self.split(':')[1].matches('[0-9]+') ||
+                                        uint(self.split(':')[0]) <= 65535u || uint(self.split(':')[1])
+                                        <= 65535u
+                                    - message: RT with 2-byte ASN global administrator
+                                        must have format EF:OPQR where EF <= 65535
+                                        and OPQR <= 4294967295
+                                      rule: self.split(':').size() != 2 || self.startsWith('*:')
+                                        || self.split(':')[0].contains('.') || !self.split(':')[0].matches('[0-9]+')
+                                        || !self.split(':')[1].matches('[0-9]+') ||
+                                        uint(self.split(':')[0]) > 65535u || uint(self.split(':')[1])
+                                        <= 4294967295u
+                                  maxItems: 100
+                                  type: array
+                                rd:
+                                  description: |-
+                                    RD is the route distinguisher for this VNI.
+                                    Format: A.B.C.D:MN|EF:OPQR|GHJK:MN (e.g., "65000:100" or "192.0.2.1:100")
+                                  maxLength: 21
+                                  type: string
+                                  x-kubernetes-validations:
+                                  - message: RD must contain exactly one colon
+                                    rule: self.split(':').size() == 2
+                                  - message: RD global administrator must be either
+                                      an IPv4 address or a number
+                                    rule: self.split(':').size() != 2 || (isIP(self.split(':')[0])
+                                      || self.split(':')[0].matches('[0-9]+'))
+                                  - message: RD local administrator must be a number
+                                    rule: self.split(':').size() != 2 || self.split(':')[1].matches('[0-9]+')
+                                  - message: RD with IPv4 global administrator must
+                                      have format A.B.C.D:MN where MN <= 65535
+                                    rule: self.split(':').size() != 2 || !self.split(':')[0].contains('.')
+                                      || (self.split(':')[1].matches('[0-9]+') &&
+                                      uint(self.split(':')[1]) <= 65535u)
+                                  - message: RD with 4-byte ASN global administrator
+                                      must have format GHJK:MN where GHJK <= 4294967295
+                                      and MN <= 65535
+                                    rule: self.split(':').size() != 2 || self.split(':')[0].contains('.')
+                                      || !self.split(':')[0].matches('[0-9]+') ||
+                                      !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                      <= 65535u || uint(self.split(':')[1]) <= 65535u
+                                  - message: RD with 2-byte ASN global administrator
+                                      must have format EF:OPQR where EF <= 65535 and
+                                      OPQR <= 4294967295
+                                    rule: self.split(':').size() != 2 || self.split(':')[0].contains('.')
+                                      || !self.split(':')[0].matches('[0-9]+') ||
+                                      !self.split(':')[1].matches('[0-9]+') || uint(self.split(':')[0])
+                                      > 65535u || uint(self.split(':')[1]) <= 4294967295u
+                                vni:
+                                  description: VNI is the VXLAN Network Identifier
+                                    (1-16777215).
+                                  format: int32
+                                  maximum: 16777215
+                                  minimum: 1
+                                  type: integer
+                              required:
+                              - advertisePrefixes
+                              - vni
+                              type: object
+                          type: object
                         id:
                           description: ID is the BGP router ID
                           type: string
@@ -1227,6 +1546,52 @@ spec:
                               address:
                                 description: Address is the IP address to establish
                                   the session with.
+                                type: string
+                              addressFamilies:
+                                default:
+                                - unicast
+                                description: |-
+                                  AddressFamilies specifies which address families to activate this neighbor for.
+                                  Supported values: "unicast" (IPv4/IPv6 unicast based on neighbor IP), "evpn" (L2VPN EVPN).
+                                items:
+                                  description: AddressFamily specifies an address
+                                    family for BGP neighbor activation.
+                                  enum:
+                                  - unicast
+                                  - evpn
+                                  type: string
+                                maxItems: 2
+                                type: array
+                              allowAsIn:
+                                description: |-
+                                  AllowAsIn controls whether routes with the local AS number in the AS path
+                                  are accepted from this neighbor for the enabled address families.
+                                  This is useful in hub-and-spoke or route-leaking topologies where the
+                                  same AS number may appear multiple times in the path.
+                                  Possible values:
+                                  - "" (empty, default): routes with the local AS in the path are rejected.
+                                    Does not reject other AllowAsIn values targeting the same neighbor.
+                                  - "none": routes with the local AS in the path are rejected.
+                                    Rejects other AllowAsIn values targeting the same neighbor.
+                                  - "origin": routes are accepted only if the local AS appears as the origin (last AS in the path).
+                                  - "1"-"10": routes are accepted with up to this many occurrences of the local AS in the path.
+                                  When multiple configurations target the same neighbor, any combination of
+                                  values resolves to the least restrictive, except "none" which rejects
+                                  all other values.
+                                enum:
+                                - ""
+                                - none
+                                - origin
+                                - "1"
+                                - "2"
+                                - "3"
+                                - "4"
+                                - "5"
+                                - "6"
+                                - "7"
+                                - "8"
+                                - "9"
+                                - "10"
                                 type: string
                               asn:
                                 description: |-
@@ -1362,7 +1727,7 @@ spec:
                               toAdvertise:
                                 description: |-
                                   ToAdvertise represents the list of prefixes to advertise to the given neighbor
-                                  and the associated properties.
+                                  and the associated properties. Only applies to IPv4 and IPv6 unicast address families.
                                 properties:
                                   allowed:
                                     description: |-
@@ -1384,6 +1749,51 @@ spec:
                                           type: string
                                         type: array
                                     type: object
+                                  nextHop:
+                                    description: |-
+                                      NextHop sets the BGP next-hop address to advertise with prefixes
+                                      sent to this neighbor.
+                                    properties:
+                                      ipv4:
+                                        description: IPv4 is the next-hop address
+                                          to advertise with IPv4 prefixes.
+                                        format: ipv4
+                                        type: string
+                                      ipv6:
+                                        description: IPv6 is the next-hop address
+                                          to advertise with IPv6 prefixes.
+                                        format: ipv6
+                                        type: string
+                                    type: object
+                                  withAsPathPrepend:
+                                    description: |-
+                                      PrefixesWithAsPathPrepend defines a list of prefixes that will have their
+                                      BGP AS-Path prepended upon advertisement. Any prefix defined in this list
+                                      must also be present in the general list of prefixes allowed to be advertised.
+                                    items:
+                                      description: AsPathPrependPrefixes is a list
+                                        of prefixes associated with an AS path prepending.
+                                      properties:
+                                        asPathPrepend:
+                                          description: AsPathPrepend is the number
+                                            of times to prepend the local ASN to the
+                                            AS path for the prefixes.
+                                          maximum: 10
+                                          minimum: 1
+                                          type: integer
+                                        prefixes:
+                                          description: Prefixes is the list of prefixes
+                                            associated with the AS path prepending.
+                                          items:
+                                            format: cidr
+                                            type: string
+                                          minItems: 1
+                                          type: array
+                                      required:
+                                      - asPathPrepend
+                                      - prefixes
+                                      type: object
+                                    type: array
                                   withCommunity:
                                     description: |-
                                       PrefixesWithCommunity is a list of prefixes that are associated to a
@@ -1433,8 +1843,9 @@ spec:
                                     type: array
                                 type: object
                               toReceive:
-                                description: ToReceive represents the list of prefixes
-                                  to receive from the given neighbor.
+                                description: |-
+                                  ToReceive represents the list of prefixes to receive from the given neighbor.
+                                  Only applies to IPv4 and IPv6 unicast address families.
                                 properties:
                                   allowed:
                                     description: |-
@@ -1494,6 +1905,7 @@ spec:
                       required:
                       - asn
                       type: object
+                    maxItems: 50
                     type: array
                 type: object
               nodeSelector:
@@ -3517,7 +3929,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.25
+        image: quay.io/metallb/frr-k8s:v0.0.27
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3607,6 +4019,7 @@ spec:
                 - amd64
                 - arm64
                 - ppc64le
+                - riscv64
                 - s390x
               - key: kubernetes.io/os
                 operator: In
@@ -3633,7 +4046,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.25
+        image: quay.io/metallb/frr-k8s:v0.0.27
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -3676,7 +4089,7 @@ spec:
         env:
         - name: TINI_SUBREAPER
           value: "true"
-        image: quay.io/frrouting/frr:10.4.3
+        image: quay.io/frrouting/frr:10.6.2
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -3717,7 +4130,7 @@ spec:
         - --metrics-bind-address=0.0.0.0
         command:
         - /etc/frr_metrics/frr-metrics
-        image: quay.io/frrouting/frr:10.4.3
+        image: quay.io/frrouting/frr:10.6.2
         name: frr-metrics
         ports:
         - containerPort: 9141
@@ -3751,7 +4164,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        image: quay.io/frrouting/frr:10.4.3
+        image: quay.io/frrouting/frr:10.6.2
         name: frr-status
         volumeMounts:
         - mountPath: /var/run/frr
@@ -3762,7 +4175,7 @@ spec:
           name: frr-status
       - command:
         - /etc/frr_reloader/frr-reloader.sh
-        image: quay.io/frrouting/frr:10.4.3
+        image: quay.io/frrouting/frr:10.6.2
         name: reloader
         volumeMounts:
         - mountPath: /var/run/frr
@@ -3777,7 +4190,7 @@ spec:
         - /bin/sh
         - -c
         - cp -rLf /tmp/frr/* /etc/frr/
-        image: quay.io/frrouting/frr:10.4.3
+        image: quay.io/frrouting/frr:10.6.2
         name: cp-frr-files
         securityContext:
           runAsGroup: 101
@@ -3791,7 +4204,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-reloader.sh /etc/frr_reloader/
-        image: quay.io/metallb/frr-k8s:v0.0.25
+        image: quay.io/metallb/frr-k8s:v0.0.27
         name: cp-reloader
         volumeMounts:
         - mountPath: /etc/frr_reloader
@@ -3800,7 +4213,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-metrics /etc/frr_metrics/
-        image: quay.io/metallb/frr-k8s:v0.0.25
+        image: quay.io/metallb/frr-k8s:v0.0.27
         name: cp-metrics
         volumeMounts:
         - mountPath: /etc/frr_metrics
@@ -3809,7 +4222,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-status /etc/frr_status/
-        image: quay.io/metallb/frr-k8s:v0.0.25
+        image: quay.io/metallb/frr-k8s:v0.0.27
         name: cp-frr-status
         volumeMounts:
         - mountPath: /etc/frr_status
