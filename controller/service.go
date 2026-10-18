@@ -59,8 +59,8 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		return nil
 	}
 
-	// Return if pools are empty.
-	if len(c.pools.ByName) == 0 {
+	// No config means no pools: clear the service rather than wait.
+	if c.pools == nil || len(c.pools.ByName) == 0 {
 		level.Debug(l).Log("event", "clearAssignment", "reason", "noConfig", "msg", "pools are empty")
 		c.clearServiceState(key, svc)
 		return ErrConverge
