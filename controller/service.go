@@ -156,8 +156,10 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		}
 	}
 
-	// If svc currently has 1 ip and policy PreferDualStack, try assigning ip from the missing family and same pool
-	if len(lbIPs) == 1 && familyPolicy == v1.IPFamilyPolicyPreferDualStack {
+	// If svc currently has 1 ip, policy PreferDualStack and dual stack clusterips,
+	// try assigning ip from the missing family and same pool. A single clusterip keeps
+	// the lb ip of its own family: serviceFamilyChanged would clear the extra one.
+	if len(lbIPs) == 1 && familyPolicy == v1.IPFamilyPolicyPreferDualStack && len(svc.Spec.ClusterIPs) > 1 {
 		level.Info(l).Log("event", "tryAssignAdditionalIP", "msg", "familyPolicy is PreferDualStack, trying to assign additional ip")
 		currentPool := c.ips.Pool(key)
 		// Try assigning a new ip with the missing stack and from the same pool.
