@@ -169,6 +169,7 @@ func TestParse(t *testing.T) {
 						Spec: v1beta1.BGPAdvertisementSpec{
 							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(100),
+							AsPathPrepend:     uint8(3),
 							Communities:       []string{"bar"},
 							IPAddressPools:    []string{"pool1"},
 							Peers:             []string{"peer1"},
@@ -265,6 +266,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           100,
+								AsPathPrepend:       3,
 								Communities: func() map[community.BGPCommunity]bool {
 									c, _ := community.New("64512:1234")
 									return map[community.BGPCommunity]bool{
@@ -1649,6 +1651,345 @@ func TestParse(t *testing.T) {
 				Peers:       map[string]*Peer{},
 			},
 		},
+		{
+			desc: "different as path prepend - same peers and nodes",
+			crs: ClusterResources{
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node2",
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend: 2,
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend: 5,
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "different as path prepend - different ipv4 aggregation length",
+			crs: ClusterResources{
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node2",
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend:     3,
+							AggregationLength: ptr.To[int32](24),
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend: 4,
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("10.20.30.40/24"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   24,
+								AggregationLengthV6: 128,
+								LocalPref:           0,
+								AsPathPrepend:       3,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           0,
+								AsPathPrepend:       4,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "different as path prepend - different aggregation lengths (dualstack)",
+			crs: ClusterResources{
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node2",
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend:       3,
+							AggregationLength:   ptr.To[int32](24),
+							AggregationLengthV6: ptr.To[int32](120),
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend: 4,
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("10.20.30.40/24"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   24,
+								AggregationLengthV6: 120,
+								LocalPref:           0,
+								AsPathPrepend:       3,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           0,
+								AsPathPrepend:       4,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "different as path prepend - same peers & different nodes",
+			crs: ClusterResources{
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "node1",
+							Labels: map[string]string{"node": "node1"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "node2",
+							Labels: map[string]string{"node": "node2"},
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend: 4,
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"node": "node1"},
+								},
+							},
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend: 5,
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"node": "node2"},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("10.20.30.40/24"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           0,
+								AsPathPrepend:       4,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true},
+							},
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           0,
+								AsPathPrepend:       5,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node2": true},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "different as path prepend - different peers & same nodes",
+			crs: ClusterResources{
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node2",
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend: 4,
+							Peers:         []string{"peer1"},
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AsPathPrepend: 5,
+							Peers:         []string{"peer2"},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("10.20.30.40/24"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           0,
+								AsPathPrepend:       4,
+								Peers:               []string{"peer1"},
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           0,
+								AsPathPrepend:       5,
+								Peers:               []string{"peer2"},
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+
 		{
 			desc: "aggregation length by range",
 			crs: ClusterResources{

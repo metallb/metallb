@@ -267,3 +267,19 @@ func LocalPrefForPrefix(exec executor.Executor, prefix string, family ipfamily.F
 	}
 	return route.LocalPref, nil
 }
+
+// AsPathForPrefix returns the AS Path value for the given prefix.
+func AsPathForPrefix(exec executor.Executor, prefix string, family ipfamily.Family) ([]string, error) {
+	routes, v6Routes, err := Routes(exec)
+	if err != nil {
+		return nil, err
+	}
+	if family == ipfamily.IPv6 {
+		routes = v6Routes
+	}
+	route, ok := routes[prefix]
+	if !ok {
+		return nil, fmt.Errorf("prefix %s not found in routes", prefix)
+	}
+	return strings.Fields(route.AsPath), nil
+}
