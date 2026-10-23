@@ -2135,6 +2135,46 @@ func TestPoolCount(t *testing.T) {
 	}
 }
 
+func TestSmallPoolMetricsWithBuggyIPs(t *testing.T) {
+	tests := []struct {
+		name       string
+		cidrs      []string
+		avoidBuggy bool
+		want       int64
+	}{
+		{"single .0", []string{"1.2.3.0/32"}, true, 0},
+		{"single .255", []string{"1.2.3.255/32"}, true, 0},
+		{"single ordinary address", []string{"1.2.3.1/32"}, true, 1},
+		{"single .0 allowed", []string{"1.2.3.0/32"}, false, 1},
+		{"single .255 allowed", []string{"1.2.3.255/32"}, false, 1},
+		{"two addresses starting at .0", []string{"1.2.3.0/31"}, true, 1},
+		{"two addresses ending at .255", []string{"1.2.3.254/31"}, true, 1},
+		{"ordinary range", []string{"1.2.3.4/30"}, true, 4},
+		{"excluded address and ordinary range", []string{"1.2.3.0/32", "1.2.4.4/30"}, true, 4},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pool := &config.Pool{Name: "small", AvoidBuggyIPs: test.avoidBuggy}
+			for _, cidr := range test.cidrs {
+				pool.CIDR = append(pool.CIDR, ipnet(cidr))
+			}
+			alloc := New(func(string) {})
+			alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{pool.Name: pool}})
+			t.Cleanup(func() { alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{}}) })
+
+			if got := ptu.ToFloat64(stats.poolCapacity.WithLabelValues(pool.Name)); got != float64(test.want) {
+				t.Errorf("total capacity = %v, want %v", got, test.want)
+			}
+			if got := ptu.ToFloat64(stats.ipv4PoolCapacity.WithLabelValues(pool.Name)); got != float64(test.want) {
+				t.Errorf("IPv4 capacity = %v, want %v", got, test.want)
+			}
+			if err := validateCounters(alloc.CountersForPool(pool.Name), test.want, 0, 0, 0); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
 func TestLargePoolMetrics(t *testing.T) {
 	tests := []struct {
 		name  string
