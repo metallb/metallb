@@ -1,0 +1,23 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "schedule:weekly",
+    ":enableVulnerabilityAlerts",
+    ":gitSignOff"
+  ],
+  "enabledManagers": ["gomod", "github-actions"],
+  "postUpdateOptions": ["gomodTidyAll"],
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": false,
+  "assignees": ["oribon", "fedepaol"],
+  "labels": ["kind/cleanup"],
+  "vulnerabilityAlerts": {
+    "addLabels": ["security"],
+    "schedule": []
+  },
+  "semanticCommits": "enabled",
+  "prConcurrentLimit": 5,
+  "prBodyNotes": ["```release-note\nNONE\n```"]
+}
