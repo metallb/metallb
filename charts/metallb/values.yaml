@@ -385,6 +385,14 @@ speaker:
 
 crds:
   enabled: true
+  # -- Failure policy of the validating webhooks (`Fail` or `Ignore`). It only
+  # applies when the API server cannot reach the webhook: a reachable webhook
+  # still rejects invalid resources under either value. With `Fail`, MetalLB
+  # resources cannot be created until the controller is ready, so installing
+  # them in the same release as this chart (for example from a parent chart's
+  # templates) fails under Helm 4, which applies the webhook configuration
+  # before them. `Ignore` makes that kind of install work, at the cost that
+  # resources created while the webhook is unreachable are not validated.
   validationFailurePolicy: Fail
 
 # frrk8s contains the configuration related to using an frrk8s instance
