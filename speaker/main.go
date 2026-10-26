@@ -681,6 +681,9 @@ func isNodeAvailableChanged(oldNodes map[string]*v1.Node, newNode *v1.Node) bool
 	if k8snodes.IsNodeExcludedFromBalancers(oldNode) != k8snodes.IsNodeExcludedFromBalancers(newNode) {
 		return true
 	}
+	if k8snodes.IsNodeOutOfService(oldNode) != k8snodes.IsNodeOutOfService(newNode) {
+		return true
+	}
 
 	return false
 }

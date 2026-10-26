@@ -260,6 +260,56 @@ jobs:
           annotate_only: true
           report_paths: 'e2etest/junit-report.xml'
 
+  e2e-out-of-service-no-memberlist:
+    runs-on: ubuntu-22.04
+    needs:
+      - unit-tests
+      - build-test-images
+      - commitlint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
+      - name: Setup
+        uses: ./.github/workflows/composite/setup
+
+      - name: Deploy MetalLB
+        run: inv dev-env -i ipv4 -b native -l all --no-build-images
+
+      - name: Configure out-of-service test deployment
+        run: |
+          # Keep the speaker pod alive so memberlist cannot drive failover via pod eviction.
+          kubectl patch daemonset speaker -n metallb-system --type=json \
+            -p='[{"op":"add","path":"/spec/template/spec/tolerations/-","value":{"key":"node.kubernetes.io/out-of-service","operator":"Equal","value":"nodeshutdown","effect":"NoExecute"}}]'
+
+          # An empty bind address disables memberlist; speakers then consider all nodes.
+          kubectl set env daemonset/speaker -n metallb-system METALLB_ML_BIND_ADDR- METALLB_ML_LABELS-
+          kubectl rollout status daemonset/speaker -n metallb-system --timeout=180s
+
+      - name: E2E
+        env:
+          METALLB_E2E_OUT_OF_SERVICE_KEEP_SPEAKER: "true"
+        run: |
+          sudo -E env "PATH=$PATH" inv e2etest --focus "out-of-service taint" --bgp-mode native -e /tmp/kind_logs
+
+      - name: Collect Logs
+        if: ${{ failure() }}
+        uses: ./.github/workflows/composite/collectlogs
+        with:
+          artifact-name: kind-logs-out-of-service-no-memberlist
+
+      - name: Publish JUnit Report
+        uses: mikepenz/action-junit-report@v6
+        if: success() || failure()
+        with:
+          annotate_only: true
+          report_paths: 'e2etest/junit-report.xml'
+
   e2e-use-operator:
     runs-on: ubuntu-22.04
     needs:
