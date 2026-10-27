@@ -237,8 +237,10 @@ metallb:
 ```
 
 This does not turn validation off: once the webhook is serving, it still
-rejects invalid resources. `Ignore` only changes what happens when the API
-server cannot reach the webhook: the resource is admitted without validation.
+rejects invalid resources, because a webhook that answers `allowed: false`
+rejects under either policy. `Ignore` only changes what happens when calling
+the webhook fails (it is unreachable, times out, or returns an error or a
+malformed response): the resource is then admitted without validation.
 That includes the resources created in the same release, and anything created
 while the controller is down or restarting.
 
