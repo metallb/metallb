@@ -246,6 +246,12 @@ If you want to keep `Fail`, create the resources in a separate step, once the
 webhook is serving. The controller's readiness probe does not cover the
 webhook server, so a ready controller Deployment does not guarantee that the
 webhook is serving yet.
+
+This only works when the webhook is enabled. If `controller.webhookMode` is
+`disabled` or `controller.enabled` is `false`, the chart still renders the
+validating webhook configurations and `metallb-webhook-service`, but nothing
+serves them, so MetalLB resources are rejected under `Fail` even when created in
+a separate step. In that case set the policy to `Ignore`.
 {{% /notice %}}
 
 ## Using the MetalLB Operator
