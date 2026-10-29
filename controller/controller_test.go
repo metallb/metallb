@@ -1600,3 +1600,32 @@ func TestControllerDualStackConfig(t *testing.T) {
 		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
 	}
 }
+
+func TestControllerNoConfigClearsIP(t *testing.T) {
+	k := &testK8S{t: t}
+	c := &controller{
+		ips:    allocator.New(noopCallback),
+		client: k,
+	}
+
+	l := log.NewNopLogger()
+	svc := &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:       "LoadBalancer",
+			ClusterIPs: []string{"1.2.3.4"},
+		},
+		Status: statusAssigned([]string{"10.20.30.40"}),
+	}
+
+	// No pools have been set: no config means no pools, so the IP is removed.
+	if got := c.SetBalancer(l, "test", svc, []discovery.EndpointSlice{}); got != controllers.SyncStateErrorNoRetry {
+		t.Fatalf("SetBalancer returned %v, want %v", got, controllers.SyncStateErrorNoRetry)
+	}
+
+	gotSvc := k.gotService(svc)
+	wantSvc := svc.DeepCopy()
+	wantSvc.Status = v1.ServiceStatus{}
+	if diff := diffService(wantSvc, gotSvc); diff != "" {
+		t.Errorf("SetBalancer with no configuration did not clear the IP (-want +got)\n%s", diff)
+	}
+}
