@@ -8,6 +8,7 @@ import (
 	"net"
 	"sort"
 	"strconv"
+	"strings"
 
 	"errors"
 )
@@ -43,6 +44,22 @@ type Route struct {
 	Origin      string
 	Stale       bool
 	AsPath      string
+}
+
+// ASPathPrependCount returns how many times asn was prepended to the route's
+// AS path: the number of leading occurrences of asn after the first one.
+func (r Route) ASPathPrependCount(asn string) int {
+	count := 0
+	for _, a := range strings.Fields(r.AsPath) {
+		if a != asn {
+			break
+		}
+		count++
+	}
+	if count == 0 {
+		return 0
+	}
+	return count - 1
 }
 
 const bgpConnected = "Established"
