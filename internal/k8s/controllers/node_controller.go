@@ -97,11 +97,32 @@ func NodeReconcilerPredicate() predicate.Predicate {
 		},
 	}
 
+	nodeConditionNodeOutOfServiceChanged := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldNode, ok := e.ObjectOld.(*corev1.Node)
+			if !ok {
+				return false
+			}
+
+			newNode, ok := e.ObjectNew.(*corev1.Node)
+			if !ok {
+				return false
+			}
+
+			if k8snodes.IsNodeOutOfService(oldNode) != k8snodes.IsNodeOutOfService(newNode) {
+				return true
+			}
+
+			return false
+		},
+	}
+
 	return predicate.And(
 		allowDeletions,
 		allowCreations,
 		predicate.Or(
 			nodeConditionNetworkAvailabilityStatusChanged,
+			nodeConditionNodeOutOfServiceChanged,
 			predicate.LabelChangedPredicate{},
 		),
 	)
