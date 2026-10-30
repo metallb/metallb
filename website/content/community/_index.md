@@ -180,13 +180,14 @@ code.
 However, there is a version of the website synced to the latest main
 branch
 at
-[https://main--metallb.netlify.com](https://main--metallb.netlify.com). Similarly,
+[https://main--metallb.netlify.app](https://main--metallb.netlify.app). Similarly,
 every branch has a published website at `<branch
-name>--metallb.netlify.com`. So if you want to view the documentation
+name>--metallb.netlify.app`, with the dots in the branch name replaced by
+dashes. So if you want to view the documentation
 for the 0.2 version, regardless of what the currently released version
 is, you can
 visit
-[https://v0.2--metallb.netlify.com](https://v0.2--metallb.netlify.com).
+[https://v0-2--metallb.netlify.app](https://v0-2--metallb.netlify.app).
 
 When editing the website, you can preview your changes locally by
 installing [Hugo](https://gohugo.io/) and running `hugo server` from
