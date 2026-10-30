@@ -554,7 +554,7 @@ that the migration path from native BGP to FRR was not explicitly tested.
 Bug Fixes:
 
 - If a configmap is marked as stale because removing an pool used by a service, metallb tries to reprocess it periodically until the service is deleted or changed.
-  ([PR #1028](https://github.com/metallb/metallb/pull/1028), [PR #1166](https://github.com/metallb/metallb/pull/1166]))
+  ([PR #1028](https://github.com/metallb/metallb/pull/1028), [PR #1166](https://github.com/metallb/metallb/pull/1166))
 
 - Controller panic when updating the address pool of a service and specifying spec.loadBalancerIP from the new address pool
   ([PR #1168](https://github.com/metallb/metallb/pull/1168))
@@ -895,7 +895,7 @@ New features:
   network
   addons](https://metallb.io/installation/network-addons/)
   and [cloud
-  providers](https://metallb.io/installation/cloud/), listing
+  providers](https://metallb.io/installation/clouds/), listing
   known issues and configuration tips.
 - MetalLB now publishes a Kubernetes event to a service, indicating
   which nodes are announcing that service. This makes it much easier
