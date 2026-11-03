@@ -209,6 +209,53 @@ frrk8s:
 
 {{% /notice %}}
 
+{{% notice note %}}
+The chart does not create any `IPAddressPool`, `L2Advertisement` or other MetalLB
+resources. If you create them in the same Helm release as MetalLB, for example
+by adding the chart as a dependency of your own chart and putting the resources
+in its `templates/` directory, the install fails under Helm 4 with an error like:
+
+```
+failed calling webhook "ipaddresspoolvalidationwebhook.metallb.io": ...
+no endpoints available for service "metallb-webhook-service"
+```
+
+Helm 4 applies the `ValidatingWebhookConfiguration` before your resources, and
+the controller that serves the webhook is not ready yet, so the default
+failure policy (`Fail`) rejects them. Helm 3 applied those resources first, so
+the same chart installed cleanly. Installers that retry by uninstalling and
+reinstalling, such as the k3s Helm controller, hit the same failure on every
+attempt.
+
+To install in one pass, set the webhook failure policy to `Ignore`. In a parent
+chart, the value goes under the name of the dependency:
+
+```yaml
+metallb:
+  crds:
+    validationFailurePolicy: Ignore
+```
+
+This does not turn validation off: once the webhook is serving, it still
+rejects invalid resources, because a webhook that answers `allowed: false`
+rejects under either policy. `Ignore` only changes what happens when calling
+the webhook fails (it is unreachable, times out, or returns an error or a
+malformed response): the resource is then admitted without validation.
+That includes the resources created in the same release, and anything created
+while the controller is down or restarting.
+
+If you want to keep `Fail`, create the resources in a separate step, once the
+webhook is serving. The controller's readiness probe does not cover the
+webhook server, so a ready controller Deployment does not guarantee that the
+webhook is serving yet.
+
+This only works when the webhook is enabled. If `controller.webhookMode` is
+`disabled` or `controller.enabled` is `false`, the chart still renders the
+validating webhook configurations and `metallb-webhook-service`, but nothing
+serves them, so MetalLB resources are rejected under `Fail` even when created in
+a separate step. In that case set the policy to `Ignore`.
+{{% /notice %}}
+
 ## Using the MetalLB Operator
 
 The MetalLB Operator is available on OperatorHub at [operatorhub.io/operator/metallb-operator](https://operatorhub.io/operator/metallb-operator). It eases the deployment and life-cycle of MetalLB in a cluster and allows configuring MetalLB via CRDs.
