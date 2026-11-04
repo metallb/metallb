@@ -188,9 +188,31 @@ func (sl *SpeakerList) start(iplist []string) {
 	// this node, and the layer2 election would pick this node for every
 	// service its L2Advertisements allow: a restarted speaker would send
 	// gratuitous ARPs for IPs owned by other nodes.
-	sl.mlJoin()
+	sl.joinWithTimeout(initialJoinTimeout)
 
 	go sl.joinMembers()
+}
+
+// initialJoinTimeout bounds how long Start waits for the first join.
+// The memberlist library contacts the join targets one after another, each for up to its
+// TCPTimeout, so a few unreachable speaker IPs could otherwise hold back the
+// Kubernetes client, and with it the health endpoint, past the liveness probe.
+const initialJoinTimeout = 15 * time.Second
+
+// joinWithTimeout runs mlJoin and waits for it for at most timeout. If the
+// join takes longer, it keeps running in the background.
+func (sl *SpeakerList) joinWithTimeout(timeout time.Duration) {
+	done := make(chan struct{})
+	go func() {
+		sl.mlJoin()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		level.Warn(sl.l).Log("op", "memberDiscovery", "msg", "initial memberlist join still running, starting without waiting for it", "timeout", timeout)
+	}
 }
 
 // updateSpeakerIPs runs forever updating the sl.mlSpeakerIPs slice with the

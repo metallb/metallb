@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/go-kit/log"
 
@@ -91,5 +92,53 @@ func TestStartJoinsBeforeReturning(t *testing.T) {
 	nodes := self.UsableSpeakers().Nodes
 	if !nodes["self"] || !nodes["peer"] {
 		t.Fatalf("usable speakers right after start: %v, want both self and peer", nodes)
+	}
+}
+
+// TestJoinWithTimeoutDoesNotWaitForStuckTargets checks that the initial join
+// gives up waiting when a join target accepts the connection but never
+// answers, so the speaker still starts.
+func TestJoinWithTimeoutDoesNotWaitForStuckTargets(t *testing.T) {
+	stuck, err := net.Listen("tcp", "127.0.0.3:0")
+	if err != nil {
+		t.Fatalf("listening for the stuck target: %v", err)
+	}
+	// Hold every accepted connection open without answering.
+	held := make(chan net.Conn, 16)
+	go func() {
+		for {
+			c, err := stuck.Accept()
+			if err != nil {
+				return
+			}
+			held <- c
+		}
+	}()
+	defer func() {
+		_ = stuck.Close()
+		for {
+			select {
+			case c := <-held:
+				_ = c.Close()
+			default:
+				return
+			}
+		}
+	}()
+	port := strconv.Itoa(stuck.Addr().(*net.TCPAddr).Port)
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	self, err := New(log.NewNopLogger(), "self", "127.0.0.1", port, "secret", "metallb-system", "app=speaker", false, stopCh)
+	if err != nil {
+		t.Fatalf("creating the local speaker: %v", err)
+	}
+	defer func() { _ = self.ml.Shutdown() }()
+	self.mlSpeakerIPs = []string{"127.0.0.3"}
+
+	start := time.Now()
+	self.joinWithTimeout(200 * time.Millisecond)
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("joinWithTimeout returned after %v, want about 200ms", elapsed)
 	}
 }
