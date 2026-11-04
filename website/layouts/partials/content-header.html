@@ -1,0 +1,10 @@
+{{- if and .IsHome .Site.Params.showBanner .Site.Data.banner }} {{- with
+.Site.Data.banner }}
+<a
+  class="announcement-banner"
+  href="{{ .url }}"
+  target="_blank"
+  rel="noopener noreferrer"
+  >{{ .text }}</a
+>
+{{- end }} {{- end }} {{- partial "tags.html" . }}
