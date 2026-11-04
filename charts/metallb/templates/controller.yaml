@@ -14,6 +14,7 @@ spec:
   {{- if .Values.controller.strategy }}
   strategy: {{- toYaml .Values.controller.strategy | nindent 4 }}
   {{- end }}
+  revisionHistoryLimit: {{ .Values.controller.revisionHistoryLimit }}
   selector:
     matchLabels:
       {{- include "metallb.selectorLabels" . | nindent 6 }}
@@ -63,6 +64,7 @@ spec:
         {{- end }}
         args:
         - --port={{ .Values.prometheus.metricsPort }}
+        - --health-probe-port={{ .Values.controller.livenessProbe.port }}
         {{- with .Values.controller.logLevel }}
         - --log-level={{ . }}
         {{- end }}

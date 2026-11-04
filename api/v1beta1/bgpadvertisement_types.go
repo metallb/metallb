@@ -42,6 +42,14 @@ type BGPAdvertisementSpec struct {
 	// +optional
 	LocalPref uint32 `json:"localPref,omitempty"`
 
+	// Specifies the number of times to prepend the ASN to the AS-path on outgoing BGP updates,
+	// artificially lengthening the path for traffic engineering.
+	// Supported only in frr-k8s mode.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=10
+	// +optional
+	AsPathPrepend uint8 `json:"asPathPrepend,omitempty"`
+
 	// The BGP communities to be associated with the announcement. Each item can be a standard community of the
 	// form 1234:1234, a large community of the form large:1234:1234:1234 or the name of an alias defined in the
 	// Community CRD.

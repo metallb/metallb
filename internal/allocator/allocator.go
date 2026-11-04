@@ -662,14 +662,22 @@ func poolCount(p *config.Pool) (int64, int64, int64) {
 				}
 			}
 		}
-		total += sz
+		total = addPoolCapacity(total, sz)
 		if cidr.IP.To4() == nil {
-			ipv6 += sz
+			ipv6 = addPoolCapacity(ipv6, sz)
 		} else {
 			ipv4 += sz
 		}
 	}
 	return total, ipv4, ipv6
+}
+
+// addPoolCapacity adds a range size without exceeding the maximum capacity.
+func addPoolCapacity(count, size int64) int64 {
+	if size > 0 && count > math.MaxInt64-size {
+		return math.MaxInt64
+	}
+	return count + size
 }
 
 // poolFor returns the pool that owns the requested IPs, or "" if none.

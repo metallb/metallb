@@ -363,7 +363,7 @@ shouldn't have the same IP address.
 ### Community Aliases
 
 It's possible to define aliases for BGP Communities used when advertising. This is done by using
-the `Community` CRD that allows to associate a name to a given BGP community:
+the `Community` CRD that allows associating a name to a given BGP community:
 
 ```yaml
 apiVersion: metallb.io/v1beta1

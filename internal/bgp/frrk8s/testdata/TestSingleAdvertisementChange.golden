@@ -24,7 +24,8 @@
                                     "prefixes": [
                                         "172.16.1.11/24"
                                     ]
-                                }
+                                },
+                                "nextHop": {}
                             },
                             "toReceive": {
                                 "allowed": {}

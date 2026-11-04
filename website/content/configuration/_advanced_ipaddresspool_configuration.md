@@ -145,10 +145,12 @@ metadata:
   name: my-app
 spec:
   type: LoadBalancer
+  ports:
+  - port: 80
   ipFamilyPolicy: PreferDualStack
   ipFamilies:
-  - ipv6
-  - ipv4
+  - IPv6
+  - IPv4
 ```
 
 Suppose that the advertisement is as followed:

@@ -97,7 +97,7 @@ func (v *BGPPeerValidator) Handle(ctx context.Context, req admission.Request) ad
 func validatePeerCreate(bgpPeer *v1beta2.BGPPeer) (string, error) {
 	level.Debug(Logger).Log("webhook", "bgppeer", "action", "create", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace)
 
-	if bgpPeer.Spec.DisableMP {
+	if bgpPeer.Spec.DisableMP { //nolint:staticcheck // SA1019: validating deprecated field for backward compat
 		return "disable mp is deprecated and has no effect since it's the default behavior now", nil
 	}
 

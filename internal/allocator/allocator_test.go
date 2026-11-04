@@ -2135,6 +2135,62 @@ func TestPoolCount(t *testing.T) {
 	}
 }
 
+func TestLargePoolMetrics(t *testing.T) {
+	tests := []struct {
+		name  string
+		cidrs []string
+		ipv4  int64
+		ipv6  int64
+	}{
+		{
+			name:  "IPv6 before IPv4",
+			cidrs: []string{"1000::/64", "1.2.3.0/24"},
+			ipv4:  256,
+			ipv6:  math.MaxInt64,
+		},
+		{
+			name:  "IPv4 before IPv6",
+			cidrs: []string{"1.2.3.0/24", "1000::/64"},
+			ipv4:  256,
+			ipv6:  math.MaxInt64,
+		},
+		{
+			name:  "large IPv6 before small IPv6",
+			cidrs: []string{"1000::/64", "2000::/128"},
+			ipv6:  math.MaxInt64,
+		},
+		{
+			name:  "multiple smaller IPv6 ranges",
+			cidrs: []string{"1000::/67", "2000::/67", "3000::/67", "4000::/67"},
+			ipv6:  math.MaxInt64,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pool := &config.Pool{Name: "large"}
+			for _, cidr := range test.cidrs {
+				pool.CIDR = append(pool.CIDR, ipnet(cidr))
+			}
+			alloc := New(func(string) {})
+			alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{pool.Name: pool}})
+			t.Cleanup(func() { alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{}}) })
+
+			if got := ptu.ToFloat64(stats.poolCapacity.WithLabelValues(pool.Name)); got != float64(math.MaxInt64) {
+				t.Errorf("total capacity = %v, want %v", got, float64(math.MaxInt64))
+			}
+			if got := ptu.ToFloat64(stats.ipv4PoolCapacity.WithLabelValues(pool.Name)); got != float64(test.ipv4) {
+				t.Errorf("IPv4 capacity = %v, want %v", got, test.ipv4)
+			}
+			if got := ptu.ToFloat64(stats.ipv6PoolCapacity.WithLabelValues(pool.Name)); got != float64(test.ipv6) {
+				t.Errorf("IPv6 capacity = %v, want %v", got, test.ipv6)
+			}
+			if err := validateCounters(alloc.CountersForPool(pool.Name), test.ipv4, test.ipv6, 0, 0); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
 func TestPoolMetrics(t *testing.T) {
 	callbackCounter := 0
 	callback := func(_ string) { callbackCounter++ }

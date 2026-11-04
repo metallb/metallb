@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: bgpadvertisements.metallb.io
 spec:
   group: metallb.io
@@ -70,6 +70,14 @@ spec:
                   “roll up” the /128s into a larger prefix. Defaults to 128. Works
                   for IPv6 addresses.
                 format: int32
+                type: integer
+              asPathPrepend:
+                description: |-
+                  Specifies the number of times to prepend the ASN to the AS-path on outgoing BGP updates,
+                  artificially lengthening the path for traffic engineering.
+                  Supported only in frr-k8s mode.
+                maximum: 10
+                minimum: 1
                 type: integer
               communities:
                 description: |-

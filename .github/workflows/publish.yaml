@@ -28,7 +28,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install python3-pip arping ndisc6
           sudo pip3 install -r dev-env/requirements.txt
-          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.22.0
 
       - name: Unit Tests
         run: |
@@ -102,7 +102,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           file: ${{matrix.image}}/Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le,linux/arm/v7
+          platforms: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le,linux/arm/v7,linux/riscv64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: true

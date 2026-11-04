@@ -13,7 +13,7 @@ import (
 	"github.com/mdlayher/ndp"
 )
 
-type ndpResponder struct {
+type ndpClient struct {
 	logger       log.Logger
 	intf         string
 	hardwareAddr net.HardwareAddr
@@ -25,14 +25,14 @@ type ndpResponder struct {
 	solicitedNodeGroups map[string]int64
 }
 
-func newNDPResponder(logger log.Logger, ifi *net.Interface, ann announceFunc) (*ndpResponder, error) {
+func newNDPClient(logger log.Logger, ifi *net.Interface, ann announceFunc) (*ndpClient, error) {
 	// Use link-local address as the source IPv6 address for NDP communications.
 	conn, _, err := ndp.Dial(ifi, ndp.LinkLocal)
 	if err != nil {
 		return nil, fmt.Errorf("creating NDP responder for %q: %s", ifi.Name, err)
 	}
 
-	ret := &ndpResponder{
+	ret := &ndpClient{
 		logger:              logger,
 		intf:                ifi.Name,
 		hardwareAddr:        ifi.HardwareAddr,
@@ -45,20 +45,20 @@ func newNDPResponder(logger log.Logger, ifi *net.Interface, ann announceFunc) (*
 	return ret, nil
 }
 
-func (n *ndpResponder) Interface() string { return n.intf }
+func (n *ndpClient) Interface() string { return n.intf }
 
-func (n *ndpResponder) Close() error {
+func (n *ndpClient) Close() error {
 	close(n.closed)
 	return n.conn.Close()
 }
 
-func (n *ndpResponder) Gratuitous(ip net.IP) error {
+func (n *ndpClient) Gratuitous(ip net.IP) error {
 	err := n.advertise(net.IPv6linklocalallnodes, ip, true)
 	stats.SentGratuitous(ip.String())
 	return err
 }
 
-func (n *ndpResponder) Watch(ip net.IP) error {
+func (n *ndpClient) Watch(ip net.IP) error {
 	if ip.To4() != nil {
 		return nil
 	}
@@ -75,7 +75,7 @@ func (n *ndpResponder) Watch(ip net.IP) error {
 	return nil
 }
 
-func (n *ndpResponder) Unwatch(ip net.IP) error {
+func (n *ndpClient) Unwatch(ip net.IP) error {
 	if ip.To4() != nil {
 		return nil
 	}
@@ -92,12 +92,12 @@ func (n *ndpResponder) Unwatch(ip net.IP) error {
 	return nil
 }
 
-func (n *ndpResponder) run() {
+func (n *ndpClient) run() {
 	for n.processRequest() != dropReasonClosed {
 	}
 }
 
-func (n *ndpResponder) processRequest() dropReason {
+func (n *ndpClient) processRequest() dropReason {
 	msg, _, src, err := n.conn.ReadFrom()
 	if err != nil {
 		select {
@@ -155,7 +155,7 @@ func (n *ndpResponder) processRequest() dropReason {
 	return dropReasonNone
 }
 
-func (n *ndpResponder) advertise(dst, target net.IP, gratuitous bool) error {
+func (n *ndpClient) advertise(dst, target net.IP, gratuitous bool) error {
 	m := &ndp.NeighborAdvertisement{
 		Solicited:     !gratuitous, // <Adam Jensen> I never asked for this...
 		Override:      gratuitous,  // Should clients replace existing cache entries

@@ -23,6 +23,8 @@ type Advertisement struct {
 	LocalPref uint32
 	// BGP communities to attach to the path.
 	Communities []community.BGPCommunity
+	// Specifies the number of times to prepend the ASN to the AS-path on outgoing BGP updates.
+	AsPathPrepend uint8
 	// Used to declare the intent of announcing IPs
 	// only to the BGPPeers in this list.
 	Peers []string
@@ -34,6 +36,9 @@ func (a *Advertisement) Equal(b *Advertisement) bool {
 		return false
 	}
 	if a.LocalPref != b.LocalPref {
+		return false
+	}
+	if a.AsPathPrepend != b.AsPathPrepend {
 		return false
 	}
 

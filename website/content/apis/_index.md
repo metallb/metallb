@@ -100,6 +100,7 @@ _Appears in:_
 | `aggregationLength` _integer_ | The aggregation-length advertisement option lets you “roll up” the /32s into a larger prefix. Defaults to 32. Works for IPv4 addresses. |
 | `aggregationLengthV6` _integer_ | The aggregation-length advertisement option lets you “roll up” the /128s into a larger prefix. Defaults to 128. Works for IPv6 addresses. |
 | `localPref` _integer_ | The BGP LOCAL_PREF attribute which is used by BGP best path algorithm,<br />Path with higher localpref is preferred over one with lower localpref. |
+| `asPathPrepend` _integer_ | Specifies the number of times to prepend the ASN to the AS-path on outgoing BGP updates,<br />artificially lengthening the path for traffic engineering.<br />Supported only in frr-k8s mode. |
 | `communities` _string array_ | The BGP communities to be associated with the announcement. Each item can be a standard community of the<br />form 1234:1234, a large community of the form large:1234:1234:1234 or the name of an alias defined in the<br />Community CRD. |
 | `ipAddressPools` _string array_ | The list of IPAddressPools to advertise via this advertisement, selected by name. |
 | `ipAddressPoolSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | A selector for the IPAddressPools which would get advertised via this advertisement.<br />If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools. |
@@ -310,7 +311,7 @@ _Appears in:_
 | `ipAddressPoolSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | A selector for the IPAddressPools which would get advertised via this advertisement.<br />If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools. |
 | `nodeSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops. |
 | `interfaces` _string array_ | A list of interfaces to announce from. The LB IP will be announced only from these interfaces.<br />If the field is not set, we advertise from all the interfaces on the host. |
-| `serviceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | ServiceSelectors limits the set of services that will be advertised via this advertisement.<br />If empty, all services from the selected pools are advertised. |
+| `serviceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | ServiceSelectors limits the set of services that will be advertised via this advertisement.<br />If empty, all services from the selected pools are advertised.<br />Services matching the selectors cannot use the allow-shared-ip annotation. |
 
 
 

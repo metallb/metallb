@@ -7,7 +7,7 @@ on:
 jobs:
   add_labels:
     runs-on: ubuntu-latest
-    if: github.actor != 'dependabot[bot]'
+    if: github.actor != 'renovate[bot]'
     steps:
       - name: checkout
         uses: actions/checkout@v4

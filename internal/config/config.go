@@ -53,6 +53,14 @@ type ClusterResources struct {
 	BGPExtras       corev1.ConfigMap                  `json:"bgpextras"`
 }
 
+// ForOptions holds optional parameters for the For config parser.
+type ForOptions struct {
+	// FRRK8sSecretPassthrough skips resolving password secrets locally and passes
+	// the secret reference as-is to frr-k8s. Used when frr-k8s runs in a separate
+	// namespace and the secret is created there directly.
+	FRRK8sSecretPassthrough bool
+}
+
 // Config is a parsed MetalLB configuration.
 type Config struct {
 	// Routers that MetalLB should peer with.
@@ -198,6 +206,10 @@ type BGPAdvertisement struct {
 	// Value of the LOCAL_PREF BGP path attribute. Used only when
 	// advertising to IBGP peers (i.e. Peer.MyASN == Peer.ASN).
 	LocalPref uint32
+	// Specifies the number of times to prepend the ASN to the AS-path
+	// on outgoing BGP updates, artificially lengthening the path for traffic
+	// engineering. Optional, defaults to 0 (no prepending).
+	AsPathPrepend uint8
 	// Value of the COMMUNITIES path attribute.
 	Communities map[community.BGPCommunity]bool
 	// The map of nodes allowed for this advertisement
@@ -218,6 +230,9 @@ type L2Advertisement struct {
 	AllInterfaces bool
 	// Sorted list of service selectors to select services for which advertisement is applied.
 	ServiceSelectors []labels.Selector
+	// PreferredNodes maps an eligible node (subset of Nodes) to its aggregated
+	// preference weight for this advertisement. Missing keys score zero.
+	PreferredNodes map[string]int64
 }
 
 // BFDProfile describes a BFD profile to be applied to a set of peers.
@@ -237,7 +252,7 @@ func (p *Pools) IsEmpty(pool string) bool {
 }
 
 // Parse loads and validates a Config from bs.
-func For(resources ClusterResources, validate Validate) (*Config, error) {
+func For(resources ClusterResources, validate Validate, opts ForOptions) (*Config, error) {
 	err := validate(resources)
 	if err != nil {
 		return nil, err
@@ -250,7 +265,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		return nil, err
 	}
 
-	cfg.Peers, err = peersFor(resources, cfg.BFDProfiles)
+	cfg.Peers, err = peersFor(resources, cfg.BFDProfiles, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -284,10 +299,10 @@ func bfdProfilesFor(resources ClusterResources) (map[string]*BFDProfile, error) 
 	return res, nil
 }
 
-func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) (map[string]*Peer, error) {
+func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile, opts ForOptions) (map[string]*Peer, error) {
 	var res = make(map[string]*Peer)
 	for _, p := range resources.Peers {
-		peer, err := peerFromCR(p, resources.PasswordSecrets)
+		peer, err := peerFromCR(p, resources.PasswordSecrets, opts.FRRK8sSecretPassthrough)
 		if err != nil {
 			return nil, fmt.Errorf("parsing peer %s %w", p.Name, err)
 		}
@@ -384,7 +399,7 @@ func communitiesFromCrs(cs []metallbv1beta1.Community) (map[string]community.BGP
 	return communities, nil
 }
 
-func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secret) (*Peer, error) {
+func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secret, frrk8sSecretPassthrough bool) (*Peer, error) {
 	if p.Spec.MyASN == 0 {
 		return nil, errors.New("missing local ASN")
 	}
@@ -458,7 +473,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	}
 
 	secretPassword := ""
-	if p.Spec.PasswordSecret.Name != "" {
+	if p.Spec.PasswordSecret.Name != "" && !frrk8sSecretPassthrough {
 		secretPassword, err = passwordFromSecretForPeer(p, passwordSecrets)
 		if err != nil {
 			return nil, errors.Join(err, fmt.Errorf("failed to parse peer %s password secret", p.Name))
@@ -492,7 +507,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		EBGPMultiHop:           p.Spec.EBGPMultiHop,
 		VRF:                    p.Spec.VRFName,
 		DualStackAddressFamily: p.Spec.DualStackAddressFamily,
-		DisableMP:              p.Spec.DisableMP,
+		DisableMP:              p.Spec.DisableMP, //nolint:staticcheck // SA1019: intentionally using deprecated field for translation
 		LocalASN:               p.Spec.LocalASN,
 	}, nil
 }
@@ -690,7 +705,11 @@ func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs [
 			}
 			continue
 		}
-		for _, poolName := range append(l2Adv.Spec.IPAddressPools, ipPoolsSelected.UnsortedList()...) {
+		// The same CR can reach a pool through both ipAddressPools and a
+		// matching ipAddressPoolSelectors entry. Attach once so the speaker
+		// doesn't sum the ad's preference weights twice.
+		allPools := sets.New(l2Adv.Spec.IPAddressPools...).Insert(ipPoolsSelected.UnsortedList()...)
+		for poolName := range allPools {
 			if pool, ok := ipPoolMap[poolName]; ok {
 				if !containsAdvertisement(pool.L2Advertisements, adv) {
 					pool.L2Advertisements = append(pool.L2Advertisements, adv)
@@ -765,15 +784,57 @@ func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.
 	if err != nil {
 		return nil, errors.Join(err, fmt.Errorf("failed to parse service selector for %s", crdAd.Name))
 	}
+	preferredNodes, err := preferredNodeScores(nodes, selected, crdAd.Spec.PreferredNodeSelectors)
+	if err != nil {
+		return nil, errors.Join(err, fmt.Errorf("failed to parse preferred node selectors for %s", crdAd.Name))
+	}
 	l2 := &L2Advertisement{
 		Nodes:            selected,
 		Interfaces:       crdAd.Spec.Interfaces,
 		ServiceSelectors: serviceSelectors,
+		PreferredNodes:   preferredNodes,
 	}
 	if len(crdAd.Spec.Interfaces) == 0 {
 		l2.AllInterfaces = true
 	}
 	return l2, nil
+}
+
+func preferredNodeScores(nodes []corev1.Node, eligible map[string]bool, preferred []metallbv1beta1.PreferredNodeSelector) (map[string]int64, error) {
+	if len(preferred) == 0 {
+		return nil, nil
+	}
+	selectors := make([]labels.Selector, 0, len(preferred))
+	weights := make([]int64, 0, len(preferred))
+	for i := range preferred {
+		sel, err := metav1.LabelSelectorAsSelector(&preferred[i].Preference)
+		if err != nil {
+			return nil, errors.Join(err, fmt.Errorf("invalid preferred node selector %v", preferred[i].Preference))
+		}
+		selectors = append(selectors, sel)
+		weights = append(weights, int64(preferred[i].Weight))
+	}
+
+	scores := make(map[string]int64)
+	for _, node := range nodes {
+		if !eligible[node.Name] {
+			continue
+		}
+		nodeLabels := labels.Set(node.Labels)
+		var total int64
+		for i, sel := range selectors {
+			if sel.Matches(nodeLabels) {
+				total += weights[i]
+			}
+		}
+		if total > 0 {
+			scores[node.Name] = total
+		}
+	}
+	if len(scores) == 0 {
+		return nil, nil
+	}
+	return scores, nil
 }
 
 func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities map[string]community.BGPCommunity, nodes []corev1.Node) (*BGPAdvertisement, error) {
@@ -817,22 +878,24 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 		AggregationLengthV6: 128,
 		LocalPref:           0,
 		Communities:         map[community.BGPCommunity]bool{},
+		AsPathPrepend:       0,
 	}
 
 	if crdAd.Spec.AggregationLength != nil {
 		ad.AggregationLength = int(*crdAd.Spec.AggregationLength) // TODO CRD cast
 	}
 	if ad.AggregationLength > 32 {
-		return nil, fmt.Errorf("invalid aggregation length %q for IPv4", ad.AggregationLength)
+		return nil, fmt.Errorf("invalid aggregation length %d for IPv4", ad.AggregationLength)
 	}
 	if crdAd.Spec.AggregationLengthV6 != nil {
 		ad.AggregationLengthV6 = int(*crdAd.Spec.AggregationLengthV6) // TODO CRD cast
 		if ad.AggregationLengthV6 > 128 {
-			return nil, fmt.Errorf("invalid aggregation length %q for IPv6", ad.AggregationLengthV6)
+			return nil, fmt.Errorf("invalid aggregation length %d for IPv6", ad.AggregationLengthV6)
 		}
 	}
 
 	ad.LocalPref = crdAd.Spec.LocalPref
+	ad.AsPathPrepend = crdAd.Spec.AsPathPrepend
 
 	if len(crdAd.Spec.Peers) > 0 {
 		ad.Peers = make([]string, 0, len(crdAd.Spec.Peers))
@@ -933,7 +996,7 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 		}
 	}
 
-	// Do not verify that BGP ADVs set a unique local preference value when service selectors are used,
+	// Do not verify that BGP ADVs set a unique local preference and as path prepend values when service selectors are used,
 	// because in that case we don't know which services will be advertised via this advertisement.
 	if len(adv.ServiceSelectors) > 0 {
 		return nil
@@ -947,6 +1010,11 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 				"already set for the same type of BGP update. Check existing BGP advertisements "+
 				"with common pools and aggregation lengths", adv.LocalPref, bgpAdv.LocalPref)
 		}
+		if !BGPAdvertisementsHaveCompatibleAsPathPrepend(adv, bgpAdv, pool) {
+			return fmt.Errorf("invalid as path prepend %d: as path prepend %d was "+
+				"already set for the same type of BGP update. Check existing BGP advertisements "+
+				"with common pools and aggregation lengths", adv.AsPathPrepend, bgpAdv.AsPathPrepend)
+		}
 	}
 
 	return nil
@@ -955,36 +1023,52 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 // BGPAdvertisementsHaveCompatibleLocalPref checks if two BGP advertisements have compatible local preferences,
 // assuming both target at least one shared service.
 func BGPAdvertisementsHaveCompatibleLocalPref(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
-	if newAdv.LocalPref == adv.LocalPref {
-		return true
-	}
+	return newAdv.LocalPref == adv.LocalPref || !bgpAdvertisementsOverlap(newAdv, adv, pool)
+}
 
+// BGPAdvertisementsHaveCompatibleAsPathPrepend checks if two BGP advertisements have compatible as path prepend,
+// assuming both target at least one shared service.
+func BGPAdvertisementsHaveCompatibleAsPathPrepend(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+	return newAdv.AsPathPrepend == adv.AsPathPrepend || !bgpAdvertisementsOverlap(newAdv, adv, pool)
+}
+
+// bgpAdvertisementsOverlap reports whether two advertisements can produce the
+// same BGP update (same prefix length, shared peer, and shared node).
+func bgpAdvertisementsOverlap(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+	// BGP ADVs with different aggregation length don't overlap
 	if isAggrLengthDifferent(newAdv, adv, pool) {
+		return false
+	}
+	// BGP ADVs with strictly disjoint sets of BGP peers don't overlap
+	if !haveSharedPeers(newAdv, adv) {
+		return false
+	}
+	// BGP ADVs with the same aggregation length and shared BGP peers
+	// overlap if they are announced from shared nodes.
+	return haveSharedNodes(newAdv, adv)
+}
+
+func haveSharedPeers(newAdv, adv *BGPAdvertisement) bool {
+	if len(newAdv.Peers) == 0 || len(adv.Peers) == 0 {
+		// An empty Peers list means "all peers". If either advertisement applies to all peers,
+		// their peer targets implicitly overlap.
 		return true
 	}
-
-	// BGP ADVs with different set of BGP peers do not collide.
-	if len(newAdv.Peers) != 0 && len(adv.Peers) != 0 {
-		equalPeer := false
-		for _, peer := range newAdv.Peers {
-			if slices.Contains(adv.Peers, peer) {
-				equalPeer = true
-				break
-			}
-		}
-		if !equalPeer {
+	for _, peer := range newAdv.Peers {
+		if slices.Contains(adv.Peers, peer) {
 			return true
 		}
 	}
+	return false
+}
 
-	// BGP ADVs with different set of nodes do not collide.
+func haveSharedNodes(newAdv, adv *BGPAdvertisement) bool {
 	for node := range newAdv.Nodes {
-		if _, ok := adv.Nodes[node]; ok {
-			return false
+		if adv.Nodes[node] {
+			return true
 		}
 	}
-
-	return true
+	return false
 }
 
 func isAggrLengthDifferent(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
@@ -1038,6 +1122,10 @@ func ParseCIDR(cidr string) ([]*net.IPNet, error) {
 	end := net.ParseIP(strings.TrimSpace(fs[1]))
 	if end == nil {
 		return nil, fmt.Errorf("invalid IP range %q: invalid end IP %q", cidr, fs[1])
+	}
+
+	if ipfamily.ForAddress(start) != ipfamily.ForAddress(end) {
+		return nil, fmt.Errorf("invalid IP range %q: start and end IPs must be the same family", cidr)
 	}
 
 	if bytes.Compare(start, end) > 0 {
@@ -1107,7 +1195,15 @@ func validateDuplicateBGPAdvertisements(ads []metallbv1beta1.BGPAdvertisement) e
 }
 
 func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bool {
+	// Preference-bearing ads must stack rather than dedupe: the speaker sums
+	// PreferredNodes across every matching ad to pick the elected node.
+	if len(toCheck.PreferredNodes) > 0 {
+		return false
+	}
 	for _, adv := range advs {
+		if len(adv.PreferredNodes) > 0 {
+			continue
+		}
 		if adv.AllInterfaces != toCheck.AllInterfaces {
 			continue
 		}

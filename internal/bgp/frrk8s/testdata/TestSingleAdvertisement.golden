@@ -25,6 +25,7 @@
                                         "172.16.1.10/24"
                                     ]
                                 },
+                                "nextHop": {},
                                 "withLocalPref": [
                                     {
                                         "prefixes": [
@@ -45,6 +46,14 @@
                                             "172.16.1.10/24"
                                         ],
                                         "community": "3333:4444"
+                                    }
+                                ],
+                                "withAsPathPrepend": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.10/24"
+                                        ],
+                                        "asPathPrepend": 3
                                     }
                                 ]
                             },

@@ -111,8 +111,17 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		},
 	}
 
+	var observedStatus v1beta1.MetalLBServiceBGPStatus
 	if len(serviceBGPStatuses.Items) > 0 {
-		state = &serviceBGPStatuses.Items[0]
+		// avoid carrying a stale resourceVersion into CreateOrPatch
+		existing := &serviceBGPStatuses.Items[0]
+		observedStatus = existing.Status
+		state = &v1beta1.ServiceBGPStatus{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      existing.Name,
+				Namespace: existing.Namespace,
+			},
+		}
 	}
 
 	desiredStatus := v1beta1.MetalLBServiceBGPStatus{
@@ -122,7 +131,7 @@ func (r *ServiceBGPStatusReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Peers:            sets.List(peers),
 	}
 
-	if reflect.DeepEqual(state.Status, desiredStatus) {
+	if reflect.DeepEqual(observedStatus, desiredStatus) {
 		return ctrl.Result{}, nil
 	}
 

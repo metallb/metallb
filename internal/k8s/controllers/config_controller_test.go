@@ -144,7 +144,7 @@ func TestConfigController(t *testing.T) {
 				t.Fatalf("test %s failed to create fake client: %v", test.desc, err)
 			}
 
-			expectedCfg, err := config.For(resources, config.DontValidate)
+			expectedCfg, err := config.For(resources, config.DontValidate, config.ForOptions{})
 			if err != nil && test.validResources {
 				t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
 			}
