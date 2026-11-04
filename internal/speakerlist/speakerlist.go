@@ -168,6 +168,11 @@ func (sl *SpeakerList) Start(client *k8s.Client) {
 		iplist = nil
 	}
 
+	sl.start(iplist)
+}
+
+// start runs the memberlist side of Start with the given speaker pod IPs.
+func (sl *SpeakerList) start(iplist []string) {
 	sl.mlMux.Lock()
 	sl.mlSpeakerIPs = iplist
 	sl.mlMux.Unlock()
@@ -176,6 +181,15 @@ func (sl *SpeakerList) Start(client *k8s.Client) {
 	go sl.updateSpeakerIPs()
 
 	go sl.memberlistWatchEvents()
+
+	// Join the other speakers before returning. Start runs before the
+	// Kubernetes client, so the first reconcile of the services already sees
+	// every reachable speaker. Until the first join, Members() holds only
+	// this node, and the layer2 election would pick this node for every
+	// service its L2Advertisements allow: a restarted speaker would send
+	// gratuitous ARPs for IPs owned by other nodes.
+	sl.mlJoin()
+
 	go sl.joinMembers()
 }
 

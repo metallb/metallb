@@ -5,7 +5,13 @@ package speakerlist
 import (
 	"bytes"
 	"crypto/sha256"
+	"net"
+	"strconv"
 	"testing"
+
+	"github.com/go-kit/log"
+
+	"go.universe.tf/metallb/internal/k8s"
 )
 
 func TestSecretKeyFor(t *testing.T) {
@@ -44,5 +50,46 @@ func TestSecretKeyFor(t *testing.T) {
 			t.Errorf("secrets %q and %q both derive key %x", other, secret, key)
 		}
 		seen[string(key)] = secret
+	}
+}
+
+// TestStartJoinsBeforeReturning checks that a speaker knows the running
+// speakers as soon as Start returns. Start runs before the Kubernetes client,
+// so a member list that holds only the local node at that point makes the
+// first layer2 reconcile elect the local node for every service.
+func TestStartJoinsBeforeReturning(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("finding a free port: %v", err)
+	}
+	port := strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
+	if err := l.Close(); err != nil {
+		t.Fatalf("closing the port probe: %v", err)
+	}
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	logger := log.NewNopLogger()
+
+	// Two loopback addresses with the same port, as speakers on two nodes:
+	// mlJoin passes bare IPs, which memberlist dials on its own bind port.
+	peer, err := New(logger, "peer", "127.0.0.2", port, "secret", "metallb-system", "app=speaker", false, stopCh)
+	if err != nil {
+		t.Fatalf("creating the peer: %v", err)
+	}
+	defer func() { _ = peer.ml.Shutdown() }()
+
+	self, err := New(logger, "self", "127.0.0.1", port, "secret", "metallb-system", "app=speaker", false, stopCh)
+	if err != nil {
+		t.Fatalf("creating the local speaker: %v", err)
+	}
+	defer func() { _ = self.ml.Shutdown() }()
+
+	self.client = &k8s.Client{ForceSync: func() {}}
+	self.start([]string{"127.0.0.1", "127.0.0.2"})
+
+	nodes := self.UsableSpeakers().Nodes
+	if !nodes["self"] || !nodes["peer"] {
+		t.Fatalf("usable speakers right after start: %v, want both self and peer", nodes)
 	}
 }
