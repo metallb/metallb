@@ -168,6 +168,11 @@ func (sl *SpeakerList) Start(client *k8s.Client) {
 		iplist = nil
 	}
 
+	sl.start(iplist)
+}
+
+// start runs the memberlist side of Start with the given speaker pod IPs.
+func (sl *SpeakerList) start(iplist []string) {
 	sl.mlMux.Lock()
 	sl.mlSpeakerIPs = iplist
 	sl.mlMux.Unlock()
@@ -176,7 +181,38 @@ func (sl *SpeakerList) Start(client *k8s.Client) {
 	go sl.updateSpeakerIPs()
 
 	go sl.memberlistWatchEvents()
+
+	// Join the other speakers before returning. Start runs before the
+	// Kubernetes client, so the first reconcile of the services already sees
+	// every reachable speaker. Until the first join, Members() holds only
+	// this node, and the layer2 election would pick this node for every
+	// service its L2Advertisements allow: a restarted speaker would send
+	// gratuitous ARPs for IPs owned by other nodes.
+	sl.joinWithTimeout(initialJoinTimeout)
+
 	go sl.joinMembers()
+}
+
+// initialJoinTimeout bounds how long Start waits for the first join.
+// The memberlist library contacts the join targets one after another, each for up to its
+// TCPTimeout, so a few unreachable speaker IPs could otherwise hold back the
+// Kubernetes client, and with it the health endpoint, past the liveness probe.
+const initialJoinTimeout = 15 * time.Second
+
+// joinWithTimeout runs mlJoin and waits for it for at most timeout. If the
+// join takes longer, it keeps running in the background.
+func (sl *SpeakerList) joinWithTimeout(timeout time.Duration) {
+	done := make(chan struct{})
+	go func() {
+		sl.mlJoin()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		level.Warn(sl.l).Log("op", "memberDiscovery", "msg", "initial memberlist join still running, starting without waiting for it", "timeout", timeout)
+	}
 }
 
 // updateSpeakerIPs runs forever updating the sl.mlSpeakerIPs slice with the
