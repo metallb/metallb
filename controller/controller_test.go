@@ -878,6 +878,64 @@ func TestControllerMutation(t *testing.T) {
 			},
 		},
 		{
+			desc: "keep the single IP from dualstack pool with PreferDualStack policy and single stack clusterip",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+		},
+		{
+			desc: "add the other family to a single IP from dualstack pool with PreferDualStack policy and dual stack clusterips",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
+			},
+		},
+		{
 			desc: "request IPs from dualstack pool with RequireDualStack policy but single stack clusterip",
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
