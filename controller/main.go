@@ -65,12 +65,6 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return controllers.SyncStateSuccess
 	}
 
-	if c.pools == nil || c.pools.ByName == nil {
-		// Config hasn't been read, nothing we can do just yet.
-		level.Debug(l).Log("event", "noConfig", "msg", "not processing, still waiting for config")
-		return controllers.SyncStateSuccess
-	}
-
 	// Making a copy unconditionally is a bit wasteful, since we don't
 	// always need to update the service. But, making an unconditional
 	// copy makes the code much easier to follow, and we have a GC for
