@@ -665,6 +665,72 @@ func TestRoutes(t *testing.T) {
 	}
 }
 
+const routesWithASPath = `{
+  "vrfId": 0,
+  "vrfName": "default",
+  "localAS": 64513,
+  "routes": { "192.168.0.0/24": [
+   {
+     "valid":true,
+     "bestpath":true,
+     "pathFrom":"external",
+     "prefix":"192.168.0.0",
+     "prefixLen":24,
+     "network":"192.168.0.0\/24",
+     "peerId":"172.18.0.2",
+     "path":"64512 64512 64512 64512",
+     "origin":"IGP",
+     "nexthops":[{"ip":"172.18.0.2","afi":"ipv4","used":true}]
+   }
+  ],
+  "192.168.1.0/24": [
+   {
+     "valid":true,
+     "bestpath":true,
+     "pathFrom":"external",
+     "prefix":"192.168.1.0",
+     "prefixLen":24,
+     "network":"192.168.1.0\/24",
+     "peerId":"172.18.0.2",
+     "path":"64512",
+     "origin":"IGP",
+     "nexthops":[{"ip":"172.18.0.2","afi":"ipv4","used":true}]
+   }
+  ]
+ }
+}`
+
+func TestRoutesASPath(t *testing.T) {
+	rr, err := ParseRoutes(routesWithASPath)
+	if err != nil {
+		t.Fatalf("Failed to parse %s", err)
+	}
+
+	prepended := rr["192.168.0.0"]
+	if got := prepended.AsPath; got != "64512 64512 64512 64512" {
+		t.Fatalf("unexpected AS path %q", got)
+	}
+	if got := prepended.ASPathPrependCount("64512"); got != 3 {
+		t.Fatalf("expected 3 prepends, got %d", got)
+	}
+	if got := prepended.ASPathPrependCount("65000"); got != 0 {
+		t.Fatalf("expected 0 prepends for another ASN, got %d", got)
+	}
+
+	if got := rr["192.168.1.0"].ASPathPrependCount("64512"); got != 0 {
+		t.Fatalf("expected 0 prepends, got %d", got)
+	}
+
+	// iBGP routes have an empty AS path.
+	ibgp, err := ParseRoutes(routes)
+	if err != nil {
+		t.Fatalf("Failed to parse %s", err)
+	}
+	if got := ibgp["192.168.10.0"]; got.AsPath != "" || got.ASPathPrependCount("64512") != 0 {
+		t.Fatalf("expected an empty AS path and no prepends, got %q", got.AsPath)
+	}
+}
+
 const bfdPeers = `[
    {
       "multihop":false,
