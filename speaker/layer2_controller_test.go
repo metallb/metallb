@@ -28,6 +28,12 @@ type fakeSpeakerList struct {
 	speakers map[string]bool
 }
 
+var outOfServiceTaint = v1.Taint{
+	Key:    v1.TaintNodeOutOfService,
+	Value:  "nodeshutdown",
+	Effect: v1.TaintEffectNoExecute,
+}
+
 func (sl *fakeSpeakerList) UsableSpeakers() speakerlist.SpeakerListInfo {
 	return speakerlist.SpeakerListInfo{
 		Nodes:    sl.speakers,
@@ -1346,6 +1352,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 		trafficPolicy       v1.ServiceExternalTrafficPolicy
 		excludeFromLB       []string
 		ignoreExcludeFromLB bool
+		taints              map[string][]v1.Taint
 		c1ExpectedResult    map[string]string
 		c2ExpectedResult    map[string]string
 	}{
@@ -1471,6 +1478,86 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			},
 			ignoreExcludeFromLB: true,
 		},
+		{
+			desc:             "One service, endpoints on both nodes, no selector, iris2 out of service, c1 should announce",
+			balancer:         "test1",
+			eps:              epsOnBothNodes,
+			L2Advertisements: advertisementsForBoth,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			taints:           map[string][]v1.Taint{"iris2": {outOfServiceTaint}},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+		},
+		{
+			desc:             "One service, endpoints on both nodes, no selector, both out of service, none should announce",
+			balancer:         "test1",
+			eps:              epsOnBothNodes,
+			L2Advertisements: advertisementsForBoth,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			taints: map[string][]v1.Taint{
+				"iris1": {outOfServiceTaint},
+				"iris2": {outOfServiceTaint},
+			},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+		},
+		{
+			desc:             "One service, endpoint on iris1, etplocal, iris1 out of service, none should announce",
+			balancer:         "test1",
+			eps:              epsOn("iris1"),
+			L2Advertisements: advertisementsForBoth,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeLocal,
+			taints:           map[string][]v1.Taint{"iris1": {outOfServiceTaint}},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+		},
+		{
+			desc:             "One service, endpoints on both nodes, no selector, iris2 out of service without NoExecute, c2 should announce",
+			balancer:         "test1",
+			eps:              epsOnBothNodes,
+			L2Advertisements: advertisementsForBoth,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			taints: map[string][]v1.Taint{"iris2": {{
+				Key:    v1.TaintNodeOutOfService,
+				Value:  "nodeshutdown",
+				Effect: v1.TaintEffectNoSchedule,
+			}}},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+		},
+		{
+			desc:             "One service, endpoints on both nodes, no selector, iris2 tainted with an unrelated NoExecute taint, c2 should announce",
+			balancer:         "test1",
+			eps:              epsOnBothNodes,
+			L2Advertisements: advertisementsForBoth,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			taints: map[string][]v1.Taint{"iris2": {{
+				Key:    v1.TaintNodeUnreachable,
+				Effect: v1.TaintEffectNoExecute,
+			}}},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+		},
 	}
 	l := log.NewNopLogger()
 	for _, test := range tests {
@@ -1539,6 +1626,9 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			nodes[n].Labels = map[string]string{
 				v1.LabelNodeExcludeBalancers: "",
 			}
+		}
+		for n, taints := range test.taints {
+			nodes[n].Spec.Taints = taints
 		}
 
 		response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
