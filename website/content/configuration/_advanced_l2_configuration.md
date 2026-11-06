@@ -71,6 +71,17 @@ and `NodeB`, and only one of those node will be chosen to expose the IP.
 
 On the other hand, IPs coming from `second-pool` will be exposed always via `NodeC`.
 
+{{% notice note %}}
+MetalLB does not announce services from nodes that have the
+`node.kubernetes.io/exclude-from-external-load-balancers` label, even if they match the `nodeSelectors`.
+kubeadm sets this label on control-plane nodes. If the `nodeSelectors` of an `L2Advertisement`
+match only control-plane nodes, no node announces the IPs and the services are not reachable.
+To announce from those nodes anyway, start the speakers with the `--ignore-exclude-lb` flag
+(`speaker.ignoreExcludeLB` in the Helm chart). See the
+[troubleshooting guide](/troubleshooting/#metallb-is-not-advertising-my-service-from-my-control-plane-nodes-or-from-my-single-node-cluster)
+for details.
+{{% /notice %}}
+
 ### Prefer specific nodes for L2 announcements
 
 `nodeSelectors` is a hard filter: nodes outside the selector cannot announce at all. When you
