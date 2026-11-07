@@ -235,14 +235,15 @@ func (f *fakeARPResponder) gratuitousCalls() map[string]int {
 }
 
 // fakeNDPResponder is a test double for the ndpResponder interface that records the IPs
-// passed to Gratuitous.
+// passed to Gratuitous and the IPs it currently watches.
 type fakeNDPResponder struct {
 	intf       string
 	gratuitous []net.IP
+	watched    map[string]int
 }
 
 func newFakeNDPResponder(intf string) *fakeNDPResponder {
-	return &fakeNDPResponder{intf: intf}
+	return &fakeNDPResponder{intf: intf, watched: map[string]int{}}
 }
 
 func (f *fakeNDPResponder) Interface() string { return f.intf }
@@ -252,9 +253,17 @@ func (f *fakeNDPResponder) Gratuitous(ip net.IP) error {
 	return nil
 }
 
-func (f *fakeNDPResponder) Watch(net.IP) error   { return nil }
-func (f *fakeNDPResponder) Unwatch(net.IP) error { return nil }
-func (f *fakeNDPResponder) Close() error         { return nil }
+func (f *fakeNDPResponder) Watch(ip net.IP) error {
+	f.watched[ip.String()]++
+	return nil
+}
+
+func (f *fakeNDPResponder) Unwatch(ip net.IP) error {
+	f.watched[ip.String()]--
+	return nil
+}
+
+func (f *fakeNDPResponder) Close() error { return nil }
 
 func (f *fakeNDPResponder) gratuitousCalls() map[string]int {
 	m := map[string]int{}
@@ -262,4 +271,45 @@ func (f *fakeNDPResponder) gratuitousCalls() map[string]int {
 		m[ip.String()]++
 	}
 	return m
+}
+
+func Test_NewNDPResponderWatchesAnnouncedIPs(t *testing.T) {
+	announce := &Announce{
+		ndps:     map[int]ndpResponder{},
+		ips:      map[string][]IPAdvertisement{},
+		ipRefcnt: map[string]int{},
+		spamCh:   make(chan IPAdvertisement, 3),
+	}
+
+	announced := net.ParseIP("fc00::64")
+	withdrawn := net.ParseIP("fc00::65")
+	announce.SetBalancer("foo", IPAdvertisement{ip: announced, allInterfaces: true})
+	announce.SetBalancer("bar", IPAdvertisement{ip: withdrawn, allInterfaces: true})
+	announce.DeleteBalancer("bar")
+
+	// The interface shows up after the IPs were announced, as it does when
+	// the periodic interface scan finds it later.
+	ndp := newFakeNDPResponder("eth0")
+	announce.Lock()
+	announce.addNDPResponder(1, ndp)
+	announce.Unlock()
+
+	if got := ndp.watched[announced.String()]; got != 1 {
+		t.Fatalf("new NDP responder watches %s %d times, want 1", announced, got)
+	}
+	if got := ndp.watched[withdrawn.String()]; got != 0 {
+		t.Fatalf("new NDP responder watches withdrawn %s %d times, want 0", withdrawn, got)
+	}
+
+	// A repeated notification for the same service must not watch again.
+	announce.SetBalancer("foo", IPAdvertisement{ip: announced, allInterfaces: true})
+	if got := ndp.watched[announced.String()]; got != 1 {
+		t.Fatalf("NDP responder watches %s %d times after a repeated SetBalancer, want 1", announced, got)
+	}
+
+	// Once the service is gone, the responder stops watching the IP.
+	announce.DeleteBalancer("foo")
+	if got := ndp.watched[announced.String()]; got != 0 {
+		t.Fatalf("NDP responder watches %s %d times after DeleteBalancer, want 0", announced, got)
+	}
 }
