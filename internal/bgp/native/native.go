@@ -547,9 +547,9 @@ func (s *session) Close() error {
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the necessary sockopts for TCP MD5.
 func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) (net.Conn, error) {
-	// If srcAddr exists on any of the local network interfaces, use it as the
-	// source address of the TCP socket. Otherwise, use the IPv6 unspecified
-	// address ("::") to let the kernel figure out the source address.
+	// If srcAddr is set, it must exist on one of the local network interfaces
+	// and is used as the source address of the TCP socket. Otherwise, use the
+	// IPv6 unspecified address ("::") to let the kernel figure out the source address.
 	// NOTE: On Linux, "::" also includes "0.0.0.0" (all IPv4 addresses).
 	a := "[::]"
 	if srcAddr != nil {
