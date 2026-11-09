@@ -346,7 +346,9 @@ to use the address `172.30.0.2` as the source address when
 establishing BGP sessions. The address must exist on one of the host's
 network interfaces. If it doesn't, the speaker does not fall back to
 an automatically selected address, and the BGP connection attempt
-fails.
+fails. The speaker keeps retrying, waiting up to two minutes between
+attempts, so once the address is added to an interface the next
+attempt uses it without restarting the speaker.
 
 {{% notice warning %}}
 In most cases the `source-address` field should only be used with
