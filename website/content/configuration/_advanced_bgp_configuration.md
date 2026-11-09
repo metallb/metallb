@@ -341,12 +341,14 @@ spec:
       kubernetes.io/hostname: node-1
 ```
 
-The configuration above tells the MetalLB speaker to check if the
-address `172.30.0.2` exists locally on one of the host's network
-interfaces, and if so - to use it as the source address when
-establishing BGP sessions. If the address isn't found, the default
-behavior takes place (that is, the kernel selects the source address
-automatically).
+In native BGP mode, the configuration above tells the MetalLB speaker
+to use the address `172.30.0.2` as the source address when
+establishing BGP sessions. The address must exist on one of the host's
+network interfaces. If it doesn't, the speaker does not fall back to
+an automatically selected address, and the BGP connection attempt
+fails. The speaker keeps retrying, waiting up to two minutes between
+attempts, so once the address is added to an interface the next
+attempt uses it without restarting the speaker.
 
 {{% notice warning %}}
 In most cases the `source-address` field should only be used with
