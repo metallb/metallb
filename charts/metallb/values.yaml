@@ -383,6 +383,10 @@ speaker:
 
   extraContainers: []
 
+  # -- Additional environment variables for the speaker container, as a list
+  # of Kubernetes EnvVar objects.
+  extraEnv: []
+
 crds:
   enabled: true
   validationFailurePolicy: Fail
