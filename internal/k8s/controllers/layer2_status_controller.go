@@ -169,20 +169,20 @@ func (r *Layer2StatusReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// can trigger the reconciler
 			label := s.GetLabels()
 			if label == nil {
-				level.Error(r.Logger).Log("controller", "Layer2StatusReconciler", "missing meta", "object", object)
+				level.Error(r.Logger).Log("controller", "Layer2StatusReconciler", "error", "missing meta", "object", client.ObjectKeyFromObject(object))
 				return false
 			}
 			if _, ok = label[LabelServiceName]; !ok {
-				level.Error(r.Logger).Log("controller", "Layer2StatusReconciler", "missing meta", "object", object)
+				level.Error(r.Logger).Log("controller", "Layer2StatusReconciler", "error", "missing meta", "object", client.ObjectKeyFromObject(object))
 				return false
 			}
 			if _, ok = label[LabelServiceNamespace]; !ok {
-				level.Error(r.Logger).Log("controller", "Layer2StatusReconciler", "missing meta", "object", object)
+				level.Error(r.Logger).Log("controller", "Layer2StatusReconciler", "error", "missing meta", "object", client.ObjectKeyFromObject(object))
 				return false
 			}
 			var node string
 			if node, ok = label[LabelAnnounceNode]; !ok {
-				level.Error(r.Logger).Log("controller", "Layer2StatusReconciler", "missing meta", "object", object)
+				level.Error(r.Logger).Log("controller", "Layer2StatusReconciler", "error", "missing meta", "object", client.ObjectKeyFromObject(object))
 				return false
 			}
 			// only trigger the reconciler if the service is announced by this node
@@ -219,7 +219,7 @@ func (r *Layer2StatusReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// for crs, we build meta from cr label which indicate the service information
 		Watches(&v1beta1.ServiceL2Status{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, object client.Object) []reconcile.Request {
-				level.Debug(r.Logger).Log("controller", "Layer2StatusReconciler", "enqueueing", "object", object)
+				level.Debug(r.Logger).Log("controller", "Layer2StatusReconciler", "event", "enqueueing", "object", client.ObjectKeyFromObject(object))
 				label := object.GetLabels()
 				return []reconcile.Request{{NamespacedName: types.NamespacedName{
 					Name:      label[LabelServiceName],

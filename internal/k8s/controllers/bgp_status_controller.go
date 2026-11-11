@@ -231,7 +231,7 @@ func (r *ServiceBGPStatusReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Named("servicebgpstatus").
 		Watches(&v1beta1.ServiceBGPStatus{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, object client.Object) []reconcile.Request {
-				level.Debug(r.Logger).Log("controller", "ServiceBGPStatus", "enqueueing", "object", object)
+				level.Debug(r.Logger).Log("controller", "ServiceBGPStatus", "event", "enqueueing", "object", client.ObjectKeyFromObject(object))
 				labels := object.GetLabels()
 				return []reconcile.Request{{NamespacedName: types.NamespacedName{
 					Name:      labels[LabelServiceName],
