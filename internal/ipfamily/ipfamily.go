@@ -4,7 +4,7 @@ package ipfamily // import "go.universe.tf/metallb/internal/ipfamily"
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
 	v1 "k8s.io/api/core/v1"
 )
@@ -25,52 +25,50 @@ const (
 
 // ForAddresses returns the address family given list of addresses strings.
 func ForAddresses(ips []string) (Family, error) {
-	switch len(ips) {
-	case 1:
-		ip := net.ParseIP(ips[0])
-		if ip == nil {
-			return Unknown, fmt.Errorf("IPFamilyForAddresses: Invalid address %q", ips)
-		}
-		if ip.To4() != nil {
-			return IPv4, nil
-		}
-		return IPv6, nil
-	case 2:
-		ip1 := net.ParseIP(ips[0])
-		ip2 := net.ParseIP(ips[1])
-		if ip1 == nil || ip2 == nil {
-			return Unknown, fmt.Errorf("IPFamilyForAddresses: Invalid address %q", ips)
-		}
-		if (ip1.To4() == nil) == (ip2.To4() == nil) {
-			return Unknown, fmt.Errorf("IPFamilyForAddresses: same address family %q", ips)
-		}
-		return DualStack, nil
-	default:
+	if len(ips) != 1 && len(ips) != 2 {
 		return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid ips length %d %q", len(ips), ips)
 	}
+	addresses := make([]netip.Addr, len(ips))
+	for i, ip := range ips {
+		addr, err := netip.ParseAddr(ip)
+		if err != nil {
+			return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid address %q: %w", ip, err)
+		}
+		addresses[i] = addr
+	}
+	return ForAddressesIPs(addresses)
 }
 
-// ForAddressesIPs returns the address family from a given list of addresses IPs.
-func ForAddressesIPs(ips []net.IP) (Family, error) {
-	ipsStrings := []string{}
-
-	for _, ip := range ips {
-		ipsStrings = append(ipsStrings, ip.String())
+// ForAddressesIPs returns the address family from a list of typed addresses.
+func ForAddressesIPs(ips []netip.Addr) (Family, error) {
+	if len(ips) != 1 && len(ips) != 2 {
+		return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid ips length %d %q", len(ips), ips)
 	}
-	return ForAddresses(ipsStrings)
+	for _, ip := range ips {
+		if !ip.IsValid() {
+			return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid address %q", ip)
+		}
+	}
+	if len(ips) == 1 {
+		return ForAddress(ips[0]), nil
+	}
+	if ips[0].Unmap().Is4() == ips[1].Unmap().Is4() {
+		return Unknown, fmt.Errorf("IPFamilyForAddresses: same address family %q", ips)
+	}
+	return DualStack, nil
 }
 
 // ForCIDR returns the address family from a given CIDR.
-func ForCIDR(cidr *net.IPNet) Family {
-	if cidr.IP.To4() == nil {
+func ForCIDR(cidr netip.Prefix) Family {
+	if !cidr.Addr().Unmap().Is4() {
 		return IPv6
 	}
 	return IPv4
 }
 
 // ForAddress returns the address family for a given address.
-func ForAddress(ip net.IP) Family {
-	if ip.To4() == nil {
+func ForAddress(ip netip.Addr) Family {
+	if !ip.Unmap().Is4() {
 		return IPv6
 	}
 	return IPv4

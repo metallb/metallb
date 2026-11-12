@@ -4,7 +4,7 @@ package container
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"strings"
@@ -213,10 +213,10 @@ func configureContainer(cfg Config, configDir string) (*FRR, error) {
 		frr.Ipv4 = ""
 		frr.Ipv6 = ""
 	case hostNetwork:
-		if net.ParseIP(cfg.HostIPv4) == nil {
+		if ip, err := netip.ParseAddr(cfg.HostIPv4); err != nil || !ip.Unmap().Is4() {
 			return nil, errors.New("Invalid hostIPv4")
 		}
-		if net.ParseIP(cfg.HostIPv6) == nil {
+		if ip, err := netip.ParseAddr(cfg.HostIPv6); err != nil || !ip.Is6() || ip.Is4In6() {
 			return nil, errors.New("Invalid hostIPv6")
 		}
 

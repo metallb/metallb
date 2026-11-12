@@ -3,6 +3,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -312,6 +313,121 @@ func TestValidate(t *testing.T) {
 			}
 			if !test.mustFail && err != nil {
 				t.Fatalf("Not expected error %s for %s", err, test.desc)
+			}
+		})
+	}
+}
+
+func TestPeerTransportBackendValidation(t *testing.T) {
+	tests := []struct {
+		name       string
+		address    string
+		srcAddress string
+		nativeErr  string
+		parseErr   string
+	}{
+		{
+			name:    "IPv4 peer with automatic source",
+			address: "192.0.2.1",
+		},
+		{
+			name:       "IPv4 peer and source",
+			address:    "192.0.2.1",
+			srcAddress: "192.0.2.2",
+		},
+		{
+			name:       "unspecified IPv4 source",
+			address:    "192.0.2.1",
+			srcAddress: "0.0.0.0",
+		},
+		{
+			name:    "mapped IPv4 peer",
+			address: "::ffff:192.0.2.1",
+		},
+		{
+			name:       "mapped IPv4 source",
+			address:    "192.0.2.1",
+			srcAddress: "::ffff:192.0.2.2",
+		},
+		{
+			name:       "mapped IPv4 peer and source",
+			address:    "::ffff:192.0.2.1",
+			srcAddress: "::ffff:192.0.2.2",
+		},
+		{
+			name:      "IPv6 peer",
+			address:   "2001:db8::1",
+			nativeErr: `peer "2001:db8::1" has an IPv6 address, native bgp mode only supports IPv4 transport`,
+		},
+		{
+			name:       "IPv4 peer with IPv6 source",
+			address:    "192.0.2.1",
+			srcAddress: "2001:db8::2",
+			nativeErr:  `peer "192.0.2.1" has an IPv6 source address "2001:db8::2", native bgp mode only supports IPv4 transport`,
+		},
+		{
+			name:       "unspecified IPv6 source",
+			address:    "192.0.2.1",
+			srcAddress: "::",
+			nativeErr:  `peer "192.0.2.1" has an IPv6 source address "::", native bgp mode only supports IPv4 transport`,
+		},
+		{
+			name:     "invalid peer address",
+			address:  "invalid",
+			parseErr: `invalid BGPPeer address "invalid"`,
+		},
+		{
+			name:       "invalid source address",
+			address:    "192.0.2.1",
+			srcAddress: "invalid",
+			parseErr:   `invalid source IP "invalid"`,
+		},
+		{
+			name:     "scoped peer address",
+			address:  "fe80::1%eth0",
+			parseErr: `invalid BGPPeer address "fe80::1%eth0"`,
+		},
+		{
+			name:       "scoped source address",
+			address:    "192.0.2.1",
+			srcAddress: "fe80::2%eth0",
+			parseErr:   `invalid source IP "fe80::2%eth0"`,
+		},
+	}
+
+	for _, mode := range []string{"native", "frr", "frr-k8s"} {
+		t.Run(mode, func(t *testing.T) {
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					resources := ClusterResources{
+						Peers: []v1beta2.BGPPeer{{
+							ObjectMeta: v1.ObjectMeta{Name: "peer"},
+							Spec: v1beta2.BGPPeerSpec{
+								MyASN:      64512,
+								ASN:        64513,
+								Address:    test.address,
+								SrcAddress: test.srcAddress,
+							},
+						}},
+					}
+					cfg, err := For(resources, ValidationFor(mode), ForOptions{})
+					wantErr := test.parseErr
+					if mode == "native" && test.nativeErr != "" {
+						wantErr = test.nativeErr
+					}
+					if wantErr != "" {
+						if err == nil || !strings.Contains(err.Error(), wantErr) {
+							t.Fatalf("For() error = %v, want error containing %q", err, wantErr)
+						}
+						if cfg != nil {
+							t.Fatal("For() returned a config for an unsupported or invalid address")
+						}
+						return
+					}
+					if err != nil {
+						t.Fatalf("For() unexpected error: %v", err)
+					}
+				})
 			}
 		})
 	}

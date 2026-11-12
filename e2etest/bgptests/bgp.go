@@ -22,7 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -1133,13 +1133,13 @@ var _ = ginkgo.Describe("BGP", func() {
 							if err != nil {
 								return err
 							}
-							if _, ok := routes[ipNoAdvertisement]; ok {
+							if _, ok := routes[routeKey(ipNoAdvertisement)]; ok {
 								return fmt.Errorf("found %s route for community %s", ipNoAdvertisement, community)
 							}
-							if _, ok := routes[ipWithAdvertisement1]; !ok {
+							if _, ok := routes[routeKey(ipWithAdvertisement1)]; !ok {
 								return fmt.Errorf("%s route not found for community %s", ipWithAdvertisement1, community)
 							}
-							if _, ok := routes[ipWithAdvertisement]; !ok {
+							if _, ok := routes[routeKey(ipWithAdvertisement)]; !ok {
 								return fmt.Errorf("%s route not found for community %s", ipWithAdvertisement, community)
 							}
 						}
@@ -1398,92 +1398,92 @@ var _ = ginkgo.Describe("BGP", func() {
 			ginkgo.Entry("FRRK8S-MODE IPV6", ipfamily.IPv6, []string{v6PoolAddresses}))
 
 		ginkgo.It("IPV4 - overlapping bgp advertisements union communities for the same prefix", func() {
-				const (
-					communityA = "65000:100"
-					communityB = "65000:200"
-				)
-				ipFamily := ipfamily.IPv4
-				poolAddresses := []string{v4PoolAddresses}
+			const (
+				communityA = "65000:100"
+				communityB = "65000:200"
+			)
+			ipFamily := ipfamily.IPv4
+			poolAddresses := []string{v4PoolAddresses}
 
-				resources := config.Resources{
-					Pools: []metallbv1beta1.IPAddressPool{
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "bgp-overlap-pool"},
-							Spec: metallbv1beta1.IPAddressPoolSpec{
-								Addresses: poolAddresses,
-							},
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "bgp-overlap-pool"},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: poolAddresses,
 						},
 					},
-					Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
-					BGPAdvs: []metallbv1beta1.BGPAdvertisement{
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-a"},
-							Spec: metallbv1beta1.BGPAdvertisementSpec{
-								Communities:    []string{communityA},
-								IPAddressPools: []string{"bgp-overlap-pool"},
-							},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-b"},
-							Spec: metallbv1beta1.BGPAdvertisementSpec{
-								Communities:    []string{communityB},
-								IPAddressPools: []string{"bgp-overlap-pool"},
-							},
+				},
+				Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-a"},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							Communities:    []string{communityA},
+							IPAddressPools: []string{"bgp-overlap-pool"},
 						},
 					},
-				}
-
-				for _, c := range FRRContainers {
-					err := frrcontainer.PairWithNodes(cs, c, ipFamily)
-					Expect(err).NotTo(HaveOccurred())
-				}
-
-				err := ConfigUpdater.Update(resources)
-				Expect(err).NotTo(HaveOccurred())
-
-				for _, c := range FRRContainers {
-					validateFRRPeeredWithAllNodes(cs, c, ipFamily)
-				}
-
-				serviceIP, err := config.GetIPFromRangeByIndex(poolAddresses[0], 0)
-				Expect(err).NotTo(HaveOccurred())
-
-				svc, jig := testservice.CreateWithBackend(cs, testNamespace, "svc-ovlp-comm",
-					func(s *corev1.Service) {
-						s.Spec.LoadBalancerIP = serviceIP
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "overlap-adv-b"},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							Communities:    []string{communityB},
+							IPAddressPools: []string{"bgp-overlap-pool"},
+						},
 					},
-					testservice.TrafficPolicyCluster)
-				Expect(svc).NotTo(BeNil())
-				Expect(jig).NotTo(BeNil())
-				defer testservice.Delete(cs, svc)
+				},
+			}
 
-				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			for _, c := range FRRContainers {
+				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
 				Expect(err).NotTo(HaveOccurred())
+			}
 
-				for _, c := range FRRContainers {
-					validateService(svc, allNodes.Items, c)
-				}
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
 
-				for _, c := range FRRContainers {
-					Eventually(func() error {
-						routesA, err := frr.RoutesForCommunity(c, communityA, ipFamily)
-						if err != nil {
-							return err
-						}
-						if _, ok := routesA[serviceIP]; !ok {
-							return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityA, c.Name)
-						}
+			for _, c := range FRRContainers {
+				validateFRRPeeredWithAllNodes(cs, c, ipFamily)
+			}
 
-						routesB, err := frr.RoutesForCommunity(c, communityB, ipFamily)
-						if err != nil {
-							return err
-						}
-						if _, ok := routesB[serviceIP]; !ok {
-							return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityB, c.Name)
-						}
-						return nil
-					}, 1*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
-				}
+			serviceIP, err := config.GetIPFromRangeByIndex(poolAddresses[0], 0)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc, jig := testservice.CreateWithBackend(cs, testNamespace, "svc-ovlp-comm",
+				func(s *corev1.Service) {
+					s.Spec.LoadBalancerIP = serviceIP
+				},
+				testservice.TrafficPolicyCluster)
+			Expect(svc).NotTo(BeNil())
+			Expect(jig).NotTo(BeNil())
+			defer testservice.Delete(cs, svc)
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, c := range FRRContainers {
+				validateService(svc, allNodes.Items, c)
+			}
+
+			for _, c := range FRRContainers {
+				Eventually(func() error {
+					routesA, err := frr.RoutesForCommunity(c, communityA, ipFamily)
+					if err != nil {
+						return err
+					}
+					if _, ok := routesA[routeKey(serviceIP)]; !ok {
+						return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityA, c.Name)
+					}
+
+					routesB, err := frr.RoutesForCommunity(c, communityB, ipFamily)
+					if err != nil {
+						return err
+					}
+					if _, ok := routesB[routeKey(serviceIP)]; !ok {
+						return fmt.Errorf("%s route not found for community %s on %s", serviceIP, communityB, c.Name)
+					}
+					return nil
+				}, 1*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
+			}
 		})
 	})
 
@@ -1543,10 +1543,10 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		ginkgo.By("Validate BGP Community is received on the FRR containers")
 		for _, c := range FRRContainers {
-			Eventually(func() (map[string]frr.Route, error) {
+			Eventually(func() (map[netip.Addr]frr.Route, error) {
 				return frr.RoutesForCommunity(c, CommunityNoAdv, pairingIPFamily)
 			}, time.Minute, time.Second).Should(
-				HaveKey(serviceIP),
+				HaveKey(routeKey(serviceIP)),
 				"BGP routes should contain service IP for community %s",
 				CommunityNoAdv,
 			)
@@ -1568,10 +1568,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		bgpAdv.Spec.LocalPref = 300
 		bgpAdv.Spec.Communities = []string{CustomCommunity}
 
-		var subnet *net.IPNet
-		bits := 32
 		if pairingIPFamily == ipfamily.IPv6 {
-			bits = 128
 			bgpAdv.Spec.AggregationLengthV6 = ptr.To(aggLen)
 		} else {
 			bgpAdv.Spec.AggregationLength = ptr.To(aggLen)
@@ -1581,22 +1578,19 @@ var _ = ginkgo.Describe("BGP", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		ginkgo.By("Validating updated BGP route prefix (aggregated)")
-		ip := net.ParseIP(serviceIP)
-		Expect(ip).NotTo(BeNil())
+		ip := netip.MustParseAddr(serviceIP)
+		subnet := netip.PrefixFrom(ip, int(aggLen))
+		Expect(subnet.IsValid()).To(BeTrue())
+		subnet = subnet.Masked()
 
-		subnet = &net.IPNet{IP: ip.Mask(net.CIDRMask(int(aggLen), bits)), Mask: net.CIDRMask(int(aggLen), bits)}
-
-		// ParseRoutes indexes maps by destination IP string (see frr.ParseRoutes), not full CIDR.
-		aggregatedRouteKey := subnet.IP.String()
-		routeHasAggregationLength := func(routes map[string]frr.Route, key string) error {
+		// ParseRoutes indexes by destination address, not the full prefix.
+		aggregatedRouteKey := subnet.Addr()
+		routeHasAggregationLength := func(routes map[netip.Addr]frr.Route, key netip.Addr) error {
 			r, ok := routes[key]
 			if !ok {
 				return fmt.Errorf("no route for key %q", key)
 			}
-			if r.Destination == nil {
-				return fmt.Errorf("route %q has nil Destination", key)
-			}
-			ones, _ := r.Destination.Mask.Size()
+			ones := r.Destination.Bits()
 			if ones != int(aggLen) {
 				return fmt.Errorf("route %q: want /%d advertised prefix, got /%d (%s)", key, aggLen, ones, r.Destination.String())
 			}
@@ -1632,7 +1626,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		for _, c := range FRRContainers {
 			if strings.Contains(c.Name, "ibgp") {
 				Eventually(func() (uint32, error) {
-					return frr.LocalPrefForPrefix(c, aggregatedRouteKey, pairingIPFamily)
+					return frr.LocalPrefForPrefix(c, aggregatedRouteKey.String(), pairingIPFamily)
 				}, time.Minute, time.Second).Should(Equal(uint32(300)))
 			}
 		}
@@ -2056,7 +2050,11 @@ var _ = ginkgo.Describe("BGP", func() {
 							return fmt.Errorf("expected connect time to be %d, got %d", int(connectTime.Seconds()), neighbor.ConfiguredConnectTime)
 						}
 
-						neighborFamily := ipfamily.ForAddress(net.ParseIP(neighbor.ID))
+						neighborAddr, err := netip.ParseAddr(neighbor.ID)
+						if err != nil {
+							continue // An unnumbered neighbor ID may be an interface name.
+						}
+						neighborFamily := ipfamily.ForAddress(neighborAddr)
 						for _, family := range neighbor.AddressFamilies {
 							if !strings.Contains(family, string(neighborFamily)) {
 								return fmt.Errorf("expected %s neighbour to contain only %s families but contains %s", neighbor.ID, neighborFamily, family)

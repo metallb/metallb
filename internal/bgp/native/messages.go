@@ -7,7 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"net"
+	"net/netip"
 	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
@@ -15,8 +15,8 @@ import (
 	"go.universe.tf/metallb/internal/safeconvert"
 )
 
-func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) error {
-	if routerID.To4() == nil {
+func sendOpen(w io.Writer, asn uint32, routerID netip.Addr, holdTime time.Duration) error {
+	if !routerID.Is4() {
 		panic("non-ipv4 address used as RouterID")
 	}
 
@@ -92,7 +92,8 @@ func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) 
 	if asn > 65535 {
 		msg.ASN16 = 23456
 	}
-	copy(msg.RouterID[:], routerID.To4())
+	routerID4 := routerID.As4() // this is safe, because we know routerID is IPv4
+	copy(msg.RouterID[:], routerID4[:])
 
 	return binary.Write(w, binary.BigEndian, msg)
 }
@@ -296,7 +297,7 @@ func readCapabilities(r io.Reader, ret *openResult) error {
 	}
 }
 
-func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, nextHop net.IP, adv *bgp.Advertisement) error {
+func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, nextHop netip.Addr, adv *bgp.Advertisement) error {
 	var b bytes.Buffer
 
 	hdr := struct {
@@ -323,7 +324,7 @@ func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, nextHop net.IP, adv *
 		return err
 	}
 	binary.BigEndian.PutUint16(b.Bytes()[21:23], toWrite)
-	encodePrefixes(&b, []*net.IPNet{adv.Prefix})
+	encodePrefixes(&b, []netip.Prefix{adv.Prefix})
 
 	toWrite, err = safeconvert.IntToUInt16(b.Len())
 	if err != nil {
@@ -337,11 +338,12 @@ func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, nextHop net.IP, adv *
 	return nil
 }
 
-func encodePrefixes(b *bytes.Buffer, pfxs []*net.IPNet) {
+func encodePrefixes(b *bytes.Buffer, pfxs []netip.Prefix) {
 	for _, pfx := range pfxs {
-		o, _ := pfx.Mask.Size()
+		o := pfx.Bits()
 		b.WriteByte(byte(o))
-		b.Write(pfx.IP.To4()[:bytesForBits(o)])
+		addr := pfx.Addr().AsSlice()
+		b.Write(addr[:bytesForBits(o)])
 	}
 }
 
@@ -352,7 +354,7 @@ func bytesForBits(n int) int {
 	return ((n + 7) &^ 7) / 8
 }
 
-func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, nextHop net.IP, adv *bgp.Advertisement) error {
+func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, nextHop netip.Addr, adv *bgp.Advertisement) error {
 	b.Write([]byte{
 		0x40, 1, // mandatory, origin
 		1, // len
@@ -392,7 +394,7 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, nextHop net.
 		4, // len
 	})
 
-	b.Write(nextHop)
+	b.Write(nextHop.AsSlice())
 
 	if ibgp {
 		b.Write([]byte{
@@ -437,7 +439,7 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, nextHop net.
 	return nil
 }
 
-func sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
+func sendWithdraw(w io.Writer, prefixes []netip.Prefix) error {
 	var b bytes.Buffer
 
 	hdr := struct {

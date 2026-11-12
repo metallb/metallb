@@ -996,7 +996,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				return svc1.Status.LoadBalancer.Ingress[0].String() == firstIP
 			}, 1*time.Minute, 1*time.Second).Should(BeTrue())
 			ginkgo.By("validate second LoadBalancer IP is ipv6 allocated from pool1")
-			additionaIPFamily, err := ipfamily.ForAddresses([]string{svc1.Status.LoadBalancer.Ingress[1].String()})
+			additionaIPFamily, err := ipfamily.ForAddresses([]string{svc1.Status.LoadBalancer.Ingress[1].IP})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(additionaIPFamily).To(Equal(ipfamily.IPv6))
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(

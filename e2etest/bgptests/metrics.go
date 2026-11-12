@@ -4,6 +4,7 @@ package bgptests
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -233,17 +234,19 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		ginkgo.DescribeTable("should be exposed by the controller", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
 			poolName := "bgp-test"
 
-			peerAddrToName := make(map[string]string)
+			peerAddrs := make(map[netip.AddrPort]struct{})
 			for _, c := range FRRContainers {
 				address := c.Ipv4
 				if ipFamily == ipfamily.IPv6 {
 					address = c.Ipv6
 				}
-				peerAddr := address + fmt.Sprintf(":%d", c.RouterConfig.BGPPort)
+				ip, err := netip.ParseAddr(address)
+				Expect(err).NotTo(HaveOccurred(), "invalid peer address %q", address)
+				port := c.RouterConfig.BGPPort
 				if FRRProvider != nil && FRRProvider.FRRK8sBased() {
-					peerAddr = address
+					port = 0
 				}
-				peerAddrToName[peerAddr] = c.Name
+				peerAddrs[netip.AddrPortFrom(ip.Unmap(), port)] = struct{}{}
 			}
 
 			resources := config.Resources{
@@ -384,7 +387,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					for addr := range peerAddrToName {
+					for peerAddr := range peerAddrs {
+						addr := peerAddr.Addr().String()
+						if peerAddr.Port() != 0 {
+							addr = fmt.Sprintf("%s:%d", addr, peerAddr.Port())
+						}
 						err = metrics.ValidateGaugeValue(1, fmt.Sprintf("%s_bgp_session_up", metricsPrefix), map[string]string{"peer": addr}, bgpMetrics)
 						if err != nil {
 							return err
@@ -757,7 +764,11 @@ func labelsForPeers(peers []*frrcontainer.FRR, ipFamily ipfamily.Family) []peerP
 		if ipFamily == ipfamily.IPv6 {
 			address = c.Ipv6
 		}
-		peerAddr := address + fmt.Sprintf(":%d", c.RouterConfig.BGPPort)
+		ip, err := netip.ParseAddr(address)
+		Expect(err).NotTo(HaveOccurred(), "invalid peer address %q", address)
+		ip = ip.Unmap()
+		address = ip.String()
+		peerAddr := fmt.Sprintf("%s:%d", address, c.RouterConfig.BGPPort)
 		if FRRProvider != nil && FRRProvider.FRRK8sBased() {
 			peerAddr = address
 		}

@@ -3,16 +3,19 @@
 package config
 
 import (
-	"net"
+	"fmt"
+	"net/netip"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
+	"go4.org/netipx"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,12 +31,41 @@ func selector(s string) labels.Selector {
 	return ret
 }
 
-func ipnet(s string) *net.IPNet {
-	_, n, err := net.ParseCIDR(s)
-	if err != nil {
-		panic(err)
+func TestPeerFromCRNormalizesRouterID(t *testing.T) {
+	tests := []struct {
+		name     string
+		routerID string
+		want     netip.Addr
+	}{
+		{
+			name:     "IPv4-mapped router ID",
+			routerID: "::ffff:192.0.2.1",
+			want:     netip.MustParseAddr("192.0.2.1"),
+		},
+		{
+			name: "omitted router ID remains unset",
+		},
 	}
-	return n
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			peer, err := peerFromCR(v1beta2.BGPPeer{
+				ObjectMeta: metav1.ObjectMeta{Name: "peer"},
+				Spec: v1beta2.BGPPeerSpec{
+					MyASN:    64512,
+					ASN:      64513,
+					Address:  "192.0.2.2",
+					RouterID: test.routerID,
+				},
+			}, nil, false)
+			if err != nil {
+				t.Fatalf("peerFromCR() error = %v", err)
+			}
+			if peer.RouterID != test.want {
+				t.Errorf("peerFromCR() RouterID = %v, want %v", peer.RouterID, test.want)
+			}
+		})
+	}
 }
 
 func TestParse(t *testing.T) {
@@ -231,13 +263,13 @@ func TestParse(t *testing.T) {
 						Name:                  "peer1",
 						MyASN:                 42,
 						ASN:                   142,
-						Addr:                  net.ParseIP("1.2.3.4"),
-						SrcAddr:               net.ParseIP("10.20.30.40"),
+						Addr:                  netip.MustParseAddr("1.2.3.4"),
+						SrcAddr:               netip.MustParseAddr("10.20.30.40"),
 						Port:                  1179,
 						HoldTime:              ptr.To(180 * time.Second),
 						KeepaliveTime:         ptr.To(60 * time.Second),
 						ConnectTime:           ptr.To(time.Second),
-						RouterID:              net.ParseIP("10.20.30.40"),
+						RouterID:              netip.MustParseAddr("10.20.30.40"),
 						NodeSelectors:         []labels.Selector{labels.Everything()},
 						EnableGracefulRestart: true,
 						EBGPMultiHop:          true,
@@ -247,7 +279,7 @@ func TestParse(t *testing.T) {
 						Name:                  "peer2",
 						MyASN:                 100,
 						ASN:                   200,
-						Addr:                  net.ParseIP("2.3.4.5"),
+						Addr:                  netip.MustParseAddr("2.3.4.5"),
 						ConnectTime:           ptr.To(time.Second),
 						NodeSelectors:         []labels.Selector{selector("bar in (quux),foo=bar")},
 						EnableGracefulRestart: false,
@@ -257,7 +289,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:          "pool1",
-						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						CIDR:          []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16"), netip.MustParsePrefix("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
 						AutoAssign:    false,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -291,7 +323,7 @@ func TestParse(t *testing.T) {
 					},
 					"pool2": {
 						Name:       "pool2",
-						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("30.0.0.0/8")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -309,19 +341,19 @@ func TestParse(t *testing.T) {
 					},
 					"pool3": {
 						Name: "pool3",
-						CIDR: []*net.IPNet{
-							ipnet("40.0.0.0/25"),
-							ipnet("40.0.0.150/31"),
-							ipnet("40.0.0.152/29"),
-							ipnet("40.0.0.160/27"),
-							ipnet("40.0.0.192/29"),
-							ipnet("40.0.0.200/32"),
-							ipnet("40.0.0.210/31"),
-							ipnet("40.0.0.212/30"),
-							ipnet("40.0.0.216/29"),
-							ipnet("40.0.0.224/28"),
-							ipnet("40.0.0.240/32"),
-							ipnet("40.0.0.250/32"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("40.0.0.0/25"),
+							netip.MustParsePrefix("40.0.0.150/31"),
+							netip.MustParsePrefix("40.0.0.152/29"),
+							netip.MustParsePrefix("40.0.0.160/27"),
+							netip.MustParsePrefix("40.0.0.192/29"),
+							netip.MustParsePrefix("40.0.0.200/32"),
+							netip.MustParsePrefix("40.0.0.210/31"),
+							netip.MustParsePrefix("40.0.0.212/30"),
+							netip.MustParsePrefix("40.0.0.216/29"),
+							netip.MustParsePrefix("40.0.0.224/28"),
+							netip.MustParsePrefix("40.0.0.240/32"),
+							netip.MustParsePrefix("40.0.0.250/32"),
 						},
 						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
@@ -331,7 +363,7 @@ func TestParse(t *testing.T) {
 					},
 					"pool4": {
 						Name: "pool4",
-						CIDR: []*net.IPNet{ipnet("2001:db8::/64")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("2001:db8::/64")},
 						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
 							AllInterfaces: true,
@@ -405,20 +437,20 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:               "pool1",
-						CIDR:               []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16"), netip.MustParsePrefix("10.50.0.0/24")},
 						AvoidBuggyIPs:      true,
 						AutoAssign:         false,
 						ServiceAllocations: &ServiceAllocation{Priority: 1, Namespaces: sets.Set[string]{"test-ns1": {}}},
 					},
 					"pool2": {
 						Name:               "pool2",
-						CIDR:               []*net.IPNet{ipnet("30.0.0.0/8")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("30.0.0.0/8")},
 						AutoAssign:         true,
 						ServiceAllocations: &ServiceAllocation{Priority: 2, Namespaces: sets.Set[string]{"test-ns2": {}}},
 					},
 					"pool3": {
 						Name:               "pool3",
-						CIDR:               []*net.IPNet{ipnet("40.0.0.0/8")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("40.0.0.0/8")},
 						AutoAssign:         true,
 						ServiceAllocations: &ServiceAllocation{Priority: 3, Namespaces: sets.Set[string]{}},
 					},
@@ -528,13 +560,13 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:               "pool1",
-						CIDR:               []*net.IPNet{ipnet("30.0.0.0/8")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("30.0.0.0/8")},
 						AutoAssign:         true,
 						ServiceAllocations: &ServiceAllocation{Priority: 2, ServiceSelectors: []labels.Selector{selector("team=metallb")}},
 					},
 					"pool2": {
 						Name:               "pool2",
-						CIDR:               []*net.IPNet{ipnet("40.0.0.0/8")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("40.0.0.0/8")},
 						AutoAssign:         true,
 						ServiceAllocations: &ServiceAllocation{Priority: 3, ServiceSelectors: []labels.Selector{selector("team=red")}},
 					},
@@ -620,14 +652,14 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("30.0.0.0/8")},
 						AutoAssign: true,
 						ServiceAllocations: &ServiceAllocation{Priority: 2, Namespaces: sets.New("test-ns1"),
 							ServiceSelectors: []labels.Selector{selector("testsvc-1=1")}},
 					},
 					"pool2": {
 						Name:       "pool2",
-						CIDR:       []*net.IPNet{ipnet("40.0.0.0/8")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("40.0.0.0/8")},
 						AutoAssign: true,
 						ServiceAllocations: &ServiceAllocation{Priority: 3, Namespaces: sets.New("test-ns2"),
 							ServiceSelectors: []labels.Selector{selector("testsvc-2=2")}},
@@ -665,7 +697,7 @@ func TestParse(t *testing.T) {
 					ByName: map[string]*Pool{
 						"pool1": {
 							Name:               "pool1",
-							CIDR:               []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+							CIDR:               []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16"), netip.MustParsePrefix("10.50.0.0/24")},
 							AvoidBuggyIPs:      true,
 							AutoAssign:         false,
 							ServiceAllocations: &ServiceAllocation{Priority: 1, ServiceSelectors: []labels.Selector{labels.Everything()}},
@@ -701,7 +733,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -825,7 +857,7 @@ func TestParse(t *testing.T) {
 						ASN:           42,
 						HoldTime:      ptr.To(180 * time.Second),
 						KeepaliveTime: ptr.To(60 * time.Second),
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -860,7 +892,7 @@ func TestParse(t *testing.T) {
 						ASN:           42,
 						HoldTime:      ptr.To(180 * time.Second),
 						KeepaliveTime: ptr.To(60 * time.Second),
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -896,7 +928,7 @@ func TestParse(t *testing.T) {
 						ASN:           42,
 						HoldTime:      ptr.To(0 * time.Second),
 						KeepaliveTime: ptr.To(0 * time.Second),
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -928,7 +960,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -974,7 +1006,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -1217,7 +1249,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv3",
@@ -1259,7 +1291,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv3",
@@ -1403,8 +1435,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1474,8 +1506,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1554,8 +1586,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1624,8 +1656,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1734,8 +1766,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1807,9 +1839,9 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
-							ipnet("2001:db8::/64"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
+							netip.MustParsePrefix("2001:db8::/64"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1890,8 +1922,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1962,8 +1994,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -2018,20 +2050,20 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("3.3.3.2/31"),
-							ipnet("3.3.3.4/30"),
-							ipnet("3.3.3.8/29"),
-							ipnet("3.3.3.16/28"),
-							ipnet("3.3.3.32/27"),
-							ipnet("3.3.3.64/26"),
-							ipnet("3.3.3.128/26"),
-							ipnet("3.3.3.192/27"),
-							ipnet("3.3.3.224/28"),
-							ipnet("3.3.3.240/29"),
-							ipnet("3.3.3.248/30"),
-							ipnet("3.3.3.252/31"),
-							ipnet("3.3.3.254/32"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("3.3.3.2/31"),
+							netip.MustParsePrefix("3.3.3.4/30"),
+							netip.MustParsePrefix("3.3.3.8/29"),
+							netip.MustParsePrefix("3.3.3.16/28"),
+							netip.MustParsePrefix("3.3.3.32/27"),
+							netip.MustParsePrefix("3.3.3.64/26"),
+							netip.MustParsePrefix("3.3.3.128/26"),
+							netip.MustParsePrefix("3.3.3.192/27"),
+							netip.MustParsePrefix("3.3.3.224/28"),
+							netip.MustParsePrefix("3.3.3.240/29"),
+							netip.MustParsePrefix("3.3.3.248/30"),
+							netip.MustParsePrefix("3.3.3.252/31"),
+							netip.MustParsePrefix("3.3.3.254/32"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -2430,7 +2462,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						BFDProfile:    "default",
 					},
@@ -2439,7 +2471,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv3",
@@ -2542,7 +2574,7 @@ func TestParse(t *testing.T) {
 						Name:           "peer1",
 						MyASN:          42,
 						ASN:            42,
-						Addr:           net.ParseIP("1.2.3.4"),
+						Addr:           netip.MustParseAddr("1.2.3.4"),
 						Port:           179,
 						NodeSelectors:  []labels.Selector{labels.Everything()},
 						BFDProfile:     "",
@@ -2603,7 +2635,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						Port:          179,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						PasswordRef: corev1.SecretReference{
@@ -2642,7 +2674,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						Port:          179,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						PasswordRef: corev1.SecretReference{
@@ -2767,7 +2799,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv3",
@@ -2937,7 +2969,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           142,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						Port:          1179,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						BFDProfile:    "with-echo"},
@@ -2945,7 +2977,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("1.2.3.4/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3056,12 +3088,12 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           142,
-						Addr:          net.ParseIP("1.2.3.4"),
-						SrcAddr:       net.ParseIP("10.20.30.40"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
+						SrcAddr:       netip.MustParseAddr("10.20.30.40"),
 						Port:          1179,
 						HoldTime:      ptr.To(180 * time.Second),
 						KeepaliveTime: ptr.To(60 * time.Second),
-						RouterID:      net.ParseIP("10.20.30.40"),
+						RouterID:      netip.MustParseAddr("10.20.30.40"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  true,
 						VRF:           "foo",
@@ -3070,7 +3102,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:          "pool1",
-						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						CIDR:          []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16"), netip.MustParsePrefix("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
 						AutoAssign:    false,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -3183,7 +3215,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3202,7 +3234,7 @@ func TestParse(t *testing.T) {
 					},
 					"pool2": {
 						Name:       "pool2",
-						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("30.0.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3259,7 +3291,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign: true,
 						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
@@ -3474,14 +3506,14 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:              "pool1",
-						CIDR:              []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:              []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign:        true,
 						BGPAdvertisements: nil,
 						L2Advertisements:  nil,
 					},
 					"pool2": {
 						Name:              "pool2",
-						CIDR:              []*net.IPNet{ipnet("30.0.0.0/16")},
+						CIDR:              []netip.Prefix{netip.MustParsePrefix("30.0.0.0/16")},
 						AutoAssign:        true,
 						BGPAdvertisements: nil,
 						L2Advertisements:  nil,
@@ -3587,7 +3619,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3607,7 +3639,7 @@ func TestParse(t *testing.T) {
 					},
 					"pool2": {
 						Name:       "pool2",
-						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("30.0.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3835,7 +3867,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3909,7 +3941,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -3918,7 +3950,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -3958,7 +3990,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						DynamicASN:    "internal",
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -4084,7 +4116,7 @@ func TestParse(t *testing.T) {
 						Name:                   "peer1",
 						MyASN:                  42,
 						ASN:                    142,
-						Addr:                   net.ParseIP("1.2.3.4"),
+						Addr:                   netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors:          []labels.Selector{labels.Everything()},
 						DisableMP:              true,
 						DualStackAddressFamily: false,
@@ -4117,7 +4149,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         100,
 						ASN:           200,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						LocalASN:      65410,
 					},
@@ -4187,14 +4219,217 @@ func TestParse(t *testing.T) {
 				return x.String() == y.String()
 			})
 			// We don't care about comparing cidrPerAddress as it's calculated
-			cidrPerAddressComparer := cmp.Comparer(func(x, y map[string][]*net.IPNet) bool {
+			cidrPerAddressComparer := cmp.Comparer(func(x, y map[string][]netip.Prefix) bool {
 				return true
 			})
 
-			if diff := cmp.Diff(test.want, got, selectorComparer, cidrPerAddressComparer, cmp.AllowUnexported(Pool{})); diff != "" {
+			if diff := cmp.Diff(test.want, got, selectorComparer, cidrPerAddressComparer, cmpopts.EquateComparable(netip.Addr{}, netip.Prefix{}), cmp.AllowUnexported(Pool{})); diff != "" {
 				t.Errorf("%q: parse returned wrong result (-want, +got)\n%s", test.desc, diff)
 			}
 		})
+	}
+}
+
+func TestBGPAdvertisementAggregationPerFamily(t *testing.T) {
+	tests := []struct {
+		name                string
+		address             string
+		aggregationLength   int32
+		aggregationLengthV6 int32
+		wantErr             string
+	}{
+		{
+			name:                "broad IPv6 aggregate too wide",
+			address:             "::ffff:192.0.2.0/95",
+			aggregationLength:   32,
+			aggregationLengthV6: 64,
+			wantErr:             "invalid aggregation length 64: prefix 95",
+		},
+		{
+			name:                "broad IPv6 aggregate matches boundary",
+			address:             "::ffff:192.0.2.0/95",
+			aggregationLength:   32,
+			aggregationLengthV6: 95,
+		},
+		{
+			name:                "crossing range IPv6 aggregate too wide",
+			address:             "::fffe:ffff:ffff-::1:0:0:0",
+			aggregationLength:   32,
+			aggregationLengthV6: 127,
+			wantErr:             "invalid aggregation length 127: prefix 128",
+		},
+		{
+			name:                "crossing range host routes",
+			address:             "::fffe:ffff:ffff-::1:0:0:0",
+			aggregationLength:   32,
+			aggregationLengthV6: 128,
+		},
+		{
+			name:              "IPv4 range aggregation unchanged",
+			address:           "3.3.3.2-3.3.3.254",
+			aggregationLength: 26,
+		},
+		{
+			name:                "IPv4 range aggregate too wide",
+			address:             "3.3.3.2-3.3.3.254",
+			aggregationLength:   24,
+			aggregationLengthV6: 128,
+			wantErr:             "invalid aggregation length 24: prefix 26",
+		},
+		{
+			name:                "IPv6 range aggregation unchanged",
+			address:             "2001:db8::2-2001:db8::fe",
+			aggregationLengthV6: 122,
+		},
+		{
+			name:                "IPv6 range aggregate too wide",
+			address:             "2001:db8::2-2001:db8::fe",
+			aggregationLength:   32,
+			aggregationLengthV6: 120,
+			wantErr:             "invalid aggregation length 120: prefix 122",
+		},
+		{
+			name:    "IPv4 default route",
+			address: "0.0.0.0/0",
+		},
+		{
+			name:    "IPv6 default route",
+			address: "::/0",
+		},
+		{
+			name:    "zero-padded IPv6 default route",
+			address: "::/000",
+		},
+		{
+			name:                "broad IPv6 ignores IPv4 aggregation length",
+			address:             "::ffff:192.0.2.0/95",
+			aggregationLengthV6: 95,
+		},
+		{
+			name:                "unmapped broad IPv6 aggregate matches boundary",
+			address:             "::/80",
+			aggregationLengthV6: 80,
+		},
+		{
+			name:                "unmapped broad IPv6 aggregate too wide",
+			address:             "::/80",
+			aggregationLengthV6: 79,
+			wantErr:             "invalid aggregation length 79: prefix 80",
+		},
+		{
+			name:    "mapped IPv4 default route",
+			address: "::ffff:0:0/96",
+		},
+		{
+			name:              "mapped IPv4 aggregate matches boundary",
+			address:           "::ffff:192.0.2.0/120",
+			aggregationLength: 24,
+		},
+		{
+			name:              "mapped IPv4 aggregate too wide",
+			address:           "::ffff:192.0.2.0/120",
+			aggregationLength: 23,
+			wantErr:           "invalid aggregation length 23: prefix 24",
+		},
+		{
+			name:              "zero-padded IPv4 aggregate matches boundary",
+			address:           "192.0.2.0/024",
+			aggregationLength: 24,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resources := ClusterResources{
+				Pools: []v1beta1.IPAddressPool{{
+					ObjectMeta: metav1.ObjectMeta{Name: "pool"},
+					Spec: v1beta1.IPAddressPoolSpec{
+						Addresses: []string{test.address},
+					},
+				}},
+				BGPAdvs: []v1beta1.BGPAdvertisement{{
+					ObjectMeta: metav1.ObjectMeta{Name: "adv"},
+					Spec: v1beta1.BGPAdvertisementSpec{
+						AggregationLength:   ptr.To(test.aggregationLength),
+						AggregationLengthV6: ptr.To(test.aggregationLengthV6),
+					},
+				}},
+			}
+			_, err := For(resources, ValidationFor("frr"), ForOptions{})
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("For() error = %v, want error containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("For() unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestBGPAdvertisementCompatibilityWithMixedFamilyPool(t *testing.T) {
+	const address = "::fffe:ffff:ffff-::1:0:0:0"
+	prefixes, err := parseConfiguredPrefixes(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name                string
+		aggregationLength   int
+		aggregationLengthV6 int
+		wantCompatible      bool
+	}{
+		{
+			name:                "shared IPv4 routes",
+			aggregationLength:   32,
+			aggregationLengthV6: 128,
+		},
+		{
+			name:                "shared IPv6 routes",
+			aggregationLength:   24,
+			aggregationLengthV6: 96,
+		},
+		{
+			name:                "disjoint route lengths",
+			aggregationLength:   24,
+			aggregationLengthV6: 128,
+			wantCompatible:      true,
+		},
+	}
+	for _, ipv4First := range []bool{false, true} {
+		for _, test := range tests {
+			t.Run(fmt.Sprintf("%s/ipv4First=%t", test.name, ipv4First), func(t *testing.T) {
+				cidrs := append([]netip.Prefix(nil), prefixes...)
+				if ipv4First {
+					cidrs[0], cidrs[1] = cidrs[1], cidrs[0]
+				}
+				pool := &Pool{cidrsPerAddresses: map[string][]netip.Prefix{address: cidrs}}
+				first := &BGPAdvertisement{
+					AggregationLength:   32,
+					AggregationLengthV6: 96,
+					LocalPref:           100,
+					AsPathPrepend:       1,
+					Nodes:               map[string]bool{"node": true},
+					Peers:               []string{"peer"},
+				}
+				second := &BGPAdvertisement{
+					AggregationLength:   test.aggregationLength,
+					AggregationLengthV6: test.aggregationLengthV6,
+					LocalPref:           200,
+					AsPathPrepend:       2,
+					Nodes:               map[string]bool{"node": true},
+					Peers:               []string{"peer"},
+				}
+				if got := BGPAdvertisementsHaveCompatibleLocalPref(first, second, pool); got != test.wantCompatible {
+					t.Errorf("local preference compatibility = %t, want %t", got, test.wantCompatible)
+				}
+				if got := BGPAdvertisementsHaveCompatibleAsPathPrepend(first, second, pool); got != test.wantCompatible {
+					t.Errorf("AS-path compatibility = %t, want %t", got, test.wantCompatible)
+				}
+			})
+		}
 	}
 }
 
@@ -4451,6 +4686,226 @@ func TestContainsAdvertisement(t *testing.T) {
 	}
 }
 
+func TestParseCIDRZeroPaddedPrefixLengths(t *testing.T) {
+	for _, test := range []struct {
+		input     string
+		canonical string
+	}{
+		{"192.0.2.129/024", "192.0.2.129/24"},
+		{"192.0.2.1/00032", "192.0.2.1/32"},
+		{"192.0.2.1/000", "192.0.2.1/0"},
+		{"2001:db8::1/0064", "2001:db8::1/64"},
+		{"2001:db8::1/00128", "2001:db8::1/128"},
+		{"::/000", "::/0"},
+		{"::ffff:192.0.2.129/00120", "::ffff:192.0.2.129/120"},
+		{"192.0.2.1/" + strings.Repeat("0", 100) + "24", "192.0.2.1/24"},
+	} {
+		t.Run(test.input, func(t *testing.T) {
+			got, err := ParseCIDR(test.input)
+			if err != nil {
+				t.Fatalf("ParseCIDR(%q) error = %v", test.input, err)
+			}
+			want, err := ParseCIDR(test.canonical)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(want, got, cmpopts.EquateComparable(netip.Prefix{})); diff != "" {
+				t.Fatalf("ParseCIDR(%q) mismatch (-want +got):\n%s", test.input, diff)
+			}
+		})
+	}
+}
+
+func TestParseCIDRRejectsMalformedPrefixLengths(t *testing.T) {
+	for _, input := range []string{
+		"192.0.2.0/", "192.0.2.0/+024", "192.0.2.0/-024",
+		"192.0.2.0/0x18", "192.0.2.0/0_24", "192.0.2.0/0 24",
+		"192.0.2.0/024 ", "192.0.2.0/024/", "192.0.2.0/033",
+		"::/0129", "::/09999999999999999999999999999999",
+		"192.000.2.0/024", "not-an-ip/024", "2001:db8:::1/0064",
+	} {
+		t.Run(input, func(t *testing.T) {
+			if got, err := ParseCIDR(input); err == nil {
+				t.Fatalf("ParseCIDR(%q) = %v, want error", input, got)
+			}
+		})
+	}
+}
+
+func TestPoolsBroadIPv6CanCoexistWithIPv4(t *testing.T) {
+	for _, address := range []string{"::/0", "::/80", "::ffff:192.0.2.0/95"} {
+		for _, samePool := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/samePool=%t", address, samePool), func(t *testing.T) {
+				resources := ClusterResources{Pools: []v1beta1.IPAddressPool{{
+					ObjectMeta: metav1.ObjectMeta{Name: "ipv6"},
+					Spec:       v1beta1.IPAddressPoolSpec{Addresses: []string{address}},
+				}}}
+				if samePool {
+					resources.Pools[0].Spec.Addresses = append(resources.Pools[0].Spec.Addresses, "192.0.2.0/24")
+				} else {
+					resources.Pools = append(resources.Pools, v1beta1.IPAddressPool{
+						ObjectMeta: metav1.ObjectMeta{Name: "ipv4"},
+						Spec:       v1beta1.IPAddressPoolSpec{Addresses: []string{"192.0.2.0/24"}},
+					})
+				}
+				if _, err := For(resources, ValidationFor("frr"), ForOptions{}); err != nil {
+					t.Fatalf("independent IPv4 and IPv6 pools rejected: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestParseCIDRIPv4MappedPrefixes(t *testing.T) {
+	tests := []struct {
+		name string
+		cidr string
+		want []netip.Prefix
+	}{
+		{
+			name: "mapped prefix converts to IPv4",
+			cidr: "::ffff:192.0.2.0/120",
+			want: []netip.Prefix{netip.MustParsePrefix("192.0.2.0/24")},
+		},
+		{
+			name: "mapped prefix with host bits converts to IPv4",
+			cidr: "::ffff:192.0.2.129/120",
+			want: []netip.Prefix{netip.MustParsePrefix("192.0.2.0/24")},
+		},
+		{
+			name: "mapped prefix at /96 converts to IPv4 default route",
+			cidr: "::ffff:0:0/96",
+			want: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")},
+		},
+		{
+			name: "prefix shorter than /96 excludes mapped IPv4",
+			cidr: "::ffff:192.0.2.0/95",
+			want: []netip.Prefix{
+				netip.MustParsePrefix("::fffe:0:0/96"),
+			},
+		},
+		{
+			name: "IPv6 range crossing the mapped block",
+			cidr: "::fffe:ffff:ffff-::1:0:0:0",
+			want: []netip.Prefix{
+				netip.MustParsePrefix("::fffe:ffff:ffff/128"),
+				netip.MustParsePrefix("0.0.0.0/0"),
+				netip.MustParsePrefix("::1:0:0:0/128"),
+			},
+		},
+		{
+			name: "mapped range converts to IPv4",
+			cidr: "::ffff:192.0.2.0-::ffff:192.0.2.1",
+			want: []netip.Prefix{netip.MustParsePrefix("192.0.2.0/31")},
+		},
+		{
+			name: "mixed plain and mapped IPv4 endpoints",
+			cidr: "192.0.2.0-::ffff:192.0.2.1",
+			want: []netip.Prefix{netip.MustParsePrefix("192.0.2.0/31")},
+		},
+		{
+			name: "IPv6 prefix outside the mapped block is unchanged",
+			cidr: "2001:db8::/64",
+			want: []netip.Prefix{netip.MustParsePrefix("2001:db8::/64")},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := ParseCIDR(test.cidr)
+			if err != nil {
+				t.Fatalf("ParseCIDR(%q) error = %v", test.cidr, err)
+			}
+			if diff := cmp.Diff(test.want, got, cmpopts.EquateComparable(netip.Prefix{})); diff != "" {
+				t.Fatalf("ParseCIDR(%q) mismatch (-want +got):\n%s", test.cidr, diff)
+			}
+		})
+	}
+}
+
+func TestParseCIDRDoesNotRetainMappedIPv6(t *testing.T) {
+	mapped := netip.MustParsePrefix("::ffff:0:0/96")
+	for bits := 0; bits <= 128; bits++ {
+		original := netip.PrefixFrom(netip.MustParseAddr("::ffff:192.0.2.129"), bits)
+		t.Run(original.String(), func(t *testing.T) {
+			prefixes, err := ParseCIDR(original.String())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var reconstructed netipx.IPSetBuilder
+			for _, prefix := range prefixes {
+				if prefix.Overlaps(mapped) {
+					t.Fatalf("retained IPv6 prefix %v can allocate mapped IPv4 addresses", prefix)
+				}
+				// Only prefixes wholly inside the mapped block represent IPv4.
+				if prefix.Addr().Is4() {
+					if bits < 96 {
+						t.Fatalf("broad IPv6 prefix gained IPv4 prefix %v", prefix)
+					}
+					prefix = netip.PrefixFrom(netip.AddrFrom16(prefix.Addr().As16()), prefix.Bits()+96)
+				}
+				reconstructed.AddPrefix(prefix)
+			}
+			set, err := reconstructed.IPSet()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var expected netipx.IPSetBuilder
+			expected.AddPrefix(original.Masked())
+			if bits < 96 {
+				// Broad IPv6 inputs retain all non-mapped IPv6 addresses,
+				// but must not turn the mapped block into IPv4 capacity.
+				expected.RemovePrefix(mapped)
+			}
+			want, err := expected.IPSet()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(want.Prefixes(), set.Prefixes(), cmpopts.EquateComparable(netip.Prefix{})); diff != "" {
+				t.Fatalf("address coverage changed (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPoolsRejectMappedIPv4Overlap(t *testing.T) {
+	for _, address := range []string{
+		"::ffff:0.0.0.1/128",
+		"::ffff:0.0.0.0/96",
+		"::ffff:0.0.0.0-::ffff:0.0.0.1",
+		"::fffe:ffff:ffff-::1:0:0:0",
+	} {
+		for _, samePool := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/samePool=%t", address, samePool), func(t *testing.T) {
+				resources := ClusterResources{Pools: []v1beta1.IPAddressPool{{
+					ObjectMeta: metav1.ObjectMeta{Name: "first"},
+					Spec: v1beta1.IPAddressPoolSpec{
+						Addresses:     []string{address},
+						AvoidBuggyIPs: true,
+					},
+				}}}
+				if samePool {
+					resources.Pools[0].Spec.Addresses = append(resources.Pools[0].Spec.Addresses, "0.0.0.1/32")
+				} else {
+					resources.Pools = append(resources.Pools, v1beta1.IPAddressPool{
+						ObjectMeta: metav1.ObjectMeta{Name: "second"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"0.0.0.1/32"},
+						},
+					})
+				}
+				cfg, err := For(resources, DontValidate, ForOptions{})
+				if err == nil || !strings.Contains(err.Error(), "overlaps") {
+					t.Fatalf("For() error = %v, want overlapping pool error", err)
+				}
+				if cfg != nil {
+					t.Fatal("For() returned a config with overlapping addresses")
+				}
+			})
+		}
+	}
+}
+
 func FuzzParseCIDR(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input string) {
 		_, _ = ParseCIDR(input)
@@ -4493,7 +4948,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4539,7 +4994,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						L2Advertisements: []*L2Advertisement{
 							{
 								Nodes:            map[string]bool{},
@@ -4585,7 +5040,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4686,7 +5141,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4733,7 +5188,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1000::/64")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1000::/64")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4781,7 +5236,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::/64")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24"), netip.MustParsePrefix("1000::/64")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4856,11 +5311,11 @@ func TestServiceSelectors(t *testing.T) {
 				}
 				return x.String() == y.String()
 			})
-			cidrPerAddressComparer := cmp.Comparer(func(x, y map[string][]*net.IPNet) bool {
+			cidrPerAddressComparer := cmp.Comparer(func(x, y map[string][]netip.Prefix) bool {
 				return true
 			})
 
-			if diff := cmp.Diff(tt.want, got, selectorComparer, cidrPerAddressComparer, cmp.AllowUnexported(Pool{})); diff != "" {
+			if diff := cmp.Diff(tt.want, got, selectorComparer, cidrPerAddressComparer, cmpopts.EquateComparable(netip.Addr{}, netip.Prefix{}), cmp.AllowUnexported(Pool{})); diff != "" {
 				t.Errorf("parse returned wrong result (-want, +got)\n%s", diff)
 			}
 		})
@@ -5105,6 +5560,76 @@ func TestSetL2AdvertisementsToPoolsPreferred(t *testing.T) {
 			sortPreferred(tc.wantPreferred)
 			if diff := cmp.Diff(tc.wantPreferred, gotPreferred); diff != "" {
 				t.Fatalf("pool-a L2Advertisements mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPeerFromCRNormalizesAddresses(t *testing.T) {
+	tests := []struct {
+		name, address, source, iface string
+		wantAddress, wantSource      netip.Addr
+	}{
+		{
+			name:    "IPv4-mapped peer and source",
+			address: "::ffff:192.0.2.1", source: "::ffff:192.0.2.2",
+			wantAddress: netip.MustParseAddr("192.0.2.1"), wantSource: netip.MustParseAddr("192.0.2.2"),
+		},
+		{
+			name: "IPv4 peer with no source", address: "192.0.2.1",
+			wantAddress: netip.MustParseAddr("192.0.2.1"),
+		},
+		{
+			name:    "IPv6 peer and source remain IPv6",
+			address: "2001:db8::1", source: "2001:db8::2",
+			wantAddress: netip.MustParseAddr("2001:db8::1"), wantSource: netip.MustParseAddr("2001:db8::2"),
+		},
+		{name: "unnumbered peer remains unset", iface: "eth0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			peer, err := peerFromCR(v1beta2.BGPPeer{Spec: v1beta2.BGPPeerSpec{
+				MyASN: 64512, ASN: 64513, Address: tt.address, SrcAddress: tt.source, Interface: tt.iface,
+			}}, nil, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if peer.Addr != tt.wantAddress || peer.SrcAddr != tt.wantSource {
+				t.Fatalf("peer/source = (%s, %s), want (%s, %s)", peer.Addr, peer.SrcAddr, tt.wantAddress, tt.wantSource)
+			}
+		})
+	}
+}
+
+func TestPeerFromCRRejectsZones(t *testing.T) {
+	for _, field := range []string{"peer", "source", "routerID"} {
+		t.Run(field, func(t *testing.T) {
+			spec := v1beta2.BGPPeerSpec{MyASN: 64512, ASN: 64513, Address: "2001:db8::1"}
+			switch field {
+			case "peer":
+				spec.Address = "2001:db8::1%eth0"
+			case "source":
+				spec.SrcAddress = "2001:db8::2%eth0"
+			case "routerID":
+				spec.RouterID = "2001:db8::3%eth0"
+			}
+			if _, err := peerFromCR(v1beta2.BGPPeer{Spec: spec}, nil, false); err == nil {
+				t.Fatal("accepted a scoped BGP address")
+			}
+		})
+	}
+}
+
+func TestParseCIDRRejectsZones(t *testing.T) {
+	for _, input := range []string{
+		"2001:db8::1%eth0-2001:db8::2",
+		"2001:db8::1-2001:db8::2%eth0",
+		"2001:db8::1%eth0-2001:db8::2%eth0",
+		"2001:db8::1%eth0-2001:db8::2%eth1",
+	} {
+		t.Run(input, func(t *testing.T) {
+			if got, err := ParseCIDR(input); err == nil {
+				t.Fatalf("accepted scoped range as %v", got)
 			}
 		})
 	}

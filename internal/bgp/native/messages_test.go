@@ -4,7 +4,7 @@ package native
 
 import (
 	"bytes"
-	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,7 +20,7 @@ func TestOpen(t *testing.T) {
 	var b bytes.Buffer
 	wantHold := 4 * time.Second
 	wantASN := uint32(12345)
-	if err := sendOpen(&b, wantASN, net.ParseIP("1.2.3.4"), wantHold); err != nil {
+	if err := sendOpen(&b, wantASN, netip.MustParseAddr("1.2.3.4"), wantHold); err != nil {
 		t.Fatalf("Send open: %s", err)
 	}
 	op, err := readOpen(&b)
@@ -106,7 +106,7 @@ func TestSendUpdate(t *testing.T) {
 		asn         uint32
 		ibgp        bool
 		fbasn       bool
-		nextHop     net.IP
+		nextHop     netip.Addr
 		adv         *bgp.Advertisement
 		errorString string
 	}{
@@ -114,12 +114,9 @@ func TestSendUpdate(t *testing.T) {
 			asn:     65000,
 			ibgp:    false,
 			fbasn:   false,
-			nextHop: net.ParseIP("192.168.123.10"),
+			nextHop: netip.MustParseAddr("192.168.123.10"),
 			adv: &bgp.Advertisement{
-				Prefix: func() *net.IPNet {
-					_, ipnet, _ := net.ParseCIDR("172.16.0.0/24")
-					return ipnet
-				}(),
+				Prefix:    netip.MustParsePrefix("172.16.0.0/24"),
 				LocalPref: 100,
 				Communities: func() []community.BGPCommunity {
 					c1, _ := community.New("0:1234")
@@ -134,12 +131,9 @@ func TestSendUpdate(t *testing.T) {
 			asn:     65000,
 			ibgp:    false,
 			fbasn:   false,
-			nextHop: net.ParseIP("192.168.123.10"),
+			nextHop: netip.MustParseAddr("192.168.123.10"),
 			adv: &bgp.Advertisement{
-				Prefix: func() *net.IPNet {
-					_, ipnet, _ := net.ParseCIDR("172.16.0.0/24")
-					return ipnet
-				}(),
+				Prefix:    netip.MustParsePrefix("172.16.0.0/24"),
 				LocalPref: 100,
 				Communities: func() []community.BGPCommunity {
 					c1, _ := community.New("0:1234")

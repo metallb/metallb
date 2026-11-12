@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"net/netip"
 	"testing"
 
 	"github.com/go-kit/log"
@@ -144,7 +145,10 @@ func TestPoolController(t *testing.T) {
 				t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
 			}
 
-			cmpOpt := cmpopts.IgnoreUnexported(metallbcfg.Pool{})
+			cmpOpt := cmp.Options{
+				cmpopts.IgnoreUnexported(metallbcfg.Pool{}),
+				cmpopts.EquateComparable(netip.Addr{}, netip.Prefix{}),
+			}
 
 			mockHandler := func(l log.Logger, pools *metallbcfg.Pools) SyncState {
 				if !cmp.Equal(expectedCfg.Pools, pools, cmpOpt) {

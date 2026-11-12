@@ -3,7 +3,7 @@
 package frr
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -114,9 +114,9 @@ func TestBFDWithSession(t *testing.T) {
 		bgp.SessionParameters{
 			PeerAddress:   "10.2.2.254",
 			PeerPort:      179,
-			SourceAddress: net.ParseIP("10.1.1.254"),
+			SourceAddress: netip.MustParseAddr("10.1.1.254"),
 			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
+			RouterID:      netip.MustParseAddr("10.1.1.254"),
 			PeerASN:       200,
 			HoldTime:      ptr.To(time.Second),
 			KeepAliveTime: ptr.To(2 * time.Second),

@@ -6,19 +6,21 @@ import (
 	"encoding"
 	"fmt"
 	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/arp"
 	"github.com/mdlayher/ethernet"
+	"github.com/mdlayher/packet"
 )
 
 func TestARPResponder(t *testing.T) {
 	tests := []struct {
 		name           string
 		dstMAC         net.HardwareAddr
-		arpTgt         net.IP
+		arpTgt         netip.Addr
 		arpOp          arp.Operation
 		shouldAnnounce announceFunc
 		reason         dropReason
@@ -44,8 +46,8 @@ func TestARPResponder(t *testing.T) {
 		},
 		{
 			name: "shouldAnnounce denies request",
-			shouldAnnounce: func(ip net.IP, intf string) dropReason {
-				if net.IPv4(192, 168, 1, 20).Equal(ip) {
+			shouldAnnounce: func(ip netip.Addr, intf string) dropReason {
+				if netip.MustParseAddr("192.168.1.20") == ip {
 					return dropReasonNone
 				}
 				return dropReasonError
@@ -54,9 +56,9 @@ func TestARPResponder(t *testing.T) {
 		},
 		{
 			name:   "shouldAnnounce allows request",
-			arpTgt: net.IPv4(192, 168, 1, 20),
-			shouldAnnounce: func(ip net.IP, intf string) dropReason {
-				if net.IPv4(192, 168, 1, 20).Equal(ip) {
+			arpTgt: netip.MustParseAddr("192.168.1.20"),
+			shouldAnnounce: func(ip netip.Addr, intf string) dropReason {
+				if netip.MustParseAddr("192.168.1.20") == ip {
 					return dropReasonNone
 				}
 				return dropReasonError
@@ -69,7 +71,7 @@ func TestARPResponder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			shouldAnnounce := tt.shouldAnnounce
 			if shouldAnnounce == nil {
-				shouldAnnounce = func(net.IP, string) dropReason {
+				shouldAnnounce = func(netip.Addr, string) dropReason {
 					return dropReasonNone
 				}
 			}
@@ -80,8 +82,8 @@ func TestARPResponder(t *testing.T) {
 			if tt.dstMAC == nil {
 				tt.dstMAC = a.hardwareAddr
 			}
-			if tt.arpTgt == nil {
-				tt.arpTgt = net.IPv4(192, 168, 1, 10)
+			if !tt.arpTgt.IsValid() {
+				tt.arpTgt = netip.MustParseAddr("192.168.1.10")
 			}
 			if tt.arpOp == 0 {
 				tt.arpOp = arp.OperationRequest
@@ -92,7 +94,7 @@ func TestARPResponder(t *testing.T) {
 				Source:      net.HardwareAddr{1, 2, 3, 4, 5, 6},
 				EtherType:   ethernet.EtherTypeARP,
 			}
-			pkt, err := arp.NewPacket(tt.arpOp, eth.Source, net.IPv4(192, 168, 1, 1), tt.dstMAC, tt.arpTgt)
+			pkt, err := arp.NewPacket(tt.arpOp, eth.Source, netip.MustParseAddr("192.168.1.1"), tt.dstMAC, tt.arpTgt)
 			if err != nil {
 				t.Fatalf("failed to make ARP packet: %s", err)
 			}
@@ -151,19 +153,18 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpClient, *net.UDP
 			continue
 		}
 
-		var c *arp.Client
-		c, err = arp.New(&intf, pc)
-		if err != nil {
-			t.Fatalf("failed to create ARP client: %s", err)
-		}
-
 		a = &arpClient{
 			logger:       log.NewNopLogger(),
 			hardwareAddr: intf.HardwareAddr,
-			conn:         c,
+			conn:         pc,
 			closed:       make(chan struct{}),
 			announce:     shouldAnnounce,
 		}
+	}
+
+	if a == nil {
+		pc.Close()
+		t.Skip("requires a network interface with a hardware address")
 	}
 
 	uc, err := net.DialUDP("udp", nil, pc.LocalAddr().(*net.UDPAddr))
@@ -176,4 +177,58 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpClient, *net.UDP
 		a.Close()
 		pc.Close()
 	}
+}
+
+// The interface's own IP is not needed: gratuitous packets use the service VIP.
+func TestARPGratuitousWithoutLocalIPv4(t *testing.T) {
+	conn := &testARPWriter{}
+	a := &arpClient{
+		hardwareAddr: net.HardwareAddr{2, 3, 4, 5, 6, 7},
+		conn:         conn,
+	}
+	vip := netip.MustParseAddr("192.0.2.1")
+	if err := a.Gratuitous(vip); err != nil {
+		t.Fatal(err)
+	}
+	if len(conn.frames) != 2 {
+		t.Fatalf("sent %d frames, want 2", len(conn.frames))
+	}
+	for i, operation := range []arp.Operation{arp.OperationRequest, arp.OperationReply} {
+		var frame ethernet.Frame
+		if err := frame.UnmarshalBinary(conn.frames[i]); err != nil {
+			t.Fatal(err)
+		}
+		var pkt arp.Packet
+		if err := pkt.UnmarshalBinary(frame.Payload); err != nil {
+			t.Fatal(err)
+		}
+		if pkt.Operation != operation || pkt.SenderIP != vip || pkt.TargetIP != vip {
+			t.Fatalf("unexpected gratuitous packet: %+v", pkt)
+		}
+		if diff := cmp.Diff(a.hardwareAddr, frame.Source); diff != "" {
+			t.Fatalf("incorrect Ethernet source (-want +got): %s", diff)
+		}
+		if diff := cmp.Diff(ethernet.Broadcast, frame.Destination); diff != "" {
+			t.Fatalf("incorrect Ethernet destination (-want +got): %s", diff)
+		}
+		addr, ok := conn.destinations[i].(*packet.Addr)
+		if !ok {
+			t.Fatalf("socket destination type = %T, want *packet.Addr", conn.destinations[i])
+		}
+		if diff := cmp.Diff(ethernet.Broadcast, addr.HardwareAddr); diff != "" {
+			t.Fatalf("incorrect socket destination (-want +got): %s", diff)
+		}
+	}
+}
+
+type testARPWriter struct {
+	net.PacketConn
+	frames       [][]byte
+	destinations []net.Addr
+}
+
+func (c *testARPWriter) WriteTo(b []byte, addr net.Addr) (int, error) {
+	c.frames = append(c.frames, append([]byte(nil), b...))
+	c.destinations = append(c.destinations, addr)
+	return len(b), nil
 }

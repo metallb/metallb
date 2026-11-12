@@ -5,6 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
@@ -67,6 +68,15 @@ func DiscardFRROnly(c ClusterResources) error {
 		if p.Spec.LocalASN != 0 {
 			return fmt.Errorf("peer %s has localASN set on native bgp mode", p.Spec.Address)
 		}
+		// Native UPDATEs only encode IPv4 next hops, so reject unsupported
+		// transports before replacing existing sessions. Leave malformed or
+		// scoped addresses to peerFromCR for the usual validation errors.
+		if addr, err := netip.ParseAddr(p.Spec.Address); err == nil && addr.Zone() == "" && !addr.Unmap().Is4() {
+			return fmt.Errorf("peer %q has an IPv6 address, native bgp mode only supports IPv4 transport", p.Spec.Address)
+		}
+		if addr, err := netip.ParseAddr(p.Spec.SrcAddress); err == nil && addr.Zone() == "" && !addr.Unmap().Is4() {
+			return fmt.Errorf("peer %q has an IPv6 source address %q, native bgp mode only supports IPv4 transport", p.Spec.Address, p.Spec.SrcAddress)
+		}
 	}
 	if len(c.BFDProfiles) > 0 {
 		return errors.New("bfd profiles section set")
@@ -102,7 +112,7 @@ func findIPv6BGPAdvertisement(c ClusterResources) error {
 				return fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
 			}
 			for _, n := range nets {
-				if n.IP.To4() == nil {
+				if !n.Addr().Unmap().Is4() {
 					return fmt.Errorf("pool %q has ipv6 CIDR %s, native bgp mode does not support ipv6", p.Name, n)
 				}
 			}
