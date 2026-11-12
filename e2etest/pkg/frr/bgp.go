@@ -4,6 +4,7 @@ package frr
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 
 	"errors"
@@ -54,13 +55,13 @@ func NeighborsInfo(exec executor.Executor) (NeighborsMap, error) {
 
 // Routes returns informations about routes in the given executor
 // first for ipv4 routes and then for ipv6 routes.
-func Routes(exec executor.Executor) (map[string]Route, map[string]Route, error) {
+func Routes(exec executor.Executor) (map[netip.Addr]Route, map[netip.Addr]Route, error) {
 	return RoutesForVRF("", exec)
 }
 
 // RoutesForVRF returns informations about routes in the given executor
 // first for ipv4 routes and then for ipv6 routes for the given vrf.
-func RoutesForVRF(vrf string, exec executor.Executor) (map[string]Route, map[string]Route, error) {
+func RoutesForVRF(vrf string, exec executor.Executor) (map[netip.Addr]Route, map[netip.Addr]Route, error) {
 	cmd := "show bgp ipv4 json"
 	if vrf != "" {
 		cmd = fmt.Sprintf("show bgp vrf %s ipv4  json", vrf)
@@ -88,7 +89,7 @@ func RoutesForVRF(vrf string, exec executor.Executor) (map[string]Route, map[str
 	return v4Routes, v6Routes, nil
 }
 
-func RoutesForFamily(exec executor.Executor, family ipfamily.Family) (map[string]Route, error) {
+func RoutesForFamily(exec executor.Executor, family ipfamily.Family) (map[netip.Addr]Route, error) {
 	v4, v6, err := Routes(exec)
 	if err != nil {
 		return nil, err
@@ -103,7 +104,7 @@ func RoutesForFamily(exec executor.Executor, family ipfamily.Family) (map[string
 }
 
 // RoutesForCommunity returns informations about routes in the given executor related to the given community.
-func RoutesForCommunity(exec executor.Executor, communityString string, family ipfamily.Family) (map[string]Route, error) {
+func RoutesForCommunity(exec executor.Executor, communityString string, family ipfamily.Family) (map[netip.Addr]Route, error) {
 	// here we assume the community is formatted properly, and we just count the number
 	// of elements to understand if it's large or not.
 	parts := strings.Split(communityString, ":")
@@ -118,7 +119,7 @@ func RoutesForCommunity(exec executor.Executor, communityString string, family i
 		families = []string{ipfamily.IPv4.String(), ipfamily.IPv6.String()}
 	}
 
-	routes := map[string]Route{}
+	routes := map[netip.Addr]Route{}
 	for _, f := range families {
 		res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s %s %s json", f, communityType, communityString))
 		if err != nil {
@@ -254,6 +255,10 @@ func ContainsCommunity(exec executor.Executor, community string) error {
 
 // LocalPrefForPrefix returns the localPref value for the given prefix.
 func LocalPrefForPrefix(exec executor.Executor, prefix string, family ipfamily.Family) (uint32, error) {
+	addr, err := netip.ParseAddr(prefix)
+	if err != nil {
+		return 0, fmt.Errorf("invalid prefix address %q: %w", prefix, err)
+	}
 	routes, v6Routes, err := Routes(exec)
 	if err != nil {
 		return 0, err
@@ -261,7 +266,7 @@ func LocalPrefForPrefix(exec executor.Executor, prefix string, family ipfamily.F
 	if family == ipfamily.IPv6 {
 		routes = v6Routes
 	}
-	route, ok := routes[prefix]
+	route, ok := routes[addr.Unmap()]
 	if !ok {
 		return 0, fmt.Errorf("prefix %s not found in routes", prefix)
 	}
@@ -270,6 +275,10 @@ func LocalPrefForPrefix(exec executor.Executor, prefix string, family ipfamily.F
 
 // AsPathForPrefix returns the AS Path value for the given prefix.
 func AsPathForPrefix(exec executor.Executor, prefix string, family ipfamily.Family) ([]string, error) {
+	addr, err := netip.ParseAddr(prefix)
+	if err != nil {
+		return nil, fmt.Errorf("invalid prefix address %q: %w", prefix, err)
+	}
 	routes, v6Routes, err := Routes(exec)
 	if err != nil {
 		return nil, err
@@ -277,7 +286,7 @@ func AsPathForPrefix(exec executor.Executor, prefix string, family ipfamily.Fami
 	if family == ipfamily.IPv6 {
 		routes = v6Routes
 	}
-	route, ok := routes[prefix]
+	route, ok := routes[addr.Unmap()]
 	if !ok {
 		return nil, fmt.Errorf("prefix %s not found in routes", prefix)
 	}

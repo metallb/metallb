@@ -5,7 +5,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"reflect"
 	"sort"
@@ -34,14 +34,6 @@ func mustSelector(s string) labels.Selector {
 		panic(err)
 	}
 	return res
-}
-
-func ipnet(s string) *net.IPNet {
-	_, n, err := net.ParseCIDR(s)
-	if err != nil {
-		panic(err)
-	}
-	return n
 }
 
 func statusAssigned(ip string) v1.ServiceStatus {
@@ -280,13 +272,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -357,7 +349,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -434,7 +426,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -507,7 +499,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -596,7 +588,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -631,7 +623,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -666,7 +658,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -677,13 +669,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -731,7 +723,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix:        ipnet("10.20.30.1/32"),
+						Prefix:        netip.MustParsePrefix("10.20.30.1/32"),
 						LocalPref:     100,
 						AsPathPrepend: 3,
 						Communities: func() []community.BGPCommunity {
@@ -741,7 +733,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						}(),
 					},
 					{
-						Prefix:    ipnet("10.20.30.0/24"),
+						Prefix:    netip.MustParsePrefix("10.20.30.0/24"),
 						LocalPref: 1000,
 					},
 				},
@@ -753,13 +745,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -806,7 +798,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix:    ipnet("10.20.30.1/32"),
+						Prefix:    netip.MustParsePrefix("10.20.30.1/32"),
 						LocalPref: 100,
 						Communities: func() []community.BGPCommunity {
 							community1, _ := community.New("0:1234")
@@ -824,13 +816,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				Peers: map[string]*config.Peer{
 					"peer1": {
 						Name:          "peer1",
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -879,7 +871,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix:    ipnet("10.20.30.1/32"),
+						Prefix:    netip.MustParsePrefix("10.20.30.1/32"),
 						LocalPref: 100,
 						Communities: func() []community.BGPCommunity {
 							community1, _ := community.New("0:1234")
@@ -889,7 +881,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						Peers: []string{"peer1"},
 					},
 					{
-						Prefix:    ipnet("10.20.30.0/24"),
+						Prefix:    netip.MustParsePrefix("10.20.30.0/24"),
 						LocalPref: 1000,
 					},
 				},
@@ -901,17 +893,17 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					"peer2": {
-						Addr:          net.ParseIP("1.2.3.5"),
+						Addr:          netip.MustParseAddr("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -947,12 +939,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 				"1.2.3.5": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -985,12 +977,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 				"1.2.3.5": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -1024,18 +1016,18 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 					{
-						Prefix: ipnet("10.20.30.5/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.5/32"),
 					},
 				},
 				"1.2.3.5": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 					{
-						Prefix: ipnet("10.20.30.5/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.5/32"),
 					},
 				},
 			},
@@ -1071,18 +1063,18 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 					// Prefixes duplicated because the dedupe happens
 					// inside the real BGP session.
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 				"1.2.3.5": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -1094,12 +1086,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 				"1.2.3.5": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -1110,13 +1102,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.5"),
+						Addr:          netip.MustParseAddr("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1152,7 +1144,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5": {
 					{
-						Prefix: ipnet("10.20.30.1/32"),
+						Prefix: netip.MustParsePrefix("10.20.30.1/32"),
 					},
 				},
 			},
@@ -1207,7 +1199,7 @@ func TestNodeSelectors(t *testing.T) {
 
 	pools := map[string]*config.Pool{
 		"default": {
-			CIDR: []*net.IPNet{ipnet("1.2.3.0/24")},
+			CIDR: []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 			BGPAdvertisements: []*config.BGPAdvertisement{
 				{
 					AggregationLength: 32,
@@ -1234,7 +1226,7 @@ func TestNodeSelectors(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -1250,11 +1242,11 @@ func TestNodeSelectors(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					"peer2": {
-						Addr: net.ParseIP("2.3.4.5"),
+						Addr: netip.MustParseAddr("2.3.4.5"),
 						NodeSelectors: []labels.Selector{
 							mustSelector("foo=bar"),
 						},
@@ -1303,11 +1295,11 @@ func TestNodeSelectors(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					"peer2": {
-						Addr: net.ParseIP("2.3.4.5"),
+						Addr: netip.MustParseAddr("2.3.4.5"),
 						NodeSelectors: []labels.Selector{
 							mustSelector("foo in (bar, baz)"),
 						},
@@ -1342,11 +1334,11 @@ func TestNodeSelectors(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					"peer2": {
-						Addr: net.ParseIP("2.3.4.5"),
+						Addr: netip.MustParseAddr("2.3.4.5"),
 						NodeSelectors: []labels.Selector{
 							mustSelector("host=frontend"),
 							mustSelector("foo in (bar, baz)"),
@@ -1466,7 +1458,7 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 		cfg := config.Config{
 			Pools: &config.Pools{ByName: map[string]*config.Pool{
 				"default": {
-					CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+					CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 					BGPAdvertisements: []*config.BGPAdvertisement{{
 						Nodes: map[string]bool{
 							"iris1": true,
@@ -1514,7 +1506,7 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 			Status: statusAssigned("10.20.30.1"),
 		}
 
-		lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+		lbIP := netip.MustParseAddr(svc.Status.LoadBalancer.Ingress[0].IP)
 		lbIPStr := lbIP.String()
 
 		nodes := map[string]*v1.Node{
@@ -1535,8 +1527,8 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 			}
 		}
 
-		response1 := c1.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
-		response2 := c2.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
+		response1 := c1.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
+		response2 := c2.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
 		if response1 != test.c1ExpectedResult[lbIPStr] {
 			t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c1ExpectedResult[lbIPStr], response1)
 		}
@@ -1714,18 +1706,18 @@ func TestPeersForService(t *testing.T) {
 				Peers: map[string]*config.Peer{
 					peer1Name: {
 						Name:          peer1Name,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					peer2Name: {
 						Name:          peer2Name,
-						Addr:          net.ParseIP("1.2.3.5"),
+						Addr:          netip.MustParseAddr("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"pool1": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1734,7 +1726,7 @@ func TestPeersForService(t *testing.T) {
 						},
 					},
 					"pool2": {
-						CIDR: []*net.IPNet{ipnet("10.20.40.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.40.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1812,18 +1804,18 @@ func TestPeersForService(t *testing.T) {
 				Peers: map[string]*config.Peer{
 					peer1Name: {
 						Name:          peer1Name,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					peer2Name: {
 						Name:          peer2Name,
-						Addr:          net.ParseIP("1.2.3.5"),
+						Addr:          netip.MustParseAddr("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"pool1": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1833,7 +1825,7 @@ func TestPeersForService(t *testing.T) {
 						},
 					},
 					"pool2": {
-						CIDR: []*net.IPNet{ipnet("10.20.40.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.40.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1883,13 +1875,13 @@ func TestPeersForService(t *testing.T) {
 				Peers: map[string]*config.Peer{
 					peer2Name: {
 						Name:          peer2Name,
-						Addr:          net.ParseIP("1.2.3.5"),
+						Addr:          netip.MustParseAddr("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"pool1": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1899,7 +1891,7 @@ func TestPeersForService(t *testing.T) {
 						},
 					},
 					"pool2": {
-						CIDR: []*net.IPNet{ipnet("10.20.40.0/24")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.40.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -2453,7 +2445,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 			cfg.Pools.ByName["default"].BGPAdvertisements = test.BGPAdvertisements
 			cfg.Peers = map[string]*config.Peer{
 				"peer1": {
-					Addr:          net.ParseIP("1.2.3.4"),
+					Addr:          netip.MustParseAddr("1.2.3.4"),
 					NodeSelectors: []labels.Selector{labels.Everything()},
 				},
 			}
@@ -2461,7 +2453,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 				t.Errorf("SetConfig failed")
 			}
 
-			lbIP := net.ParseIP(test.svc.Status.LoadBalancer.Ingress[0].IP)
+			lbIP := netip.MustParseAddr(test.svc.Status.LoadBalancer.Ingress[0].IP)
 			eps := []discovery.EndpointSlice{
 				{
 					Endpoints: []discovery.Endpoint{
@@ -2480,7 +2472,7 @@ func TestShouldAnnounceBGPServiceSelectors(t *testing.T) {
 				},
 			}
 
-			response := c.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nodes)
+			response := c.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nodes)
 			if response != test.expected {
 				t.Errorf("expected %q, got %q", test.expected, response)
 			}

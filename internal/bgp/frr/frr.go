@@ -4,7 +4,7 @@ package frr
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"sort"
 	"strconv"
@@ -246,7 +246,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				ipV6Prefixes: make(map[string]string),
 				vrf:          s.VRFName,
 			}
-			if s.RouterID != nil {
+			if s.RouterID.IsValid() {
 				rout.routerID = s.RouterID.String()
 			}
 			routers[routerName] = rout
@@ -254,7 +254,8 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 
 		neighborName := NeighborName(s.PeerAddress, s.PeerInterface, s.PeerASN, s.DynamicASN, s.VRFName)
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
-			family := ipfamily.ForAddress(net.ParseIP(s.PeerAddress))
+			addr, _ := netip.ParseAddr(s.PeerAddress)
+			family := ipfamily.ForAddress(addr)
 
 			if s.PeerInterface != "" || s.DualStackAddressFamily {
 				family = ipfamily.DualStack
@@ -299,7 +300,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				CommunityPrefixModifiers: make(map[string]CommunityPrefixList),
 				LocalPrefPrefixModifiers: make(map[string]LocalPrefPrefixList),
 			}
-			if s.SourceAddress != nil {
+			if s.SourceAddress.IsValid() {
 				neighbor.SrcAddr = s.SourceAddress.String()
 			}
 
@@ -308,7 +309,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 
 		for _, adv := range s.advertised {
 			prefix := adv.Prefix.String()
-			family := ipfamily.ForAddress(adv.Prefix.IP)
+			family := ipfamily.ForAddress(adv.Prefix.Addr())
 
 			if neighbor.IPFamily != family &&
 				neighbor.IPFamily != ipfamily.DualStack {

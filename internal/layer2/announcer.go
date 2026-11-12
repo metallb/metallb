@@ -5,6 +5,7 @@ package layer2
 import (
 	"maps"
 	"net"
+	"net/netip"
 	"os"
 	"regexp"
 	"slices"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"go.universe.tf/metallb/internal/netutil"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -21,7 +23,7 @@ import (
 // uses. It exists so the ARP responders can be replaced with fakes in tests.
 type arpResponder interface {
 	Interface() string
-	Gratuitous(ip net.IP) error
+	Gratuitous(ip netip.Addr) error
 	Close() error
 }
 
@@ -29,9 +31,9 @@ type arpResponder interface {
 // uses. It exists so the NDP responders can be replaced with fakes in tests.
 type ndpResponder interface {
 	Interface() string
-	Gratuitous(ip net.IP) error
-	Watch(ip net.IP) error
-	Unwatch(ip net.IP) error
+	Gratuitous(ip netip.Addr) error
+	Watch(ip netip.Addr) error
+	Unwatch(ip netip.Addr) error
 	Close() error
 }
 
@@ -44,7 +46,7 @@ type Announce struct {
 	arps           map[int]arpResponder
 	ndps           map[int]ndpResponder
 	ips            map[string][]IPAdvertisement // svcName -> IPAdvertisements
-	ipRefcnt       map[string]int               // ip.String() -> number of uses
+	ipRefcnt       map[netip.Addr]int
 
 	// This channel can block - do not write to it while holding the mutex
 	// to avoid deadlocking.
@@ -62,7 +64,7 @@ func New(l log.Logger, excludeRegexp *regexp.Regexp, gratuitousARPInterval time.
 		arps:           map[int]arpResponder{},
 		ndps:           map[int]ndpResponder{},
 		ips:            map[string][]IPAdvertisement{},
-		ipRefcnt:       map[string]int{},
+		ipRefcnt:       map[netip.Addr]int{},
 		spamCh:         make(chan IPAdvertisement, 1024),
 		excludeRegexp:  excludeRegexp,
 	}
@@ -131,11 +133,11 @@ func (a *Announce) updateInterfaces() {
 		}
 
 		for _, a := range addrs {
-			ipaddr, ok := a.(*net.IPNet)
+			ip, ok := netutil.AddrFromNetAddr(a)
 			if !ok {
 				continue
 			}
-			if ipaddr.IP.To4() != nil || !ipaddr.IP.IsLinkLocalUnicast() {
+			if ip.Is4() || !ip.IsLinkLocalUnicast() {
 				continue
 			}
 			keepNDP[ifi.Index] = true
@@ -186,7 +188,7 @@ func (a *Announce) spamLoop() {
 		until time.Time
 		IPAdvertisement
 	}
-	m := map[string]timedSpam{}
+	m := map[netip.Addr]timedSpam{}
 	// We can't create a stopped ticker, so create one with a big period to avoid ticking for nothing
 	ticker := time.NewTicker(time.Hour)
 	ticker.Stop()
@@ -197,20 +199,20 @@ func (a *Announce) spamLoop() {
 				// See https://github.com/metallb/metallb/issues/172 for the 1100 choice.
 				ticker.Reset(1100 * time.Millisecond)
 			}
-			ipStr := s.ip.String()
-			_, ok := m[ipStr]
+			ip := s.ip
+			_, ok := m[ip]
 			// Set spam stop time to 5 seconds from now.
-			m[ipStr] = timedSpam{time.Now().Add(5 * time.Second), s}
+			m[ip] = timedSpam{time.Now().Add(5 * time.Second), s}
 			if !ok {
 				// Spam right away to avoid waiting up to 1100 milliseconds even if
 				// it means we call gratuitous() twice in a row in a short amount of time.
 				a.gratuitous(s)
 			}
 		case now := <-ticker.C:
-			for ipStr, tSpam := range m {
+			for ip, tSpam := range m {
 				if now.After(tSpam.until) {
 					// We have spammed enough - remove the IP from the map.
-					delete(m, ipStr)
+					delete(m, ip)
 				} else {
 					a.gratuitous(tSpam.IPAdvertisement)
 				}
@@ -249,17 +251,17 @@ func (a *Announce) mergedAdvertisementsPerIP() []IPAdvertisement {
 	a.RLock()
 	defer a.RUnlock()
 
-	merged := map[string]IPAdvertisement{}
+	merged := map[netip.Addr]IPAdvertisement{}
 	for _, ipAdvs := range a.ips {
 		for _, adv := range ipAdvs {
-			ipStr := adv.ip.String()
-			existing, ok := merged[ipStr]
+			ip := adv.ip
+			existing, ok := merged[ip]
 			if !ok {
 				m := adv
 				if !m.allInterfaces {
 					m.interfaces = m.interfaces.Clone()
 				}
-				merged[ipStr] = m
+				merged[ip] = m
 				continue
 			}
 			if existing.allInterfaces {
@@ -271,7 +273,7 @@ func (a *Announce) mergedAdvertisementsPerIP() []IPAdvertisement {
 			} else {
 				existing.interfaces = existing.interfaces.Union(adv.interfaces)
 			}
-			merged[ipStr] = existing
+			merged[ip] = existing
 		}
 	}
 
@@ -283,13 +285,13 @@ func (a *Announce) gratuitous(adv IPAdvertisement) {
 	defer a.RUnlock()
 
 	ip := adv.ip
-	if a.ipRefcnt[ip.String()] <= 0 {
+	if a.ipRefcnt[ip] <= 0 {
 		// We've lost control of the IP, someone else is
 		// doing announcements.
 		return
 	}
 
-	if ip.To4() != nil {
+	if ip.Is4() {
 		for _, client := range a.arps {
 			if !adv.matchInterface(client.Interface()) {
 				level.Debug(a.logger).Log("op", "gratuitousAnnounce", "skip interfaces", client.Interface())
@@ -312,13 +314,13 @@ func (a *Announce) gratuitous(adv IPAdvertisement) {
 	}
 }
 
-func (a *Announce) shouldAnnounce(ip net.IP, intf string) dropReason {
+func (a *Announce) shouldAnnounce(ip netip.Addr, intf string) dropReason {
 	a.RLock()
 	defer a.RUnlock()
 	ipFound := false
 	for _, ipAdvertisements := range a.ips {
 		for _, i := range ipAdvertisements {
-			if i.ip.Equal(ip) {
+			if i.ip == ip {
 				ipFound = true
 				if i.matchInterface(intf) {
 					return dropReasonNone
@@ -343,7 +345,7 @@ func (a *Announce) SetBalancer(name string, adv IPAdvertisement) {
 	// times, so just no-op any subsequent requests.
 	if ipAdvertisements, ok := a.ips[name]; ok {
 		for i := range ipAdvertisements {
-			if adv.ip.Equal(a.ips[name][i].ip) {
+			if adv.ip == a.ips[name][i].ip {
 				a.ips[name][i] = adv // override in case the interface list changed
 				return
 			}
@@ -351,8 +353,8 @@ func (a *Announce) SetBalancer(name string, adv IPAdvertisement) {
 	}
 	a.ips[name] = append(a.ips[name], adv)
 
-	a.ipRefcnt[adv.ip.String()]++
-	if a.ipRefcnt[adv.ip.String()] > 1 {
+	a.ipRefcnt[adv.ip]++
+	if a.ipRefcnt[adv.ip] > 1 {
 		// Multiple services are using this IP, so there's nothing
 		// else to do right now.
 		return
@@ -377,8 +379,8 @@ func (a *Announce) DeleteBalancer(name string) {
 	delete(a.ips, name)
 
 	for _, cur := range advs {
-		a.ipRefcnt[cur.ip.String()]--
-		if a.ipRefcnt[cur.ip.String()] > 0 {
+		a.ipRefcnt[cur.ip]--
+		if a.ipRefcnt[cur.ip] > 0 {
 			// Another service is still using this IP, don't touch any
 			// more things.
 			continue

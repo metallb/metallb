@@ -16,6 +16,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"sync"
@@ -246,12 +247,17 @@ func (sl *SpeakerList) joinMembers() {
 	}
 }
 
-func (sl *SpeakerList) members() map[string]struct{} {
-	members := make(map[string]struct{})
+// members returns member addresses in netip form. Unmap at this boundary to
+// match net.IP.String(), which renders IPv4-mapped IPv6 addresses as IPv4.
+func (sl *SpeakerList) members() map[netip.Addr]struct{} {
+	members := make(map[netip.Addr]struct{})
 
 	for _, node := range sl.ml.Members() {
-		ip := node.Addr.String()
-		members[ip] = struct{}{}
+		ip, ok := netip.AddrFromSlice(node.Addr)
+		if !ok {
+			continue
+		}
+		members[ip.Unmap()] = struct{}{}
 	}
 
 	return members
@@ -271,9 +277,13 @@ func (sl *SpeakerList) mlJoin() {
 
 	for _, ip := range sl.mlSpeakerIPs {
 		// If an IP is not a member of the cluster, add it to joinIPs.
-		if _, isMember := members[ip]; !isMember {
-			joinIPs = append(joinIPs, ip)
+		addr, err := netip.ParseAddr(ip)
+		if err == nil {
+			if _, isMember := members[addr.Unmap()]; isMember {
+				continue
+			}
 		}
+		joinIPs = append(joinIPs, ip)
 	}
 
 	if len(joinIPs) == 0 {

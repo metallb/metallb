@@ -4,7 +4,7 @@ package controllers
 
 import (
 	"context"
-	"net"
+	"net/netip"
 
 	"github.com/go-kit/log"
 	. "github.com/onsi/ginkgo/v2"
@@ -89,7 +89,7 @@ var _ = Describe("Layer2StatusReconciler stale resourceVersion", func() {
 			SpeakerPod: speakerPod,
 			StatusFetcher: func(types.NamespacedName) []layer2.IPAdvertisement {
 				return []layer2.IPAdvertisement{
-					layer2.NewIPAdvertisement(net.IP("127.0.0.9"), true, sets.Set[string]{}),
+					layer2.NewIPAdvertisement(netip.MustParseAddr("127.0.0.9"), true, sets.Set[string]{}),
 				}
 			},
 		}

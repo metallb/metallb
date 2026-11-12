@@ -3,13 +3,14 @@
 package config
 
 import (
-	"net"
+	"net/netip"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
@@ -26,14 +27,6 @@ func selector(s string) labels.Selector {
 		panic(err)
 	}
 	return ret
-}
-
-func ipnet(s string) *net.IPNet {
-	_, n, err := net.ParseCIDR(s)
-	if err != nil {
-		panic(err)
-	}
-	return n
 }
 
 func TestParse(t *testing.T) {
@@ -231,13 +224,13 @@ func TestParse(t *testing.T) {
 						Name:                  "peer1",
 						MyASN:                 42,
 						ASN:                   142,
-						Addr:                  net.ParseIP("1.2.3.4"),
-						SrcAddr:               net.ParseIP("10.20.30.40"),
+						Addr:                  netip.MustParseAddr("1.2.3.4"),
+						SrcAddr:               netip.MustParseAddr("10.20.30.40"),
 						Port:                  1179,
 						HoldTime:              ptr.To(180 * time.Second),
 						KeepaliveTime:         ptr.To(60 * time.Second),
 						ConnectTime:           ptr.To(time.Second),
-						RouterID:              net.ParseIP("10.20.30.40"),
+						RouterID:              netip.MustParseAddr("10.20.30.40"),
 						NodeSelectors:         []labels.Selector{labels.Everything()},
 						EnableGracefulRestart: true,
 						EBGPMultiHop:          true,
@@ -247,7 +240,7 @@ func TestParse(t *testing.T) {
 						Name:                  "peer2",
 						MyASN:                 100,
 						ASN:                   200,
-						Addr:                  net.ParseIP("2.3.4.5"),
+						Addr:                  netip.MustParseAddr("2.3.4.5"),
 						ConnectTime:           ptr.To(time.Second),
 						NodeSelectors:         []labels.Selector{selector("bar in (quux),foo=bar")},
 						EnableGracefulRestart: false,
@@ -257,7 +250,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:          "pool1",
-						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						CIDR:          []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16"), netip.MustParsePrefix("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
 						AutoAssign:    false,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -291,7 +284,7 @@ func TestParse(t *testing.T) {
 					},
 					"pool2": {
 						Name:       "pool2",
-						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("30.0.0.0/8")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -309,19 +302,19 @@ func TestParse(t *testing.T) {
 					},
 					"pool3": {
 						Name: "pool3",
-						CIDR: []*net.IPNet{
-							ipnet("40.0.0.0/25"),
-							ipnet("40.0.0.150/31"),
-							ipnet("40.0.0.152/29"),
-							ipnet("40.0.0.160/27"),
-							ipnet("40.0.0.192/29"),
-							ipnet("40.0.0.200/32"),
-							ipnet("40.0.0.210/31"),
-							ipnet("40.0.0.212/30"),
-							ipnet("40.0.0.216/29"),
-							ipnet("40.0.0.224/28"),
-							ipnet("40.0.0.240/32"),
-							ipnet("40.0.0.250/32"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("40.0.0.0/25"),
+							netip.MustParsePrefix("40.0.0.150/31"),
+							netip.MustParsePrefix("40.0.0.152/29"),
+							netip.MustParsePrefix("40.0.0.160/27"),
+							netip.MustParsePrefix("40.0.0.192/29"),
+							netip.MustParsePrefix("40.0.0.200/32"),
+							netip.MustParsePrefix("40.0.0.210/31"),
+							netip.MustParsePrefix("40.0.0.212/30"),
+							netip.MustParsePrefix("40.0.0.216/29"),
+							netip.MustParsePrefix("40.0.0.224/28"),
+							netip.MustParsePrefix("40.0.0.240/32"),
+							netip.MustParsePrefix("40.0.0.250/32"),
 						},
 						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
@@ -331,7 +324,7 @@ func TestParse(t *testing.T) {
 					},
 					"pool4": {
 						Name: "pool4",
-						CIDR: []*net.IPNet{ipnet("2001:db8::/64")},
+						CIDR: []netip.Prefix{netip.MustParsePrefix("2001:db8::/64")},
 						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
 							AllInterfaces: true,
@@ -405,20 +398,20 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:               "pool1",
-						CIDR:               []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16"), netip.MustParsePrefix("10.50.0.0/24")},
 						AvoidBuggyIPs:      true,
 						AutoAssign:         false,
 						ServiceAllocations: &ServiceAllocation{Priority: 1, Namespaces: sets.Set[string]{"test-ns1": {}}},
 					},
 					"pool2": {
 						Name:               "pool2",
-						CIDR:               []*net.IPNet{ipnet("30.0.0.0/8")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("30.0.0.0/8")},
 						AutoAssign:         true,
 						ServiceAllocations: &ServiceAllocation{Priority: 2, Namespaces: sets.Set[string]{"test-ns2": {}}},
 					},
 					"pool3": {
 						Name:               "pool3",
-						CIDR:               []*net.IPNet{ipnet("40.0.0.0/8")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("40.0.0.0/8")},
 						AutoAssign:         true,
 						ServiceAllocations: &ServiceAllocation{Priority: 3, Namespaces: sets.Set[string]{}},
 					},
@@ -528,13 +521,13 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:               "pool1",
-						CIDR:               []*net.IPNet{ipnet("30.0.0.0/8")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("30.0.0.0/8")},
 						AutoAssign:         true,
 						ServiceAllocations: &ServiceAllocation{Priority: 2, ServiceSelectors: []labels.Selector{selector("team=metallb")}},
 					},
 					"pool2": {
 						Name:               "pool2",
-						CIDR:               []*net.IPNet{ipnet("40.0.0.0/8")},
+						CIDR:               []netip.Prefix{netip.MustParsePrefix("40.0.0.0/8")},
 						AutoAssign:         true,
 						ServiceAllocations: &ServiceAllocation{Priority: 3, ServiceSelectors: []labels.Selector{selector("team=red")}},
 					},
@@ -620,14 +613,14 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("30.0.0.0/8")},
 						AutoAssign: true,
 						ServiceAllocations: &ServiceAllocation{Priority: 2, Namespaces: sets.New("test-ns1"),
 							ServiceSelectors: []labels.Selector{selector("testsvc-1=1")}},
 					},
 					"pool2": {
 						Name:       "pool2",
-						CIDR:       []*net.IPNet{ipnet("40.0.0.0/8")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("40.0.0.0/8")},
 						AutoAssign: true,
 						ServiceAllocations: &ServiceAllocation{Priority: 3, Namespaces: sets.New("test-ns2"),
 							ServiceSelectors: []labels.Selector{selector("testsvc-2=2")}},
@@ -665,7 +658,7 @@ func TestParse(t *testing.T) {
 					ByName: map[string]*Pool{
 						"pool1": {
 							Name:               "pool1",
-							CIDR:               []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+							CIDR:               []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16"), netip.MustParsePrefix("10.50.0.0/24")},
 							AvoidBuggyIPs:      true,
 							AutoAssign:         false,
 							ServiceAllocations: &ServiceAllocation{Priority: 1, ServiceSelectors: []labels.Selector{labels.Everything()}},
@@ -701,7 +694,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -825,7 +818,7 @@ func TestParse(t *testing.T) {
 						ASN:           42,
 						HoldTime:      ptr.To(180 * time.Second),
 						KeepaliveTime: ptr.To(60 * time.Second),
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -860,7 +853,7 @@ func TestParse(t *testing.T) {
 						ASN:           42,
 						HoldTime:      ptr.To(180 * time.Second),
 						KeepaliveTime: ptr.To(60 * time.Second),
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -896,7 +889,7 @@ func TestParse(t *testing.T) {
 						ASN:           42,
 						HoldTime:      ptr.To(0 * time.Second),
 						KeepaliveTime: ptr.To(0 * time.Second),
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -928,7 +921,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -974,7 +967,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -1217,7 +1210,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv3",
@@ -1259,7 +1252,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv3",
@@ -1403,8 +1396,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1474,8 +1467,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1554,8 +1547,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1624,8 +1617,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1734,8 +1727,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1807,9 +1800,9 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
-							ipnet("2001:db8::/64"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
+							netip.MustParsePrefix("2001:db8::/64"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1890,8 +1883,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1962,8 +1955,8 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("10.20.30.40/24"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("10.20.30.0/24"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -2018,20 +2011,20 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR: []*net.IPNet{
-							ipnet("3.3.3.2/31"),
-							ipnet("3.3.3.4/30"),
-							ipnet("3.3.3.8/29"),
-							ipnet("3.3.3.16/28"),
-							ipnet("3.3.3.32/27"),
-							ipnet("3.3.3.64/26"),
-							ipnet("3.3.3.128/26"),
-							ipnet("3.3.3.192/27"),
-							ipnet("3.3.3.224/28"),
-							ipnet("3.3.3.240/29"),
-							ipnet("3.3.3.248/30"),
-							ipnet("3.3.3.252/31"),
-							ipnet("3.3.3.254/32"),
+						CIDR: []netip.Prefix{
+							netip.MustParsePrefix("3.3.3.2/31"),
+							netip.MustParsePrefix("3.3.3.4/30"),
+							netip.MustParsePrefix("3.3.3.8/29"),
+							netip.MustParsePrefix("3.3.3.16/28"),
+							netip.MustParsePrefix("3.3.3.32/27"),
+							netip.MustParsePrefix("3.3.3.64/26"),
+							netip.MustParsePrefix("3.3.3.128/26"),
+							netip.MustParsePrefix("3.3.3.192/27"),
+							netip.MustParsePrefix("3.3.3.224/28"),
+							netip.MustParsePrefix("3.3.3.240/29"),
+							netip.MustParsePrefix("3.3.3.248/30"),
+							netip.MustParsePrefix("3.3.3.252/31"),
+							netip.MustParsePrefix("3.3.3.254/32"),
 						},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -2430,7 +2423,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						BFDProfile:    "default",
 					},
@@ -2439,7 +2432,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv3",
@@ -2542,7 +2535,7 @@ func TestParse(t *testing.T) {
 						Name:           "peer1",
 						MyASN:          42,
 						ASN:            42,
-						Addr:           net.ParseIP("1.2.3.4"),
+						Addr:           netip.MustParseAddr("1.2.3.4"),
 						Port:           179,
 						NodeSelectors:  []labels.Selector{labels.Everything()},
 						BFDProfile:     "",
@@ -2603,7 +2596,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						Port:          179,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						PasswordRef: corev1.SecretReference{
@@ -2642,7 +2635,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						Port:          179,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						PasswordRef: corev1.SecretReference{
@@ -2767,7 +2760,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv3",
@@ -2937,7 +2930,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           142,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						Port:          1179,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						BFDProfile:    "with-echo"},
@@ -2945,7 +2938,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("1.2.3.4/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3056,12 +3049,12 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           142,
-						Addr:          net.ParseIP("1.2.3.4"),
-						SrcAddr:       net.ParseIP("10.20.30.40"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
+						SrcAddr:       netip.MustParseAddr("10.20.30.40"),
 						Port:          1179,
 						HoldTime:      ptr.To(180 * time.Second),
 						KeepaliveTime: ptr.To(60 * time.Second),
-						RouterID:      net.ParseIP("10.20.30.40"),
+						RouterID:      netip.MustParseAddr("10.20.30.40"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  true,
 						VRF:           "foo",
@@ -3070,7 +3063,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:          "pool1",
-						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						CIDR:          []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16"), netip.MustParsePrefix("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
 						AutoAssign:    false,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -3183,7 +3176,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3202,7 +3195,7 @@ func TestParse(t *testing.T) {
 					},
 					"pool2": {
 						Name:       "pool2",
-						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("30.0.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3259,7 +3252,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign: true,
 						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
@@ -3474,14 +3467,14 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:              "pool1",
-						CIDR:              []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:              []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign:        true,
 						BGPAdvertisements: nil,
 						L2Advertisements:  nil,
 					},
 					"pool2": {
 						Name:              "pool2",
-						CIDR:              []*net.IPNet{ipnet("30.0.0.0/16")},
+						CIDR:              []netip.Prefix{netip.MustParsePrefix("30.0.0.0/16")},
 						AutoAssign:        true,
 						BGPAdvertisements: nil,
 						L2Advertisements:  nil,
@@ -3587,7 +3580,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3607,7 +3600,7 @@ func TestParse(t *testing.T) {
 					},
 					"pool2": {
 						Name:       "pool2",
-						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("30.0.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3835,7 +3828,7 @@ func TestParse(t *testing.T) {
 				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
 						Name:       "pool1",
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("10.20.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -3909,7 +3902,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -3918,7 +3911,7 @@ func TestParse(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -3958,7 +3951,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						DynamicASN:    "internal",
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  false,
 					},
@@ -4084,7 +4077,7 @@ func TestParse(t *testing.T) {
 						Name:                   "peer1",
 						MyASN:                  42,
 						ASN:                    142,
-						Addr:                   net.ParseIP("1.2.3.4"),
+						Addr:                   netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors:          []labels.Selector{labels.Everything()},
 						DisableMP:              true,
 						DualStackAddressFamily: false,
@@ -4117,7 +4110,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         100,
 						ASN:           200,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          netip.MustParseAddr("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						LocalASN:      65410,
 					},
@@ -4187,11 +4180,11 @@ func TestParse(t *testing.T) {
 				return x.String() == y.String()
 			})
 			// We don't care about comparing cidrPerAddress as it's calculated
-			cidrPerAddressComparer := cmp.Comparer(func(x, y map[string][]*net.IPNet) bool {
+			cidrPerAddressComparer := cmp.Comparer(func(x, y map[string][]netip.Prefix) bool {
 				return true
 			})
 
-			if diff := cmp.Diff(test.want, got, selectorComparer, cidrPerAddressComparer, cmp.AllowUnexported(Pool{})); diff != "" {
+			if diff := cmp.Diff(test.want, got, selectorComparer, cidrPerAddressComparer, cmpopts.EquateComparable(netip.Addr{}, netip.Prefix{}), cmp.AllowUnexported(Pool{})); diff != "" {
 				t.Errorf("%q: parse returned wrong result (-want, +got)\n%s", test.desc, diff)
 			}
 		})
@@ -4493,7 +4486,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4539,7 +4532,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						L2Advertisements: []*L2Advertisement{
 							{
 								Nodes:            map[string]bool{},
@@ -4585,7 +4578,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4686,7 +4679,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4733,7 +4726,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1000::/64")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1000::/64")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4781,7 +4774,7 @@ func TestServiceSelectors(t *testing.T) {
 					"pool1": {
 						Name:       "pool1",
 						AutoAssign: true,
-						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::/64")},
+						CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24"), netip.MustParsePrefix("1000::/64")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								Name:                "adv1",
@@ -4856,11 +4849,11 @@ func TestServiceSelectors(t *testing.T) {
 				}
 				return x.String() == y.String()
 			})
-			cidrPerAddressComparer := cmp.Comparer(func(x, y map[string][]*net.IPNet) bool {
+			cidrPerAddressComparer := cmp.Comparer(func(x, y map[string][]netip.Prefix) bool {
 				return true
 			})
 
-			if diff := cmp.Diff(tt.want, got, selectorComparer, cidrPerAddressComparer, cmp.AllowUnexported(Pool{})); diff != "" {
+			if diff := cmp.Diff(tt.want, got, selectorComparer, cidrPerAddressComparer, cmpopts.EquateComparable(netip.Addr{}, netip.Prefix{}), cmp.AllowUnexported(Pool{})); diff != "" {
 				t.Errorf("parse returned wrong result (-want, +got)\n%s", diff)
 			}
 		})

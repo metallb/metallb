@@ -3,47 +3,59 @@
 package iprange
 
 import (
-	"bytes"
 	"fmt"
-	"net"
+	"net/netip"
 	"strings"
 
-	"github.com/mikioh/ipaddr"
+	"go4.org/netipx"
 )
 
-func Parse(cidr string) ([]*net.IPNet, error) {
+func Parse(cidr string) ([]netip.Prefix, error) {
 	if !strings.Contains(cidr, "-") {
-		_, n, err := net.ParseCIDR(cidr)
+		n, err := netip.ParsePrefix(cidr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q", cidr)
 		}
-		return []*net.IPNet{n}, nil
+		n, err = normalizePrefix(n)
+		if err != nil {
+			return nil, fmt.Errorf("invalid CIDR %q: %w", cidr, err)
+		}
+		return []netip.Prefix{n.Masked()}, nil
 	}
 
 	fs := strings.SplitN(cidr, "-", 2)
 	if len(fs) != 2 {
 		return nil, fmt.Errorf("invalid IP range %q", cidr)
 	}
-	start := net.ParseIP(strings.TrimSpace(fs[0]))
-	if start == nil {
+	start, err := netip.ParseAddr(strings.TrimSpace(fs[0]))
+	if err != nil {
 		return nil, fmt.Errorf("invalid IP range %q: invalid start IP %q", cidr, fs[0])
 	}
-	end := net.ParseIP(strings.TrimSpace(fs[1]))
-	if end == nil {
+	end, err := netip.ParseAddr(strings.TrimSpace(fs[1]))
+	if err != nil {
 		return nil, fmt.Errorf("invalid IP range %q: invalid end IP %q", cidr, fs[1])
 	}
 
-	if bytes.Compare(start, end) > 0 {
+	start = start.Unmap()
+	end = end.Unmap()
+	if start.Is4() != end.Is4() {
+		return nil, fmt.Errorf("invalid IP range %q: start and end IPs must be the same family", cidr)
+	}
+	if start.Compare(end) > 0 {
 		return nil, fmt.Errorf("invalid IP range %q: start IP %q is after the end IP %q", cidr, start, end)
 	}
 
-	var ret []*net.IPNet
-	for _, pfx := range ipaddr.Summarize(start, end) {
-		n := &net.IPNet{
-			IP:   pfx.IP,
-			Mask: pfx.Mask,
-		}
-		ret = append(ret, n)
+	return netipx.IPRangeFrom(start, end).Prefixes(), nil
+}
+
+// normalizePrefix converts IPv4-mapped IPv6 prefixes to their IPv4 form.
+func normalizePrefix(prefix netip.Prefix) (netip.Prefix, error) {
+	addr := prefix.Addr()
+	if !addr.Is4In6() {
+		return prefix, nil
 	}
-	return ret, nil
+	if prefix.Bits() < 96 {
+		return netip.Prefix{}, fmt.Errorf("IPv4-mapped prefix length %d is shorter than 96", prefix.Bits())
+	}
+	return netip.PrefixFrom(addr.Unmap(), prefix.Bits()-96), nil
 }

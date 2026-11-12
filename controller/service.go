@@ -16,7 +16,7 @@ package main
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"reflect"
 	"sort"
 	"strings"
@@ -47,7 +47,7 @@ const (
 var ErrConverge = fmt.Errorf("failed to converge")
 
 func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) error {
-	lbIPs := []net.IP{}
+	lbIPs := []netip.Addr{}
 	var err error
 	// Not a LoadBalancer, early exit. It might have been a balancer
 	// in the past, so we still need to clear LB state.
@@ -80,7 +80,13 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	for i := range svc.Status.LoadBalancer.Ingress {
 		ip := svc.Status.LoadBalancer.Ingress[i].IP
 		if len(ip) != 0 {
-			lbIPs = append(lbIPs, net.ParseIP(ip))
+			lbIP, parseErr := netip.ParseAddr(ip)
+			if parseErr != nil {
+				level.Error(l).Log("event", "clearAssignment", "reason", "invalidLBIP", "ip", ip, "error", parseErr)
+				c.clearServiceState(key, svc)
+				return ErrConverge
+			}
+			lbIPs = append(lbIPs, lbIP.Unmap())
 		}
 	}
 
@@ -114,7 +120,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		// (this should not happen since the "ipFamily" of a service is immutable)
 		if serviceFamilyChanged(lbIPsIPFamily, clusterIPsIPFamily, familyPolicy) {
 			c.clearServiceState(key, svc)
-			lbIPs = []net.IP{}
+			lbIPs = []netip.Addr{}
 		}
 	}
 
@@ -128,7 +134,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			level.Info(l).Log("event", "clearAssignment", "error", err, "msg", "current IP not allowed by config, clearing")
 			c.client.Infof(svc, "ClearAssignment", "current IP for %q not allowed by config, will attempt for new IP assignment: %s", key, err)
 			c.clearServiceState(key, svc)
-			lbIPs = []net.IP{}
+			lbIPs = []netip.Addr{}
 		}
 
 		// The user might also have changed the pool annotation, and
@@ -138,7 +144,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if len(lbIPs) != 0 && desiredPool != "" && c.ips.Pool(key) != desiredPool {
 			level.Info(l).Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
 			c.clearServiceState(key, svc)
-			lbIPs = []net.IP{}
+			lbIPs = []netip.Addr{}
 		}
 		// User set or changed the desired LB IP(s), nuke the
 		// state. allocateIP will pay attention to LoadBalancerIP(s) and try
@@ -152,7 +158,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if len(desiredLbIPs) > 0 && !isEqualIPs(lbIPs, desiredLbIPs) {
 			level.Info(l).Log("event", "clearAssignment", "reason", "differentIPRequested", "msg", "user requested a different IP than the one currently assigned")
 			c.clearServiceState(key, svc)
-			lbIPs = []net.IP{}
+			lbIPs = []netip.Addr{}
 		}
 	}
 
@@ -165,7 +171,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if err != nil {
 			c.client.Infof(svc, "AdditionalAssignFailed", "cannot assign additional IP in PreferDualStack: %s", err)
 		}
-		if newIP != nil {
+		if newIP.IsValid() {
 			lbIPs = append(lbIPs, newIP)
 			level.Info(l).Log("event", "ipAllocated", "ip", newIP, "msg", "Additional IP address assigned by controller")
 			c.client.Infof(svc, "IPAllocated", "Assigned additional IP %q", newIP)
@@ -258,7 +264,7 @@ func (c *controller) clearServiceState(key string, svc *v1.Service) {
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
 }
 
-func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) {
+func (c *controller) allocateIPs(key string, svc *v1.Service) ([]netip.Addr, error) {
 	if len(svc.Spec.ClusterIPs) == 0 && svc.Spec.ClusterIP == "" {
 		// (we should never get here because the caller ensured that Spec.ClusterIP != nil)
 		return nil, fmt.Errorf("invalid ClusterIPs [%v] [%s], can't determine family", svc.Spec.ClusterIPs, svc.Spec.ClusterIP)
@@ -311,8 +317,8 @@ func (c *controller) isServiceAllocated(key string) bool {
 	return c.ips.Pool(key) != ""
 }
 
-func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
-	var desiredLbIPs []net.IP
+func getDesiredLbIPs(svc *v1.Service) ([]netip.Addr, ipfamily.Family, error) {
+	var desiredLbIPs []netip.Addr
 	desiredLbIPsStr := valueForAnnotation(svc.Annotations, AnnotationLoadBalancerIPs, DeprecatedAnnotationLoadBalancerIPs)
 
 	if desiredLbIPsStr == "" && svc.Spec.LoadBalancerIP == "" {
@@ -324,11 +330,11 @@ func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 	if desiredLbIPsStr != "" {
 		desiredLbIPsSlice := strings.Split(desiredLbIPsStr, ",")
 		for _, desiredLbIPStr := range desiredLbIPsSlice {
-			desiredLbIP := net.ParseIP(strings.TrimSpace(desiredLbIPStr))
-			if desiredLbIP == nil {
+			desiredLbIP, parseErr := netip.ParseAddr(strings.TrimSpace(desiredLbIPStr))
+			if parseErr != nil {
 				return nil, "", fmt.Errorf("invalid %s: %q", AnnotationLoadBalancerIPs, desiredLbIPsStr)
 			}
-			desiredLbIPs = append(desiredLbIPs, desiredLbIP)
+			desiredLbIPs = append(desiredLbIPs, desiredLbIP.Unmap())
 		}
 		desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs)
 		if err != nil {
@@ -337,17 +343,17 @@ func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 		return desiredLbIPs, desiredLbIPFamily, nil
 	}
 
-	desiredLbIP := net.ParseIP(svc.Spec.LoadBalancerIP)
-	if desiredLbIP == nil {
+	desiredLbIP, err := netip.ParseAddr(svc.Spec.LoadBalancerIP)
+	if err != nil {
 		return nil, "", fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 	}
-	desiredLbIPs = append(desiredLbIPs, desiredLbIP)
+	desiredLbIPs = append(desiredLbIPs, desiredLbIP.Unmap())
 	desiredLbIPFamily := ipfamily.ForAddress(desiredLbIP)
 
 	return desiredLbIPs, desiredLbIPFamily, nil
 }
 
-func isEqualIPs(ipsA, ipsB []net.IP) bool {
+func isEqualIPs(ipsA, ipsB []netip.Addr) bool {
 	sort.Slice(ipsA, func(i, j int) bool {
 		return ipsA[i].String() < ipsA[j].String()
 	})

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -15,7 +16,7 @@ import (
 	"github.com/mdlayher/ethernet"
 )
 
-type announceFunc func(net.IP, string) dropReason
+type announceFunc func(netip.Addr, string) dropReason
 
 type arpClient struct {
 	logger       log.Logger
@@ -51,7 +52,7 @@ func (a *arpClient) Close() error {
 	return a.conn.Close()
 }
 
-func (a *arpClient) Gratuitous(ip net.IP) error {
+func (a *arpClient) Gratuitous(ip netip.Addr) error {
 	for _, op := range []arp.Operation{arp.OperationRequest, arp.OperationReply} {
 		pkt, err := arp.NewPacket(op, a.hardwareAddr, ip, ethernet.Broadcast, ip)
 		if err != nil {

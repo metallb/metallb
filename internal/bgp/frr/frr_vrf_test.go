@@ -3,7 +3,7 @@
 package frr
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -26,9 +26,9 @@ func TestVRFSingleEBGPSessionMultiHop(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.254",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.1.1.254"),
+				SourceAddress: netip.MustParseAddr("10.1.1.254"),
 				MyASN:         100,
-				RouterID:      net.ParseIP("10.1.1.254"),
+				RouterID:      netip.MustParseAddr("10.1.1.254"),
 				PeerASN:       200,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -57,9 +57,9 @@ func TestSingleVRFIBGPSession(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.254",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.1.1.254"),
+				SourceAddress: netip.MustParseAddr("10.1.1.254"),
 				MyASN:         100,
-				RouterID:      net.ParseIP("10.1.1.254"),
+				RouterID:      netip.MustParseAddr("10.1.1.254"),
 				PeerASN:       100,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -89,9 +89,9 @@ func TestTwoSessionsOneVRF(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.254",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.1.1.254"),
+				SourceAddress: netip.MustParseAddr("10.1.1.254"),
 				MyASN:         100,
-				RouterID:      net.ParseIP("10.1.1.254"),
+				RouterID:      netip.MustParseAddr("10.1.1.254"),
 				PeerASN:       200,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -108,9 +108,9 @@ func TestTwoSessionsOneVRF(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.4.4.255",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.3.3.254"),
+				SourceAddress: netip.MustParseAddr("10.3.3.254"),
 				MyASN:         300,
-				RouterID:      net.ParseIP("10.3.3.254"),
+				RouterID:      netip.MustParseAddr("10.3.3.254"),
 				PeerASN:       400,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -140,9 +140,9 @@ func TestTwoSessionsSameIPVRF(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.254",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.1.1.254"),
+				SourceAddress: netip.MustParseAddr("10.1.1.254"),
 				MyASN:         100,
-				RouterID:      net.ParseIP("10.1.1.254"),
+				RouterID:      netip.MustParseAddr("10.1.1.254"),
 				PeerASN:       200,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -159,9 +159,9 @@ func TestTwoSessionsSameIPVRF(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.254",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.3.3.254"),
+				SourceAddress: netip.MustParseAddr("10.3.3.254"),
 				MyASN:         300,
-				RouterID:      net.ParseIP("10.3.3.254"),
+				RouterID:      netip.MustParseAddr("10.3.3.254"),
 				PeerASN:       400,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -238,9 +238,9 @@ func TestSingleAdvertisementVRF(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.254",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.1.1.254"),
+				SourceAddress: netip.MustParseAddr("10.1.1.254"),
 				MyASN:         100,
-				RouterID:      net.ParseIP("10.1.1.254"),
+				RouterID:      netip.MustParseAddr("10.1.1.254"),
 				PeerASN:       200,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -254,10 +254,7 @@ func TestSingleAdvertisementVRF(t *testing.T) {
 		}
 		defer session.Close()
 
-		prefix := &net.IPNet{
-			IP:   net.ParseIP("172.16.1.10"),
-			Mask: classCMask,
-		}
+		prefix := netip.MustParsePrefix("172.16.1.10/24")
 		communities := []community.BGPCommunity{}
 		community1, _ := community.New("1111:2222")
 		communities = append(communities, community1)
@@ -289,9 +286,9 @@ func TestSingleAdvertisementChangeVRF(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.254",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.1.1.254"),
+				SourceAddress: netip.MustParseAddr("10.1.1.254"),
 				MyASN:         100,
-				RouterID:      net.ParseIP("10.1.1.254"),
+				RouterID:      netip.MustParseAddr("10.1.1.254"),
 				PeerASN:       200,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -305,10 +302,7 @@ func TestSingleAdvertisementChangeVRF(t *testing.T) {
 		}
 		defer session.Close()
 
-		prefix := &net.IPNet{
-			IP:   net.ParseIP("172.16.1.10"),
-			Mask: classCMask,
-		}
+		prefix := netip.MustParsePrefix("172.16.1.10/24")
 
 		adv := &bgp.Advertisement{
 			Prefix: prefix,
@@ -319,10 +313,7 @@ func TestSingleAdvertisementChangeVRF(t *testing.T) {
 			t.Fatalf("Could not advertise prefix: %s", err)
 		}
 
-		prefix = &net.IPNet{
-			IP:   net.ParseIP("172.16.1.11"),
-			Mask: classCMask,
-		}
+		prefix = netip.MustParsePrefix("172.16.1.11/24")
 
 		adv = &bgp.Advertisement{
 			Prefix: prefix,
@@ -348,9 +339,9 @@ func TestTwoAdvertisementsVRF(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.254",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.1.1.254"),
+				SourceAddress: netip.MustParseAddr("10.1.1.254"),
 				MyASN:         100,
-				RouterID:      net.ParseIP("10.1.1.254"),
+				RouterID:      netip.MustParseAddr("10.1.1.254"),
 				PeerASN:       200,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -364,10 +355,7 @@ func TestTwoAdvertisementsVRF(t *testing.T) {
 		}
 		defer session.Close()
 
-		prefix1 := &net.IPNet{
-			IP:   net.ParseIP("172.16.1.10"),
-			Mask: classCMask,
-		}
+		prefix1 := netip.MustParsePrefix("172.16.1.10/24")
 		communities := []community.BGPCommunity{}
 		community, _ := community.New("1111:2222")
 		communities = append(communities, community)
@@ -376,10 +364,7 @@ func TestTwoAdvertisementsVRF(t *testing.T) {
 			Communities: communities,
 		}
 
-		prefix2 := &net.IPNet{
-			IP:   net.ParseIP("172.16.1.11"),
-			Mask: classCMask,
-		}
+		prefix2 := netip.MustParsePrefix("172.16.1.11/24")
 
 		adv2 := &bgp.Advertisement{
 			Prefix: prefix2,
@@ -405,9 +390,9 @@ func TestTwoAdvertisementsTwoSessionsOneVRF(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.254",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.1.1.254"),
+				SourceAddress: netip.MustParseAddr("10.1.1.254"),
 				MyASN:         100,
-				RouterID:      net.ParseIP("10.1.1.254"),
+				RouterID:      netip.MustParseAddr("10.1.1.254"),
 				PeerASN:       200,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -424,9 +409,9 @@ func TestTwoAdvertisementsTwoSessionsOneVRF(t *testing.T) {
 			bgp.SessionParameters{
 				PeerAddress:   "10.2.2.255",
 				PeerPort:      179,
-				SourceAddress: net.ParseIP("10.1.1.254"),
+				SourceAddress: netip.MustParseAddr("10.1.1.254"),
 				MyASN:         100,
-				RouterID:      net.ParseIP("10.1.1.254"),
+				RouterID:      netip.MustParseAddr("10.1.1.254"),
 				PeerASN:       200,
 				HoldTime:      ptr.To(time.Second),
 				KeepAliveTime: ptr.To(time.Second),
@@ -440,10 +425,7 @@ func TestTwoAdvertisementsTwoSessionsOneVRF(t *testing.T) {
 		}
 		defer session1.Close()
 
-		prefix1 := &net.IPNet{
-			IP:   net.ParseIP("172.16.1.10"),
-			Mask: classCMask,
-		}
+		prefix1 := netip.MustParsePrefix("172.16.1.10/24")
 		communities := []community.BGPCommunity{}
 		community, _ := community.New("1111:2222")
 		communities = append(communities, community)
@@ -452,10 +434,7 @@ func TestTwoAdvertisementsTwoSessionsOneVRF(t *testing.T) {
 			Communities: communities,
 		}
 
-		prefix2 := &net.IPNet{
-			IP:   net.ParseIP("172.16.1.11"),
-			Mask: classCMask,
-		}
+		prefix2 := netip.MustParsePrefix("172.16.1.11/24")
 
 		adv2 := &bgp.Advertisement{
 			Prefix:      prefix2,

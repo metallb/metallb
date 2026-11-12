@@ -6,19 +6,21 @@ import (
 	"encoding"
 	"fmt"
 	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/arp"
 	"github.com/mdlayher/ethernet"
+	"go.universe.tf/metallb/internal/netutil"
 )
 
 func TestARPResponder(t *testing.T) {
 	tests := []struct {
 		name           string
 		dstMAC         net.HardwareAddr
-		arpTgt         net.IP
+		arpTgt         netip.Addr
 		arpOp          arp.Operation
 		shouldAnnounce announceFunc
 		reason         dropReason
@@ -44,8 +46,8 @@ func TestARPResponder(t *testing.T) {
 		},
 		{
 			name: "shouldAnnounce denies request",
-			shouldAnnounce: func(ip net.IP, intf string) dropReason {
-				if net.IPv4(192, 168, 1, 20).Equal(ip) {
+			shouldAnnounce: func(ip netip.Addr, intf string) dropReason {
+				if netip.MustParseAddr("192.168.1.20") == ip {
 					return dropReasonNone
 				}
 				return dropReasonError
@@ -54,9 +56,9 @@ func TestARPResponder(t *testing.T) {
 		},
 		{
 			name:   "shouldAnnounce allows request",
-			arpTgt: net.IPv4(192, 168, 1, 20),
-			shouldAnnounce: func(ip net.IP, intf string) dropReason {
-				if net.IPv4(192, 168, 1, 20).Equal(ip) {
+			arpTgt: netip.MustParseAddr("192.168.1.20"),
+			shouldAnnounce: func(ip netip.Addr, intf string) dropReason {
+				if netip.MustParseAddr("192.168.1.20") == ip {
 					return dropReasonNone
 				}
 				return dropReasonError
@@ -69,7 +71,7 @@ func TestARPResponder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			shouldAnnounce := tt.shouldAnnounce
 			if shouldAnnounce == nil {
-				shouldAnnounce = func(net.IP, string) dropReason {
+				shouldAnnounce = func(netip.Addr, string) dropReason {
 					return dropReasonNone
 				}
 			}
@@ -80,8 +82,8 @@ func TestARPResponder(t *testing.T) {
 			if tt.dstMAC == nil {
 				tt.dstMAC = a.hardwareAddr
 			}
-			if tt.arpTgt == nil {
-				tt.arpTgt = net.IPv4(192, 168, 1, 10)
+			if !tt.arpTgt.IsValid() {
+				tt.arpTgt = netip.MustParseAddr("192.168.1.10")
 			}
 			if tt.arpOp == 0 {
 				tt.arpOp = arp.OperationRequest
@@ -92,7 +94,7 @@ func TestARPResponder(t *testing.T) {
 				Source:      net.HardwareAddr{1, 2, 3, 4, 5, 6},
 				EtherType:   ethernet.EtherTypeARP,
 			}
-			pkt, err := arp.NewPacket(tt.arpOp, eth.Source, net.IPv4(192, 168, 1, 1), tt.dstMAC, tt.arpTgt)
+			pkt, err := arp.NewPacket(tt.arpOp, eth.Source, netip.MustParseAddr("192.168.1.1"), tt.dstMAC, tt.arpTgt)
 			if err != nil {
 				t.Fatalf("failed to make ARP packet: %s", err)
 			}
@@ -142,12 +144,28 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpClient, *net.UDP
 		t.Fatalf("no network interfaces")
 	}
 
-	// Find any interface that has a hardware address. We don't care
-	// which one, we just need something to satisfy the various
+	// Find any interface that has a hardware address and IPv4 address.
+	// We don't care which one, we just need something to satisfy the various
 	// interfaces.
 	var a *arpClient
 	for _, intf := range intfs {
 		if intf.HardwareAddr == nil {
+			continue
+		}
+
+		addrs, err := intf.Addrs()
+		if err != nil {
+			t.Fatalf("failed to get addresses for interface %q: %s", intf.Name, err)
+		}
+		hasIPv4 := false
+		for _, addr := range addrs {
+			ip, ok := netutil.AddrFromNetAddr(addr)
+			if ok && ip.Is4() {
+				hasIPv4 = true
+				break
+			}
+		}
+		if !hasIPv4 {
 			continue
 		}
 

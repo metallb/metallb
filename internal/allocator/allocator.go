@@ -6,30 +6,29 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net"
+	"net/netip"
 	"sort"
 	"strings"
 	"sync"
 
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/ipfamily"
+	"go4.org/netipx"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-
-	"github.com/mikioh/ipaddr"
 )
 
 // An Allocator tracks IP address pools and allocates addresses from them.
 type Allocator struct {
 	pools *config.Pools
 
-	allocated       map[string]*alloc          // svc -> alloc
-	sharingKeyForIP map[string]*key            // ip.String() -> assigned sharing key
-	portsInUse      map[string]map[Port]string // ip.String() -> Port -> svc
-	servicesOnIP    map[string]map[string]bool // ip.String() -> svc -> allocated?
-	poolIPsInUse    map[string]map[string]int  // poolName -> ip.String() -> number of users
-	poolIPV4InUse   map[string]map[string]int  // poolName -> ipv4.String() -> number of users
-	poolIPV6InUse   map[string]map[string]int  // poolName -> ipv6.String() -> number of users
+	allocated       map[string]*alloc              // svc -> alloc
+	sharingKeyForIP map[netip.Addr]*key            // IP -> assigned sharing key
+	portsInUse      map[netip.Addr]map[Port]string // IP -> Port -> service
+	servicesOnIP    map[netip.Addr]map[string]bool // IP -> service -> allocated?
+	poolIPsInUse    map[string]map[netip.Addr]int  // pool -> IP -> number of users
+	poolIPV4InUse   map[string]map[netip.Addr]int  // pool -> IPv4 -> number of users
+	poolIPV6InUse   map[string]map[netip.Addr]int  // pool -> IPv6 -> number of users
 
 	poolToCounters          map[string]PoolCounters // poolName -> Counters
 	countersMutex           sync.RWMutex
@@ -54,7 +53,7 @@ type key struct {
 
 type alloc struct {
 	pool  string
-	ips   []net.IP
+	ips   []netip.Addr
 	ports []Port
 	key
 }
@@ -72,12 +71,12 @@ func New(countersCallback func(string)) *Allocator {
 		pools: &config.Pools{ByName: map[string]*config.Pool{}},
 
 		allocated:               map[string]*alloc{},
-		sharingKeyForIP:         map[string]*key{},
-		portsInUse:              map[string]map[Port]string{},
-		servicesOnIP:            map[string]map[string]bool{},
-		poolIPsInUse:            map[string]map[string]int{},
-		poolIPV4InUse:           map[string]map[string]int{},
-		poolIPV6InUse:           map[string]map[string]int{},
+		sharingKeyForIP:         map[netip.Addr]*key{},
+		portsInUse:              map[netip.Addr]map[Port]string{},
+		servicesOnIP:            map[netip.Addr]map[string]bool{},
+		poolIPsInUse:            map[string]map[netip.Addr]int{},
+		poolIPV4InUse:           map[string]map[netip.Addr]int{},
+		poolIPV6InUse:           map[string]map[netip.Addr]int{},
 		poolToCounters:          map[string]PoolCounters{},
 		countersMutex:           sync.RWMutex{},
 		countersChangedCallback: countersCallback,
@@ -134,32 +133,32 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 	a.Unassign(svc)
 	a.allocated[svc] = alloc
 	for _, ip := range alloc.ips {
-		a.sharingKeyForIP[ip.String()] = &alloc.key
-		if a.portsInUse[ip.String()] == nil {
-			a.portsInUse[ip.String()] = map[Port]string{}
+		a.sharingKeyForIP[ip] = &alloc.key
+		if a.portsInUse[ip] == nil {
+			a.portsInUse[ip] = map[Port]string{}
 		}
 		for _, port := range alloc.ports {
-			a.portsInUse[ip.String()][port] = svc
+			a.portsInUse[ip][port] = svc
 		}
-		if a.servicesOnIP[ip.String()] == nil {
-			a.servicesOnIP[ip.String()] = map[string]bool{}
+		if a.servicesOnIP[ip] == nil {
+			a.servicesOnIP[ip] = map[string]bool{}
 		}
-		a.servicesOnIP[ip.String()][svc] = true
+		a.servicesOnIP[ip][svc] = true
 		if a.poolIPsInUse[alloc.pool] == nil {
-			a.poolIPsInUse[alloc.pool] = map[string]int{}
+			a.poolIPsInUse[alloc.pool] = map[netip.Addr]int{}
 		}
 		if a.poolIPV4InUse[alloc.pool] == nil {
-			a.poolIPV4InUse[alloc.pool] = map[string]int{}
+			a.poolIPV4InUse[alloc.pool] = map[netip.Addr]int{}
 		}
 		if a.poolIPV6InUse[alloc.pool] == nil {
-			a.poolIPV6InUse[alloc.pool] = map[string]int{}
+			a.poolIPV6InUse[alloc.pool] = map[netip.Addr]int{}
 		}
 
-		a.poolIPsInUse[alloc.pool][ip.String()]++
-		if ip.To4() == nil {
-			a.poolIPV6InUse[alloc.pool][ip.String()]++
+		a.poolIPsInUse[alloc.pool][ip]++
+		if !ip.Unmap().Is4() {
+			a.poolIPV6InUse[alloc.pool][ip]++
 		} else {
-			a.poolIPV4InUse[alloc.pool][ip.String()]++
+			a.poolIPV4InUse[alloc.pool][ip]++
 		}
 	}
 	a.updatePoolStats(a.pools.ByName[alloc.pool])
@@ -168,7 +167,7 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 
 // Assign assigns the requested ip to svc, if the assignment is
 // permissible by sharingKey and backendKey.
-func (a *Allocator) Assign(svcKey string, svc *v1.Service, ips []net.IP, ports []Port, sharingKey, backendKey string) error {
+func (a *Allocator) Assign(svcKey string, svc *v1.Service, ips []netip.Addr, ports []Port, sharingKey, backendKey string) error {
 	pool := poolFor(a.pools.ByName, ips)
 	if pool == nil {
 		return fmt.Errorf("%q is not allowed in config", ips)
@@ -194,7 +193,7 @@ func (a *Allocator) Assign(svcKey string, svc *v1.Service, ips []net.IP, ports [
 		// Does the IP already have allocs? If so, needs to be the same
 		// sharing key, and have non-overlapping ports. If not, the
 		// proposed IP needs to be allowed by configuration.
-		if err := a.checkSharing(svcKey, ip.String(), ports, sk); err != nil {
+		if err := a.checkSharing(svcKey, ip, ports, sk); err != nil {
 			return err
 		}
 	}
@@ -225,33 +224,33 @@ func (a *Allocator) Unassign(svc string) {
 	delete(a.allocated, svc)
 	for _, ip := range al.ips {
 		for _, port := range al.ports {
-			if curSvc := a.portsInUse[ip.String()][port]; curSvc != svc {
+			if curSvc := a.portsInUse[ip][port]; curSvc != svc {
 				panic(fmt.Sprintf("incoherent state, I thought port %q belonged to service %q, but it seems to belong to %q", port, svc, curSvc))
 			}
-			delete(a.portsInUse[ip.String()], port)
+			delete(a.portsInUse[ip], port)
 		}
 
-		delete(a.servicesOnIP[ip.String()], svc)
-		if len(a.portsInUse[ip.String()]) == 0 {
-			delete(a.portsInUse, ip.String())
-			delete(a.sharingKeyForIP, ip.String())
+		delete(a.servicesOnIP[ip], svc)
+		if len(a.portsInUse[ip]) == 0 {
+			delete(a.portsInUse, ip)
+			delete(a.sharingKeyForIP, ip)
 		}
-		a.poolIPsInUse[al.pool][ip.String()]--
-		if ip.To4() == nil {
-			a.poolIPV6InUse[al.pool][ip.String()]--
+		a.poolIPsInUse[al.pool][ip]--
+		if !ip.Unmap().Is4() {
+			a.poolIPV6InUse[al.pool][ip]--
 		} else {
-			a.poolIPV4InUse[al.pool][ip.String()]--
+			a.poolIPV4InUse[al.pool][ip]--
 		}
 		// Explicitly delete unused IPs from the pool, so that len()
 		// is an accurate count of IPs in use.
-		if a.poolIPsInUse[al.pool][ip.String()] == 0 {
-			delete(a.poolIPsInUse[al.pool], ip.String())
+		if a.poolIPsInUse[al.pool][ip] == 0 {
+			delete(a.poolIPsInUse[al.pool], ip)
 		}
-		if a.poolIPV4InUse[al.pool][ip.String()] == 0 {
-			delete(a.poolIPV4InUse[al.pool], ip.String())
+		if a.poolIPV4InUse[al.pool][ip] == 0 {
+			delete(a.poolIPV4InUse[al.pool], ip)
 		}
-		if a.poolIPV6InUse[al.pool][ip.String()] == 0 {
-			delete(a.poolIPV6InUse[al.pool], ip.String())
+		if a.poolIPV6InUse[al.pool][ip] == 0 {
+			delete(a.poolIPV6InUse[al.pool], ip)
 		}
 	}
 
@@ -275,19 +274,19 @@ func (a *Allocator) getFreeIPsFromPool(
 ) (*Allocation, error) {
 	allocation := &Allocation{
 		PoolName: pool.Name,
-		IPV4:     nil,
-		IPV6:     nil,
+		IPV4:     netip.Addr{},
+		IPV6:     netip.Addr{},
 	}
 	for _, cidr := range pool.CIDR {
 		cidrIPFamily := ipfamily.ForCIDR(cidr)
-		if ip := allocation.getIPForFamily(cidrIPFamily); ip != nil {
+		if ip := allocation.getIPForFamily(cidrIPFamily); ip.IsValid() {
 			continue
 		}
-		if ip := a.getIPFromCIDR(cidr, pool.AvoidBuggyIPs, svcKey, ports, sharingKey, backendKey); ip != nil {
+		if ip := a.getIPFromCIDR(cidr, pool.AvoidBuggyIPs, svcKey, ports, sharingKey, backendKey); ip.IsValid() {
 			allocation.setIPForFamily(cidrIPFamily, ip)
 		}
 	}
-	if allocation.IPV4 == nil && allocation.IPV6 == nil {
+	if !allocation.IPV4.IsValid() && !allocation.IPV6.IsValid() {
 		return nil, fmt.Errorf("no available IPs in pool %s", pool.Name)
 	}
 	return allocation, nil
@@ -319,14 +318,14 @@ func (a *Allocator) findBestPoolForService(
 			continue
 		}
 		// This can happen only in case serviceIPFamily is ipv4 or ipv6.
-		if ip := allocation.getIPForFamily(serviceIPFamily); ip != nil {
+		if ip := allocation.getIPForFamily(serviceIPFamily); ip.IsValid() {
 			return allocation, nil
 		}
 
 		primaryIP := allocation.getIPForFamily(primaryIPFamily)
 		secondaryIP := allocation.getIPForFamily(secondaryIPFamily)
 
-		if primaryIP != nil && secondaryIP != nil {
+		if primaryIP.IsValid() && secondaryIP.IsValid() {
 			return allocation, nil
 		}
 
@@ -336,10 +335,10 @@ func (a *Allocator) findBestPoolForService(
 			continue
 		}
 
-		if primaryIP != nil && primaryAllocationCandidate == nil {
+		if primaryIP.IsValid() && primaryAllocationCandidate == nil {
 			primaryAllocationCandidate = allocation
 		}
-		if secondaryIP != nil && secondaryAllocationCandidate == nil {
+		if secondaryIP.IsValid() && secondaryAllocationCandidate == nil {
 			secondaryAllocationCandidate = allocation
 		}
 	}
@@ -366,7 +365,7 @@ func (a *Allocator) Allocate(
 	serviceIPFamily ipfamily.Family,
 	ports []Port,
 	sharingKey, backendKey string,
-) ([]net.IP, error) {
+) ([]netip.Addr, error) {
 	if alloc := a.allocated[svcKey]; alloc != nil {
 		if err := a.Assign(svcKey, svc, alloc.ips, ports, sharingKey, backendKey); err != nil {
 			return nil, err
@@ -405,7 +404,7 @@ func (a *Allocator) allocateFromPools(
 	serviceIPFamily ipfamily.Family,
 	ports []Port,
 	sharingKey, backendKey string,
-) ([]net.IP, error) {
+) ([]netip.Addr, error) {
 	poolIps, err := a.findBestPoolForService(pools, svcKey, svc, serviceIPFamily, ports, sharingKey, backendKey)
 	if err != nil {
 		return nil, err
@@ -428,7 +427,7 @@ func (a *Allocator) AllocateFromPool(
 	ports []Port,
 	sharingKey,
 	backendKey string,
-) ([]net.IP, error) {
+) ([]netip.Addr, error) {
 	if alloc := a.allocated[svcKey]; alloc != nil {
 		// Handle the case where the svc has already been assigned an IP but from the wrong family.
 		// This "should-not-happen" since the "serviceIPFamily" is an immutable field in services.
@@ -478,12 +477,12 @@ func (a *Allocator) AllocateFromPool(
 func (a *Allocator) AllocateFromPoolForAdditionalFamily(
 	svcKey string,
 	svc *v1.Service,
-	existingIP net.IP,
+	existingIP netip.Addr,
 	poolName string,
 	ports []Port,
 	sharingKey,
 	backendKey string,
-) (net.IP, error) {
+) (netip.Addr, error) {
 	additionalFamily := ipfamily.IPv4
 	existingFamily := ipfamily.ForAddress(existingIP)
 	if existingFamily == ipfamily.IPv4 {
@@ -491,21 +490,21 @@ func (a *Allocator) AllocateFromPoolForAdditionalFamily(
 	}
 	pool := a.pools.ByName[poolName]
 	if pool == nil {
-		return nil, fmt.Errorf("unknown pool %q", poolName)
+		return netip.Addr{}, fmt.Errorf("unknown pool %q", poolName)
 	}
 
 	poolIps, err := a.getFreeIPsFromPool(pool, svcKey, ports, sharingKey, backendKey)
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 	additionalIPs, err := poolIps.selectIPsForFamilyAndPolicy(additionalFamily, v1.IPFamilyPolicySingleStack)
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
-	newIps := []net.IP{existingIP, additionalIPs[0]}
+	newIps := []netip.Addr{existingIP, additionalIPs[0]}
 	err = a.Assign(svcKey, svc, newIps, ports, sharingKey, backendKey)
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 
 	return additionalIPs[0], nil
@@ -566,7 +565,7 @@ func (a *Allocator) Pool(svc string) string {
 }
 
 // IPs returns the allocated IPs of a service.
-func (a *Allocator) IPs(svc string) []net.IP {
+func (a *Allocator) IPs(svc string) []netip.Addr {
 	if alloc := a.allocated[svc]; alloc != nil {
 		return alloc.ips
 	}
@@ -581,7 +580,7 @@ func (a *Allocator) AllocationKey(svc string) string {
 }
 
 // PoolForIP returns the pool structure associated with an IP.
-func (a *Allocator) PoolForIP(ips []net.IP) *config.Pool {
+func (a *Allocator) PoolForIP(ips []netip.Addr) *config.Pool {
 	return poolFor(a.pools.ByName, ips)
 }
 
@@ -631,7 +630,11 @@ func poolCount(p *config.Pool) (int64, int64, int64) {
 	var ipv4 int64
 	var ipv6 int64
 	for _, cidr := range p.CIDR {
-		o, b := cidr.Mask.Size()
+		o := cidr.Bits()
+		b := 128
+		if cidr.Addr().Is4() {
+			b = 32
+		}
 		if b-o >= 62 {
 			// An enormous ipv6 range is allocated which will never run out.
 			total = math.MaxInt64
@@ -640,10 +643,8 @@ func poolCount(p *config.Pool) (int64, int64, int64) {
 		}
 		sz := int64(math.Pow(2, float64(b-o)))
 
-		cidrCopy := copyCIDR(cidr)
-		cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidrCopy)})
-		firstIP := cur.First().IP
-		lastIP := cur.Last().IP
+		firstIP := cidr.Masked().Addr()
+		lastIP := netipx.PrefixLastIP(cidr)
 
 		if p.AvoidBuggyIPs {
 			if o <= 24 {
@@ -663,7 +664,7 @@ func poolCount(p *config.Pool) (int64, int64, int64) {
 			}
 		}
 		total = addPoolCapacity(total, sz)
-		if cidr.IP.To4() == nil {
+		if !cidr.Addr().Unmap().Is4() {
 			ipv6 = addPoolCapacity(ipv6, sz)
 		} else {
 			ipv4 += sz
@@ -681,7 +682,7 @@ func addPoolCapacity(count, size int64) int64 {
 }
 
 // poolFor returns the pool that owns the requested IPs, or "" if none.
-func poolFor(pools map[string]*config.Pool, ips []net.IP) *config.Pool {
+func poolFor(pools map[string]*config.Pool, ips []netip.Addr) *config.Pool {
 	for _, p := range pools {
 		cnt := 0
 		for _, ip := range ips {
@@ -706,34 +707,33 @@ func poolFor(pools map[string]*config.Pool, ips []net.IP) *config.Pool {
 //
 // Such addresses can confuse smurf protection on crappy CPE
 // firmwares, leading to packet drops.
-func ipConfusesBuggyFirmwares(ip net.IP) bool {
-	ip = ip.To4()
-	if ip == nil {
+func ipConfusesBuggyFirmwares(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	if !ip.Is4() {
 		return false
 	}
-	return ip[3] == 0 || ip[3] == 255
+	b := ip.As4()
+	return b[3] == 0 || b[3] == 255
 }
 
-func (a *Allocator) getIPFromCIDR(cidr *net.IPNet, avoidBuggyIPs bool, svc string, ports []Port, sharingKey, backendKey string) net.IP {
+func (a *Allocator) getIPFromCIDR(cidr netip.Prefix, avoidBuggyIPs bool, svc string, ports []Port, sharingKey, backendKey string) netip.Addr {
 	sk := &key{
 		sharing: sharingKey,
 		backend: backendKey,
 	}
-	cidrCopy := copyCIDR(cidr)
-	c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidrCopy)})
-	for pos := c.First(); pos != nil; pos = c.Next() {
-		if avoidBuggyIPs && ipConfusesBuggyFirmwares(pos.IP) {
+	for pos := cidr.Masked().Addr(); cidr.Contains(pos); pos = pos.Next() {
+		if avoidBuggyIPs && ipConfusesBuggyFirmwares(pos) {
 			continue
 		}
-		if a.checkSharing(svc, pos.IP.String(), ports, sk) != nil {
+		if a.checkSharing(svc, pos, ports, sk) != nil {
 			continue
 		}
-		return pos.IP
+		return pos
 	}
-	return nil
+	return netip.Addr{}
 }
 
-func (a *Allocator) checkSharing(svc string, ip string, ports []Port, sk *key) error {
+func (a *Allocator) checkSharing(svc string, ip netip.Addr, ports []Port, sk *key) error {
 	if existingSK := a.sharingKeyForIP[ip]; existingSK != nil {
 		if err := sharingOK(existingSK, sk); err != nil {
 			// Sharing key is incompatible. However, if the owner is
@@ -783,18 +783,5 @@ func (a *Allocator) updatePoolStats(p *config.Pool) {
 		AvailableIPv6: ipv6 - int64(len(a.poolIPV6InUse[p.Name])),
 		AssignedIPv4:  int64(len(a.poolIPV4InUse[p.Name])),
 		AssignedIPv6:  int64(len(a.poolIPV6InUse[p.Name])),
-	}
-}
-
-// copyCIDR creates a new copy of a CIDR, useful for passing to functions that
-// mutate it (e.g. ipaddr.NewPrefix).
-func copyCIDR(cidr *net.IPNet) *net.IPNet {
-	ip := make(net.IP, len(cidr.IP))
-	copy(ip, cidr.IP)
-	mask := make(net.IPMask, len(cidr.Mask))
-	copy(mask, cidr.Mask)
-	return &net.IPNet{
-		IP:   ip,
-		Mask: mask,
 	}
 }

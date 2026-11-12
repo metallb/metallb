@@ -4,7 +4,7 @@ package ipfamily // import "go.universe.tf/e2etests/pkg/ipfamily"
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
 	v1 "k8s.io/api/core/v1"
 )
@@ -27,18 +27,21 @@ const (
 func ForAddresses(ips []string) (Family, error) {
 	switch len(ips) {
 	case 1:
-		ip := net.ParseIP(ips[0])
-		if ip.To4() != nil {
-			return IPv4, nil
+		ip, err := netip.ParseAddr(ips[0])
+		if err != nil {
+			return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid address %q: %w", ips[0], err)
 		}
-		return IPv6, nil
+		return ForAddress(ip), nil
 	case 2:
-		ip1 := net.ParseIP(ips[0])
-		ip2 := net.ParseIP(ips[1])
-		if ip1 == nil || ip2 == nil {
-			return Unknown, fmt.Errorf("IPFamilyForAddresses: Invalid address %q", ips)
+		ip1, err := netip.ParseAddr(ips[0])
+		if err != nil {
+			return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid address %q: %w", ips[0], err)
 		}
-		if (ip1.To4() == nil) == (ip2.To4() == nil) {
+		ip2, err := netip.ParseAddr(ips[1])
+		if err != nil {
+			return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid address %q: %w", ips[1], err)
+		}
+		if ip1.Unmap().Is4() == ip2.Unmap().Is4() {
 			return Unknown, fmt.Errorf("IPFamilyForAddresses: same address family %q", ips)
 		}
 		return DualStack, nil
@@ -48,29 +51,41 @@ func ForAddresses(ips []string) (Family, error) {
 }
 
 // ForAddressesIPs returns the address family from a given list of addresses IPs.
-func ForAddressesIPs(ips []net.IP) (Family, error) {
-	ipsStrings := []string{}
-
-	for _, ip := range ips {
-		ipsStrings = append(ipsStrings, ip.String())
+func ForAddressesIPs(ips []netip.Addr) (Family, error) {
+	if len(ips) != 1 && len(ips) != 2 {
+		return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid ips length %d %q", len(ips), ips)
 	}
-	return ForAddresses(ipsStrings)
+	for _, ip := range ips {
+		if !ip.IsValid() {
+			return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid address %q", ip)
+		}
+	}
+	if len(ips) == 1 {
+		return ForAddress(ips[0]), nil
+	}
+	if ips[0].Unmap().Is4() == ips[1].Unmap().Is4() {
+		return Unknown, fmt.Errorf("IPFamilyForAddresses: same address family %q", ips)
+	}
+	return DualStack, nil
 }
 
 // ForCIDR returns the address family from a given CIDR.
-func ForCIDR(cidr *net.IPNet) Family {
-	if cidr.IP.To4() == nil {
-		return IPv6
+func ForCIDR(cidr netip.Prefix) Family {
+	if !cidr.IsValid() {
+		return Unknown
 	}
-	return IPv4
+	return ForAddress(cidr.Addr())
 }
 
 // ForAddress returns the address family for a given address.
-func ForAddress(ip net.IP) Family {
-	if ip.To4() == nil {
-		return IPv6
+func ForAddress(ip netip.Addr) Family {
+	if !ip.IsValid() {
+		return Unknown
 	}
-	return IPv4
+	if ip.Unmap().Is4() {
+		return IPv4
+	}
+	return IPv6
 }
 
 // ForService returns the address family of a given service.

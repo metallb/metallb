@@ -3,7 +3,7 @@
 package ipfamily
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 )
 
@@ -80,40 +80,40 @@ func TestIPFamilyForAddresses(t *testing.T) {
 func TestIPFamilyForAddressesIPs(t *testing.T) {
 	tests := []struct {
 		desc    string
-		ips     []net.IP
+		ips     []netip.Addr
 		family  Family
 		wantErr bool
 	}{
 		{
 			desc:   "ipv4 address",
-			ips:    []net.IP{net.ParseIP("1.2.4.0")},
+			ips:    []netip.Addr{netip.MustParseAddr("1.2.4.0")},
 			family: IPv4,
 		},
 		{
 			desc:   "ipv6 address",
-			ips:    []net.IP{net.ParseIP("100::1")},
+			ips:    []netip.Addr{netip.MustParseAddr("100::1")},
 			family: IPv6,
 		},
 		{
 			desc:   "ipv4 and ipv6 addresse",
-			ips:    []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("100::1")},
+			ips:    []netip.Addr{netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("100::1")},
 			family: DualStack,
 		},
 		{
 			desc:    "dual stack with same address family",
-			ips:     []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("5.6.7.8")},
+			ips:     []netip.Addr{netip.MustParseAddr("1.2.3.4"), netip.MustParseAddr("5.6.7.8")},
 			family:  Unknown,
 			wantErr: true,
 		},
 		{
 			desc:    "dual stack with empty address",
-			ips:     []net.IP{net.ParseIP(""), net.ParseIP("")},
+			ips:     []netip.Addr{{}, {}},
 			family:  Unknown,
 			wantErr: true,
 		},
 		{
 			desc:    "more than 2 addresses",
-			ips:     []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("100::1"), net.ParseIP("2.2.2.2")},
+			ips:     []netip.Addr{netip.MustParseAddr("1.1.1.1"), netip.MustParseAddr("100::1"), netip.MustParseAddr("2.2.2.2")},
 			family:  Unknown,
 			wantErr: true,
 		},
@@ -138,17 +138,17 @@ func TestIPFamilyForAddressesIPs(t *testing.T) {
 func TestIPFamilyForCIDR(t *testing.T) {
 	tests := []struct {
 		desc   string
-		cidr   *net.IPNet
+		cidr   netip.Prefix
 		family Family
 	}{
 		{
 			desc:   "ipv4 cidr",
-			cidr:   ipnet("1.2.3.4/30"),
+			cidr:   netip.MustParsePrefix("1.2.3.4/30"),
 			family: IPv4,
 		},
 		{
 			desc:   "ipv6 cidr",
-			cidr:   ipnet("100::/96"),
+			cidr:   netip.MustParsePrefix("100::/96"),
 			family: IPv6,
 		},
 	}
@@ -166,17 +166,17 @@ func TestIPFamilyForCIDR(t *testing.T) {
 func TestIPFamilyForAddress(t *testing.T) {
 	tests := []struct {
 		desc   string
-		ip     net.IP
+		ip     netip.Addr
 		family Family
 	}{
 		{
 			desc:   "ipv4 address",
-			ip:     net.ParseIP("1.2.3.4"),
+			ip:     netip.MustParseAddr("1.2.3.4"),
 			family: IPv4,
 		},
 		{
 			desc:   "ipv6 address",
-			ip:     net.ParseIP("100::"),
+			ip:     netip.MustParseAddr("100::"),
 			family: IPv6,
 		},
 	}
@@ -189,12 +189,4 @@ func TestIPFamilyForAddress(t *testing.T) {
 			}
 		})
 	}
-}
-
-func ipnet(s string) *net.IPNet {
-	_, n, err := net.ParseCIDR(s)
-	if err != nil {
-		panic(err)
-	}
-	return n
 }

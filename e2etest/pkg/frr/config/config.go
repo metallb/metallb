@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"text/template"
 
@@ -160,9 +159,9 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 	}
 	for _, ip := range ips {
 		neighbor := nc
-		neighbor.Addr = ip
+		neighbor.Addr = ip.String()
 
-		peerIPFamily := ipfamily.ForAddress(net.ParseIP(ip))
+		peerIPFamily := ipfamily.ForAddress(ip)
 
 		switch {
 		case multiProtocol == MultiProtocolEnabled: // in case of multiprotocol
