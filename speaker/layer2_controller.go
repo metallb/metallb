@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"maps"
-	"net"
+	"net/netip"
 	"sort"
 
 	"github.com/go-kit/log"
@@ -85,7 +85,7 @@ func nodesWithEndpoint(eps []discovery.EndpointSlice, speakers map[string]bool) 
 	return ret
 }
 
-func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, pool *config.Pool, svc *v1.Service, eps []discovery.EndpointSlice, nodes map[string]*v1.Node) string {
+func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []netip.Addr, pool *config.Pool, svc *v1.Service, eps []discovery.EndpointSlice, nodes map[string]*v1.Node) string {
 	if !activeEndpointExists(eps) { // no active endpoints, just return
 		level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "message", "failed no active endpoints", "service", name)
 		return "notOwner"
@@ -132,7 +132,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	return "notOwner"
 }
 
-func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, client service, svc *v1.Service) error {
+func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []netip.Addr, pool *config.Pool, client service, svc *v1.Service) error {
 	ifs := c.announcer.GetInterfaces()
 	updateStatus := false
 	allAdsForService := l2AdsForService(pool.L2Advertisements, svc)
@@ -212,7 +212,7 @@ func preferredScoresFor(ads []*config.L2Advertisement) map[string]int64 {
 	return scores
 }
 
-func ipAdvertisementFor(ip net.IP, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
+func ipAdvertisementFor(ip netip.Addr, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
 	ifs := sets.Set[string]{}
 	for _, l2 := range l2Advertisements {
 		if l2.AllInterfaces {

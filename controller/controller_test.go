@@ -5,7 +5,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"net"
+	"net/netip"
 	"testing"
 
 	"go.universe.tf/metallb/internal/allocator"
@@ -41,14 +41,6 @@ func diffService(a, b *v1.Service) string {
 	return cmp.Diff(a, b)
 }
 
-func ipnet(s string) *net.IPNet {
-	_, n, err := net.ParseCIDR(s)
-	if err != nil {
-		panic(err)
-	}
-	return n
-}
-
 func statusAssigned(ips []string) v1.ServiceStatus {
 	lbIngressIPs := []v1.LoadBalancerIngress{}
 	for _, ip := range ips {
@@ -58,6 +50,68 @@ func statusAssigned(ips []string) v1.ServiceStatus {
 		LoadBalancer: v1.LoadBalancerStatus{
 			Ingress: lbIngressIPs,
 		},
+	}
+}
+
+func TestGetDesiredLbIPsRejectsZones(t *testing.T) {
+	tests := []struct {
+		name    string
+		service *v1.Service
+		wantErr string
+	}{
+		{
+			name: "spec.loadBalancerIP",
+			service: &v1.Service{Spec: v1.ServiceSpec{
+				LoadBalancerIP: "fe80::1%eth0",
+			}},
+			wantErr: `invalid spec.loadBalancerIP "fe80::1%eth0"`,
+		},
+		{
+			name: "loadBalancerIPs annotation",
+			service: &v1.Service{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+				AnnotationLoadBalancerIPs: "fe80::1%eth0",
+			}}},
+			wantErr: `invalid metallb.io/loadBalancerIPs: "fe80::1%eth0"`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, _, err := getDesiredLbIPs(test.service)
+			if err == nil || err.Error() != test.wantErr {
+				t.Fatalf("getDesiredLbIPs() error = %v, want %q", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestConvergeBalancerRejectsZonedIngressIP(t *testing.T) {
+	pools := &config.Pools{ByName: map[string]*config.Pool{
+		"pool": {
+			Name:       "pool",
+			AutoAssign: true,
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("2001:db8::/126")},
+		},
+	}}
+	c := &controller{
+		ips:    allocator.New(noopCallback),
+		pools:  pools,
+		client: &testK8S{t: t},
+	}
+	c.ips.SetPools(pools)
+	svc := &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:       v1.ServiceTypeLoadBalancer,
+			ClusterIPs: []string{"2001:db8::2"},
+		},
+		Status: statusAssigned([]string{"fe80::1%eth0"}),
+	}
+
+	if err := c.convergeBalancer(log.NewNopLogger(), "test", svc); err != ErrConverge {
+		t.Fatalf("convergeBalancer() error = %v, want %v", err, ErrConverge)
+	}
+	if got := svc.Status.LoadBalancer.Ingress; len(got) != 0 {
+		t.Fatalf("convergeBalancer() left ingress IPs %v, want them cleared", got)
 	}
 }
 
@@ -127,73 +181,73 @@ func TestControllerMutation(t *testing.T) {
 		"pool1": {
 			Name:       "pool1",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/31")},
 		},
 		"pool2": {
 			Name:       "pool2",
 			AutoAssign: false,
-			CIDR:       []*net.IPNet{ipnet("3.4.5.6/32")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("3.4.5.6/32")},
 		},
 		"pool3": {
 			Name:       "pool3",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1000::/127")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1000::/127")},
 		},
 		"pool4": {
 			Name:       "pool4",
 			AutoAssign: false,
-			CIDR:       []*net.IPNet{ipnet("2000::1/128")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("2000::1/128")},
 		},
 		"pool5": {
 			Name:       "pool5",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/31"), netip.MustParsePrefix("1000::/127")},
 		},
 		"pool6": {
 			Name:       "pool6",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("7.8.9.0/31")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("7.8.9.0/31")},
 			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
 				Priority: 10},
 		},
 		"pool7": {
 			Name:       "pool7",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("10.11.12.0/31")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("10.11.12.0/31")},
 			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
 				Priority: 11},
 		},
 		"pool8": {
 			Name:       "pool8",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("13.14.15.0/31")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("13.14.15.0/31")},
 			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{testSelector},
 				Priority: 9},
 		},
 		"pool9": {
 			Name:               "pool9",
 			AutoAssign:         true,
-			CIDR:               []*net.IPNet{ipnet("16.17.18.0/31")},
+			CIDR:               []netip.Prefix{netip.MustParsePrefix("16.17.18.0/31")},
 			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns2")},
 		},
 		"pool10": {
 			Name:       "pool10",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("19.20.21.0/31")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("19.20.21.0/31")},
 			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{testSelector},
 				Priority: 8},
 		},
 		"pool11": {
 			Name:       "pool11",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("22.23.24.0/31")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("22.23.24.0/31")},
 			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
 				ServiceSelectors: []labels.Selector{testSelector}, Priority: 8},
 		},
 		"pool12": {
 			Name:       "pool12",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("25.26.27.0/31")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("25.26.27.0/31")},
 			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
 				ServiceSelectors: []labels.Selector{testSelector}, Priority: 5},
 		},
@@ -1162,7 +1216,7 @@ func TestControllerRemovesDeprecatedManagedAnnotation(t *testing.T) {
 		"pool1": {
 			Name:       "pool1",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/31")},
 		},
 	}}
 	l := log.NewNopLogger()
@@ -1214,7 +1268,7 @@ func TestControllerClearsDeprecatedManagedAnnotation(t *testing.T) {
 		"pool1": {
 			Name:       "pool1",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/31")},
 		},
 	}}
 	l := log.NewNopLogger()
@@ -1306,7 +1360,7 @@ func TestControllerConfig(t *testing.T) {
 		"default": {
 			Name:       "default",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
 		},
 	}}
 	if c.SetPools(l, pools) == controllers.SyncStateError {
@@ -1367,7 +1421,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 		"default": {
 			Name:       "default",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/32")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/32")},
 		},
 	}}
 	if c.SetPools(l, pools) == controllers.SyncStateError {
@@ -1449,7 +1503,7 @@ func TestControllerReassign(t *testing.T) {
 		"default": {
 			Name:       "default",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::1/127")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24"), netip.MustParsePrefix("1000::1/127")},
 		},
 	}}
 
@@ -1474,12 +1528,12 @@ func TestControllerReassign(t *testing.T) {
 		"default": {
 			Name:       "default",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::1/127")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24"), netip.MustParsePrefix("1000::1/127")},
 		},
 		"second": {
 			Name:       "second",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("4.5.6.0/24")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("4.5.6.0/24")},
 		},
 	}}
 
@@ -1503,7 +1557,7 @@ func TestControllerReassign(t *testing.T) {
 		"second": {
 			Name:       "second",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("4.5.6.0/24")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("4.5.6.0/24")},
 		},
 	}}
 
@@ -1572,7 +1626,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 		"default": {
 			Name:       "default",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::1/127")},
+			CIDR:       []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24"), netip.MustParsePrefix("1000::1/127")},
 		},
 	}}
 

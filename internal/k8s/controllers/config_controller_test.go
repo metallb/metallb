@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"net/netip"
 	"reflect"
 	"strings"
 	"testing"
@@ -149,7 +150,10 @@ func TestConfigController(t *testing.T) {
 				t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
 			}
 
-			cmpOpt := cmpopts.IgnoreUnexported(config.Pool{})
+			cmpOpt := cmp.Options{
+				cmpopts.IgnoreUnexported(config.Pool{}),
+				cmpopts.EquateComparable(netip.Addr{}, netip.Prefix{}),
+			}
 
 			mockHandler := func(l log.Logger, cfg *config.Config) SyncState {
 				if !cmp.Equal(expectedCfg, cfg, cmpOpt) {

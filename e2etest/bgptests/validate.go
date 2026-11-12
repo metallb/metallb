@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +29,13 @@ import (
 )
 
 var ErrStaleRoute = errors.New("stale route")
+
+// routeKey parses and normalizes an address used to look up a BGP route.
+func routeKey(address string) netip.Addr {
+	ip, err := netip.ParseAddr(address)
+	Expect(err).NotTo(HaveOccurred(), "invalid route address %q", address)
+	return ip.Unmap()
+}
 
 func validateFRRPeeredWithAllNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -71,9 +79,17 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 	port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 
 	if len(svc.Status.LoadBalancer.Ingress) == 2 {
-		ip1 := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
-		ip2 := net.ParseIP(svc.Status.LoadBalancer.Ingress[1].IP)
-		Expect(ip1.To4()).NotTo(Equal(ip2.To4()))
+		ip1, err := netip.ParseAddr(svc.Status.LoadBalancer.Ingress[0].IP)
+		if err != nil {
+			return fmt.Errorf("invalid service ingress IP %q: %w", svc.Status.LoadBalancer.Ingress[0].IP, err)
+		}
+		ip2, err := netip.ParseAddr(svc.Status.LoadBalancer.Ingress[1].IP)
+		if err != nil {
+			return fmt.Errorf("invalid service ingress IP %q: %w", svc.Status.LoadBalancer.Ingress[1].IP, err)
+		}
+		if ip1.Unmap().Is4() == ip2.Unmap().Is4() {
+			return fmt.Errorf("service ingress IPs %s and %s are not dual-stack", ip1, ip2)
+		}
 	}
 	for _, ip := range svc.Status.LoadBalancer.Ingress {
 		ingressIP := jigservice.GetIngressPoint(&ip)
@@ -95,9 +111,9 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 			return err
 		}
 		serviceIPFamily := ipfamily.IPv4
-		frrRoutes, ok := frrRoutesV4[ingressIP]
+		frrRoutes, ok := frrRoutesV4[routeKey(ingressIP)]
 		if !ok {
-			frrRoutes, ok = frrRoutesV6[ingressIP]
+			frrRoutes, ok = frrRoutesV6[routeKey(ingressIP)]
 			serviceIPFamily = ipfamily.IPv6
 		}
 		if !ok {
@@ -197,14 +213,15 @@ func checkServiceOnlyOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, i
 		validateService(svc, expectedNodes, c)
 		Eventually(func() error {
 			routes, err := frr.RoutesForFamily(c, ipFamily)
-			if len(routes[ip].NextHops) != len(nodeIps) {
-				return fmt.Errorf("%s: invalid number of routes for %s: expecting %d got %d", c.Name, ip, len(nodeIps), len(routes[ip].NextHops))
+			route := routes[routeKey(ip)]
+			if len(route.NextHops) != len(nodeIps) {
+				return fmt.Errorf("%s: invalid number of routes for %s: expecting %d got %d", c.Name, ip, len(nodeIps), len(route.NextHops))
 			}
 
 		OUTER:
-			for _, n := range routes[ip].NextHops {
+			for _, n := range route.NextHops {
 				for _, ip := range nodeIps {
-					if n.String() == ip {
+					if n == ip {
 						continue OUTER
 					}
 				}
@@ -227,9 +244,9 @@ func checkServiceNotOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, ip
 		Eventually(func() bool {
 			routes, err := frr.RoutesForFamily(c, ipFamily)
 			Expect(err).NotTo(HaveOccurred())
-			for _, n := range routes[ip].NextHops {
+			for _, n := range routes[routeKey(ip)].NextHops {
 				for _, ip := range nodeIps {
-					if n.String() == ip {
+					if n == ip {
 						return true
 					}
 				}
@@ -251,14 +268,15 @@ func checkCommunitiesOnlyOnNodes(svc *corev1.Service, community string, expected
 
 		Eventually(func() error {
 			routes, err := frr.RoutesForCommunity(c, community, ipFamily)
-			if len(routes[ip].NextHops) != len(nodeIps) {
-				return fmt.Errorf("%s: invalid number of routes for %s: expecting %d got %d", c.Name, ip, len(nodeIps), len(routes[ip].NextHops))
+			route := routes[routeKey(ip)]
+			if len(route.NextHops) != len(nodeIps) {
+				return fmt.Errorf("%s: invalid number of routes for %s: expecting %d got %d", c.Name, ip, len(nodeIps), len(route.NextHops))
 			}
 
 		OUTER:
-			for _, n := range routes[ip].NextHops {
+			for _, n := range route.NextHops {
 				for _, ip := range nodeIps {
-					if n.String() == ip {
+					if n == ip {
 						continue OUTER
 					}
 				}
@@ -307,9 +325,9 @@ func validateServiceNotAdvertised(svc *corev1.Service, frrContainers []*frrconta
 						Expect(err).NotTo(HaveOccurred())
 					}
 
-					_, ok := frrRoutesV4[ingressIP]
+					_, ok := frrRoutesV4[routeKey(ingressIP)]
 					if ipFamily == ipfamily.IPv6 {
-						_, ok = frrRoutesV6[ingressIP]
+						_, ok = frrRoutesV6[routeKey(ingressIP)]
 					}
 
 					return ok
@@ -327,7 +345,7 @@ func validateServiceInRoutesForCommunity(c *frrcontainer.FRR, community string, 
 		}
 		for _, ip := range svc.Status.LoadBalancer.Ingress {
 			ingressIP := jigservice.GetIngressPoint(&ip)
-			if _, ok := routes[ingressIP]; !ok {
+			if _, ok := routes[routeKey(ingressIP)]; !ok {
 				return fmt.Errorf("service IP %s not in routes", ingressIP)
 			}
 		}
@@ -343,7 +361,7 @@ func validateServiceNotInRoutesForCommunity(c *frrcontainer.FRR, community strin
 		}
 		for _, ip := range svc.Status.LoadBalancer.Ingress {
 			ingressIP := jigservice.GetIngressPoint(&ip)
-			if _, ok := routes[ingressIP]; !ok {
+			if _, ok := routes[routeKey(ingressIP)]; !ok {
 				return fmt.Errorf("service IP %s not in routes", ingressIP)
 			}
 		}
@@ -354,6 +372,11 @@ func validateServiceNotInRoutesForCommunity(c *frrcontainer.FRR, community strin
 // isRouteInjected checks if the routeToCheck is injected in at least one pod, and
 // returns the name of the first pod where it is found.
 func isRouteInjected(pods []*corev1.Pod, pairingFamily ipfamily.Family, routeToCheck, vrf string) (bool, string) {
+	target, err := netip.ParsePrefix(routeToCheck)
+	if err != nil {
+		Expect(err).NotTo(HaveOccurred(), "invalid route prefix %q", routeToCheck)
+	}
+	target = target.Masked()
 	for _, pod := range pods {
 		podExec, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -366,7 +389,7 @@ func isRouteInjected(pods []*corev1.Pod, pairingFamily ipfamily.Family, routeToC
 		}
 
 		for _, route := range routes {
-			if route.Destination.String() == routeToCheck {
+			if route.Destination == target {
 				return true, pod.Name
 			}
 		}

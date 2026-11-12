@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -22,12 +23,12 @@ type ndpClient struct {
 	announce     announceFunc
 	// Refcount of how many watchers for each solicited node
 	// multicast group.
-	solicitedNodeGroups map[string]int64
+	solicitedNodeGroups map[netip.Addr]int64
 }
 
 func newNDPClient(logger log.Logger, ifi *net.Interface, ann announceFunc) (*ndpClient, error) {
 	// Use link-local address as the source IPv6 address for NDP communications.
-	conn, _, err := ndp.Dial(ifi, ndp.LinkLocal)
+	conn, _, err := ndp.Listen(ifi, ndp.LinkLocal)
 	if err != nil {
 		return nil, fmt.Errorf("creating NDP responder for %q: %s", ifi.Name, err)
 	}
@@ -39,7 +40,7 @@ func newNDPClient(logger log.Logger, ifi *net.Interface, ann announceFunc) (*ndp
 		conn:                conn,
 		closed:              make(chan struct{}),
 		announce:            ann,
-		solicitedNodeGroups: map[string]int64{},
+		solicitedNodeGroups: map[netip.Addr]int64{},
 	}
 	go ret.run()
 	return ret, nil
@@ -52,39 +53,39 @@ func (n *ndpClient) Close() error {
 	return n.conn.Close()
 }
 
-func (n *ndpClient) Gratuitous(ip net.IP) error {
-	err := n.advertise(net.IPv6linklocalallnodes, ip, true)
+func (n *ndpClient) Gratuitous(ip netip.Addr) error {
+	err := n.advertise(netip.MustParseAddr("ff02::1"), ip, true)
 	stats.SentGratuitous(ip.String())
 	return err
 }
 
-func (n *ndpClient) Watch(ip net.IP) error {
-	if ip.To4() != nil {
+func (n *ndpClient) Watch(ip netip.Addr) error {
+	if ip.Is4() {
 		return nil
 	}
 	group, err := ndp.SolicitedNodeMulticast(ip)
 	if err != nil {
 		return fmt.Errorf("looking up solicited node multicast group for %q: %s", ip, err)
 	}
-	if n.solicitedNodeGroups[group.String()] == 0 {
+	if n.solicitedNodeGroups[group] == 0 {
 		if err = n.conn.JoinGroup(group); err != nil {
 			return fmt.Errorf("joining solicited node multicast group for %q: %s", ip, err)
 		}
 	}
-	n.solicitedNodeGroups[group.String()]++
+	n.solicitedNodeGroups[group]++
 	return nil
 }
 
-func (n *ndpClient) Unwatch(ip net.IP) error {
-	if ip.To4() != nil {
+func (n *ndpClient) Unwatch(ip netip.Addr) error {
+	if ip.Is4() {
 		return nil
 	}
 	group, err := ndp.SolicitedNodeMulticast(ip)
 	if err != nil {
 		return fmt.Errorf("looking up solicited node multicast group for %q: %s", ip, err)
 	}
-	n.solicitedNodeGroups[group.String()]--
-	if n.solicitedNodeGroups[group.String()] == 0 {
+	n.solicitedNodeGroups[group]--
+	if n.solicitedNodeGroups[group] == 0 {
 		if err = n.conn.LeaveGroup(group); err != nil {
 			return fmt.Errorf("leaving solicited node multicast group for %q: %s", ip, err)
 		}
@@ -155,7 +156,7 @@ func (n *ndpClient) processRequest() dropReason {
 	return dropReasonNone
 }
 
-func (n *ndpClient) advertise(dst, target net.IP, gratuitous bool) error {
+func (n *ndpClient) advertise(dst, target netip.Addr, gratuitous bool) error {
 	m := &ndp.NeighborAdvertisement{
 		Solicited:     !gratuitous, // <Adam Jensen> I never asked for this...
 		Override:      gratuitous,  // Should clients replace existing cache entries

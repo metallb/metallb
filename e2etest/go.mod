@@ -7,13 +7,13 @@ toolchain go1.26.9
 require (
 	github.com/google/go-cmp v0.7.0
 	github.com/metallb/frr-k8s v0.0.27
-	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.43.0
 	github.com/openshift-kni/k8sreporter v1.0.7
 	github.com/prometheus/client_model v0.6.3
 	github.com/prometheus/common v0.71.0
 	go.universe.tf/metallb v0.15.2
+	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb
 	golang.org/x/sync v0.23.0
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1

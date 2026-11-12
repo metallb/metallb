@@ -4,7 +4,7 @@ package allocator // import "go.universe.tf/metallb/internal/allocator"
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
 	"go.universe.tf/metallb/internal/ipfamily"
 	v1 "k8s.io/api/core/v1"
@@ -22,23 +22,23 @@ import (
 // - ipfamily.IPv6: Corresponds to the IPv6 address allocated for the service.
 type Allocation struct {
 	PoolName string
-	IPV4     net.IP
-	IPV6     net.IP
+	IPV4     netip.Addr
+	IPV6     netip.Addr
 }
 
-func (a *Allocation) getIPForFamily(family ipfamily.Family) net.IP {
+func (a *Allocation) getIPForFamily(family ipfamily.Family) netip.Addr {
 	switch family {
 	case ipfamily.IPv4:
 		return a.IPV4
 	case ipfamily.IPv6:
 		return a.IPV6
 	default:
-		return nil
+		return netip.Addr{}
 	}
 }
 
-func (a *Allocation) setIPForFamily(family ipfamily.Family, ip net.IP) {
-	if ip == nil {
+func (a *Allocation) setIPForFamily(family ipfamily.Family, ip netip.Addr) {
+	if !ip.IsValid() {
 		return
 	}
 	switch family {
@@ -54,36 +54,36 @@ func (a *Allocation) setIPForFamily(family ipfamily.Family, ip net.IP) {
 func (a *Allocation) selectIPsForFamilyAndPolicy(
 	serviceIPFamily ipfamily.Family,
 	serviceIPFamilyPolicy v1.IPFamilyPolicy,
-) ([]net.IP, error) {
+) ([]netip.Addr, error) {
 	ipv4 := a.getIPForFamily(ipfamily.IPv4)
 	ipv6 := a.getIPForFamily(ipfamily.IPv6)
 
 	// if we don't have dual cluster ips, we should align the lb ip to the clusterip
 	if serviceIPFamily == ipfamily.IPv4 {
-		return []net.IP{ipv4}, nil
+		return []netip.Addr{ipv4}, nil
 	}
 	if serviceIPFamily == ipfamily.IPv6 {
-		return []net.IP{ipv6}, nil
+		return []netip.Addr{ipv6}, nil
 	}
 
 	switch serviceIPFamilyPolicy {
 	case v1.IPFamilyPolicySingleStack:
-		if ip := a.getIPForFamily(serviceIPFamily); ip != nil {
-			return []net.IP{ip}, nil
+		if ip := a.getIPForFamily(serviceIPFamily); ip.IsValid() {
+			return []netip.Addr{ip}, nil
 		}
 	case v1.IPFamilyPolicyRequireDualStack:
-		if ipv4 != nil && ipv6 != nil {
-			return []net.IP{ipv4, ipv6}, nil
+		if ipv4.IsValid() && ipv6.IsValid() {
+			return []netip.Addr{ipv4, ipv6}, nil
 		}
 	case v1.IPFamilyPolicyPreferDualStack:
-		if ipv4 != nil && ipv6 != nil {
-			return []net.IP{ipv4, ipv6}, nil
+		if ipv4.IsValid() && ipv6.IsValid() {
+			return []netip.Addr{ipv4, ipv6}, nil
 		}
-		if ipv4 != nil {
-			return []net.IP{ipv4}, nil
+		if ipv4.IsValid() {
+			return []netip.Addr{ipv4}, nil
 		}
-		if ipv6 != nil {
-			return []net.IP{ipv6}, nil
+		if ipv6.IsValid() {
+			return []netip.Addr{ipv6}, nil
 		}
 	}
 	return nil, fmt.Errorf("no available IPs in pool %s for %s IPFamily", a.PoolName, serviceIPFamily)

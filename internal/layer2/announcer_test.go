@@ -3,7 +3,7 @@
 package layer2
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -12,7 +12,7 @@ import (
 func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 	announce := &Announce{
 		ips:      map[string][]IPAdvertisement{},
-		ipRefcnt: map[string]int{},
+		ipRefcnt: map[netip.Addr]int{},
 		spamCh:   make(chan IPAdvertisement, 1),
 	}
 
@@ -23,7 +23,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 		{
 			name: "foo",
 			adv: IPAdvertisement{
-				ip:            net.IPv4(192, 168, 1, 20),
+				ip:            netip.MustParseAddr("192.168.1.20"),
 				interfaces:    sets.Set[string]{},
 				allInterfaces: true,
 			},
@@ -31,7 +31,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 		{
 			name: "foo",
 			adv: IPAdvertisement{
-				ip:            net.ParseIP("1000::1"),
+				ip:            netip.MustParseAddr("1000::1"),
 				interfaces:    sets.New("eth0"),
 				allInterfaces: true,
 			},
@@ -39,7 +39,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 		{
 			name: "bar",
 			adv: IPAdvertisement{
-				ip:            net.IPv4(192, 168, 1, 20),
+				ip:            netip.MustParseAddr("192.168.1.20"),
 				interfaces:    sets.New("eth1"),
 				allInterfaces: false,
 			},
@@ -58,19 +58,19 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 	if len(announce.ips["foo"]) != 2 {
 		t.Fatalf("service foo has more than 2 ips: %d", len(announce.ips["foo"]))
 	}
-	if announce.ipRefcnt["192.168.1.20"] != 2 {
-		t.Fatalf("ip 192.168.1.20 has not 2 refcnt: %d", announce.ipRefcnt["192.168.1.20"])
+	if announce.ipRefcnt[netip.MustParseAddr("192.168.1.20")] != 2 {
+		t.Fatalf("ip 192.168.1.20 has not 2 refcnt: %d", announce.ipRefcnt[netip.MustParseAddr("192.168.1.20")])
 	}
 }
 
 func Test_MergedAdvertisementsPerIP(t *testing.T) {
-	ipA := net.IPv4(192, 168, 1, 100)
-	ipB := net.IPv4(192, 168, 1, 101)
+	ipA := netip.MustParseAddr("192.168.1.100")
+	ipB := netip.MustParseAddr("192.168.1.101")
 
 	tests := []struct {
 		name string
 		ips  map[string][]IPAdvertisement
-		want map[string]IPAdvertisement
+		want map[netip.Addr]IPAdvertisement
 	}{
 		{
 			name: "allInterfaces wins over interface set",
@@ -78,8 +78,8 @@ func Test_MergedAdvertisementsPerIP(t *testing.T) {
 				"svc1": {{ip: ipA, allInterfaces: true}},
 				"svc2": {{ip: ipA, interfaces: sets.New("eth0"), allInterfaces: false}},
 			},
-			want: map[string]IPAdvertisement{
-				ipA.String(): {ip: ipA, allInterfaces: true},
+			want: map[netip.Addr]IPAdvertisement{
+				ipA: {ip: ipA, allInterfaces: true},
 			},
 		},
 		{
@@ -88,8 +88,8 @@ func Test_MergedAdvertisementsPerIP(t *testing.T) {
 				"svc2": {{ip: ipA, interfaces: sets.New("eth0"), allInterfaces: false}},
 				"svc1": {{ip: ipA, allInterfaces: true}},
 			},
-			want: map[string]IPAdvertisement{
-				ipA.String(): {ip: ipA, allInterfaces: true},
+			want: map[netip.Addr]IPAdvertisement{
+				ipA: {ip: ipA, allInterfaces: true},
 			},
 		},
 		{
@@ -98,8 +98,8 @@ func Test_MergedAdvertisementsPerIP(t *testing.T) {
 				"svc1": {{ip: ipA, interfaces: sets.New("eth0"), allInterfaces: false}},
 				"svc2": {{ip: ipA, interfaces: sets.New("eth1"), allInterfaces: false}},
 			},
-			want: map[string]IPAdvertisement{
-				ipA.String(): {ip: ipA, interfaces: sets.New("eth0", "eth1"), allInterfaces: false},
+			want: map[netip.Addr]IPAdvertisement{
+				ipA: {ip: ipA, interfaces: sets.New("eth0", "eth1"), allInterfaces: false},
 			},
 		},
 		{
@@ -108,9 +108,9 @@ func Test_MergedAdvertisementsPerIP(t *testing.T) {
 				"svc1": {{ip: ipA, interfaces: sets.New("eth0"), allInterfaces: false}},
 				"svc2": {{ip: ipB, allInterfaces: true}},
 			},
-			want: map[string]IPAdvertisement{
-				ipA.String(): {ip: ipA, interfaces: sets.New("eth0"), allInterfaces: false},
-				ipB.String(): {ip: ipB, allInterfaces: true},
+			want: map[netip.Addr]IPAdvertisement{
+				ipA: {ip: ipA, interfaces: sets.New("eth0"), allInterfaces: false},
+				ipB: {ip: ipB, allInterfaces: true},
 			},
 		},
 	}
@@ -124,9 +124,9 @@ func Test_MergedAdvertisementsPerIP(t *testing.T) {
 			if len(merged) != len(tt.want) {
 				t.Fatalf("got %d merged advs, want %d", len(merged), len(tt.want))
 			}
-			byIP := map[string]IPAdvertisement{}
+			byIP := map[netip.Addr]IPAdvertisement{}
 			for _, adv := range merged {
-				key := adv.ip.String()
+				key := adv.ip
 				if _, dup := byIP[key]; dup {
 					t.Fatalf("duplicate merged advertisement for %s", key)
 				}
@@ -156,9 +156,9 @@ func Test_SendPeriodicGratuitous_IteratesEveryAnnouncedIP(t *testing.T) {
 	// path instead of only the merge helper.
 	arp := newFakeARPResponder("eth0")
 	ndp := newFakeNDPResponder("eth0")
-	ipV4 := net.IPv4(192, 168, 1, 20)
-	ipV6a := net.ParseIP("1000::1")
-	ipV6b := net.ParseIP("1000::2")
+	ipV4 := netip.MustParseAddr("192.168.1.20")
+	ipV6a := netip.MustParseAddr("1000::1")
+	ipV6b := netip.MustParseAddr("1000::2")
 	announce := &Announce{
 		arps: map[int]arpResponder{0: arp},
 		ndps: map[int]ndpResponder{0: ndp},
@@ -169,10 +169,10 @@ func Test_SendPeriodicGratuitous_IteratesEveryAnnouncedIP(t *testing.T) {
 			"baz": {{ip: ipV6b, allInterfaces: true}},
 			"qux": {{ip: ipV4, allInterfaces: true}},
 		},
-		ipRefcnt: map[string]int{
-			ipV4.String():  1,
-			ipV6a.String(): 2,
-			ipV6b.String(): 1,
+		ipRefcnt: map[netip.Addr]int{
+			ipV4:  1,
+			ipV6a: 2,
+			ipV6b: 1,
 		},
 		spamCh: make(chan IPAdvertisement, 1024),
 	}
@@ -180,17 +180,17 @@ func Test_SendPeriodicGratuitous_IteratesEveryAnnouncedIP(t *testing.T) {
 	announce.sendPeriodicGratuitous()
 
 	gotNDP := ndp.gratuitousCalls()
-	wantNDP := map[string]int{ipV6a.String(): 1, ipV6b.String(): 1}
+	wantNDP := map[netip.Addr]int{ipV6a: 1, ipV6b: 1}
 	assertGratuitousCounts(t, "NDP", gotNDP, wantNDP)
 	gotARP := arp.gratuitousCalls()
-	wantARP := map[string]int{ipV4.String(): 1}
+	wantARP := map[netip.Addr]int{ipV4: 1}
 	assertGratuitousCounts(t, "ARP", gotARP, wantARP)
 }
 
 // assertGratuitousCounts checks that each expected IP was pinged exactly the
 // wanted number of times (and no unexpected IPs were pinged), so we can catch
 // both missing announcements and accidental duplicates.
-func assertGratuitousCounts(t *testing.T, proto string, got, want map[string]int) {
+func assertGratuitousCounts(t *testing.T, proto string, got, want map[netip.Addr]int) {
 	t.Helper()
 	if len(got) != len(want) {
 		t.Fatalf("%s Gratuitous called for IPs %v, want %v", proto, got, want)
@@ -210,7 +210,7 @@ func assertGratuitousCounts(t *testing.T, proto string, got, want map[string]int
 // passed to Gratuitous.
 type fakeARPResponder struct {
 	intf       string
-	gratuitous []net.IP
+	gratuitous []netip.Addr
 }
 
 func newFakeARPResponder(intf string) *fakeARPResponder {
@@ -219,17 +219,17 @@ func newFakeARPResponder(intf string) *fakeARPResponder {
 
 func (f *fakeARPResponder) Interface() string { return f.intf }
 
-func (f *fakeARPResponder) Gratuitous(ip net.IP) error {
+func (f *fakeARPResponder) Gratuitous(ip netip.Addr) error {
 	f.gratuitous = append(f.gratuitous, ip)
 	return nil
 }
 
 func (f *fakeARPResponder) Close() error { return nil }
 
-func (f *fakeARPResponder) gratuitousCalls() map[string]int {
-	m := map[string]int{}
+func (f *fakeARPResponder) gratuitousCalls() map[netip.Addr]int {
+	m := map[netip.Addr]int{}
 	for _, ip := range f.gratuitous {
-		m[ip.String()]++
+		m[ip]++
 	}
 	return m
 }
@@ -238,7 +238,7 @@ func (f *fakeARPResponder) gratuitousCalls() map[string]int {
 // passed to Gratuitous.
 type fakeNDPResponder struct {
 	intf       string
-	gratuitous []net.IP
+	gratuitous []netip.Addr
 }
 
 func newFakeNDPResponder(intf string) *fakeNDPResponder {
@@ -247,19 +247,19 @@ func newFakeNDPResponder(intf string) *fakeNDPResponder {
 
 func (f *fakeNDPResponder) Interface() string { return f.intf }
 
-func (f *fakeNDPResponder) Gratuitous(ip net.IP) error {
+func (f *fakeNDPResponder) Gratuitous(ip netip.Addr) error {
 	f.gratuitous = append(f.gratuitous, ip)
 	return nil
 }
 
-func (f *fakeNDPResponder) Watch(net.IP) error   { return nil }
-func (f *fakeNDPResponder) Unwatch(net.IP) error { return nil }
-func (f *fakeNDPResponder) Close() error         { return nil }
+func (f *fakeNDPResponder) Watch(netip.Addr) error   { return nil }
+func (f *fakeNDPResponder) Unwatch(netip.Addr) error { return nil }
+func (f *fakeNDPResponder) Close() error             { return nil }
 
-func (f *fakeNDPResponder) gratuitousCalls() map[string]int {
-	m := map[string]int{}
+func (f *fakeNDPResponder) gratuitousCalls() map[netip.Addr]int {
+	m := map[netip.Addr]int{}
 	for _, ip := range f.gratuitous {
-		m[ip.String()]++
+		m[ip]++
 	}
 	return m
 }

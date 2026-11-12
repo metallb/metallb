@@ -4,6 +4,7 @@ package frr
 
 import (
 	"fmt"
+	"net/netip"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -16,7 +17,7 @@ import (
 // frr instance may be configured with more nodes than are currently
 // paired.
 func NeighborsMatchNodes(nodes []v1.Node, neighbors NeighborsMap, ipFamily ipfamily.Family, vrfName string) error {
-	nodesIPs := map[string]struct{}{}
+	nodesIPs := map[netip.Addr]struct{}{}
 
 	ips, err := k8s.NodeIPsForFamily(nodes, ipFamily, vrfName)
 	if err != nil {
@@ -26,13 +27,18 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors NeighborsMap, ipFamily ipfam
 		nodesIPs[ip] = struct{}{}
 	}
 	for _, n := range neighbors {
-		if _, ok := nodesIPs[n.ID]; !ok { // skipping neighbors that are not nodes
+		neighborIP, err := netip.ParseAddr(n.ID)
+		if err != nil {
+			continue // FRR may use an interface name as an unnumbered neighbor ID.
+		}
+		neighborIP = neighborIP.Unmap()
+		if _, ok := nodesIPs[neighborIP]; !ok { // skipping neighbors that are not nodes
 			continue
 		}
 		if !n.Connected {
 			return fmt.Errorf("node %s BGP session not established", n.ID)
 		}
-		delete(nodesIPs, n.ID)
+		delete(nodesIPs, neighborIP)
 	}
 	if len(nodesIPs) != 0 { // some leftover, meaning more nodes than neighbors
 		return fmt.Errorf("vrfName=%s ,nodeIPS=%v vs nextHops=%v\n", vrfName, ips, neighbors)
@@ -43,7 +49,7 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors NeighborsMap, ipFamily ipfam
 // RoutesMatchNodes tells if ALL the given nodes are exposed as
 // destinations for the given address.
 func RoutesMatchNodes(nodes []v1.Node, route Route, ipFamily ipfamily.Family, vrfName string) error {
-	nodesIPs := map[string]struct{}{}
+	nodesIPs := map[netip.Addr]struct{}{}
 
 	ips, err := k8s.NodeIPsForFamily(nodes, ipFamily, vrfName)
 	if err != nil {
@@ -54,11 +60,12 @@ func RoutesMatchNodes(nodes []v1.Node, route Route, ipFamily ipfamily.Family, vr
 	}
 
 	for _, h := range route.NextHops {
-		if _, ok := nodesIPs[h.String()]; !ok { // skipping neighbors that are not nodes
-			return fmt.Errorf("%s not found in nodes ips, %v", h.String(), nodesIPs)
+		h = h.Unmap()
+		if _, ok := nodesIPs[h]; !ok { // skipping neighbors that are not nodes
+			return fmt.Errorf("%s not found in nodes ips, %v", h, nodesIPs)
 		}
 
-		delete(nodesIPs, h.String())
+		delete(nodesIPs, h)
 	}
 	if len(nodesIPs) != 0 { // some leftover, meaning more nodes than routes
 		return fmt.Errorf("vrfName=%s ,nodeIPS=%v vs nextHops=%v\n", vrfName, ips, route.NextHops)
@@ -68,8 +75,8 @@ func RoutesMatchNodes(nodes []v1.Node, route Route, ipFamily ipfamily.Family, vr
 
 // BFDPeersMatchNodes verifies that the BFD peers exactly match the node IPs for the given
 // IP family and VRF.
-func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]BFDPeer, ipFamily ipfamily.Family, vrfName string) error {
-	nodesIPs := map[string]struct{}{}
+func BFDPeersMatchNodes(nodes []v1.Node, peers map[netip.Addr]BFDPeer, ipFamily ipfamily.Family, vrfName string) error {
+	nodesIPs := map[netip.Addr]struct{}{}
 	ips, err := k8s.NodeIPsForFamily(nodes, ipFamily, vrfName)
 	if err != nil {
 		return err
@@ -80,9 +87,9 @@ func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]BFDPeer, ipFamily ipfa
 			return fmt.Errorf("address %s not found in peers", ip)
 		}
 	}
-	for k := range peers {
-		if _, ok := nodesIPs[k]; !ok {
-			return fmt.Errorf("%s not found in nodes ips %v", k, nodesIPs)
+	for peerIP := range peers {
+		if _, ok := nodesIPs[peerIP.Unmap()]; !ok {
+			return fmt.Errorf("%s not found in nodes ips %v", peerIP, nodesIPs)
 		}
 	}
 	return nil

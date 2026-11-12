@@ -102,7 +102,7 @@ func findIPv6BGPAdvertisement(c ClusterResources) error {
 				return fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
 			}
 			for _, n := range nets {
-				if n.IP.To4() == nil {
+				if !n.Addr().Unmap().Is4() {
 					return fmt.Errorf("pool %q has ipv6 CIDR %s, native bgp mode does not support ipv6", p.Name, n)
 				}
 			}

@@ -5,7 +5,7 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -557,7 +557,7 @@ var _ = Describe("Layer2 Status Controller", func() {
 
 			// simulate some service is advertised
 			layer2ServiceAdvs = append(layer2ServiceAdvs,
-				layer2.NewIPAdvertisement(net.IP("127.0.0.1"), true, sets.Set[string]{}))
+				layer2.NewIPAdvertisement(netip.MustParseAddr("127.0.0.1"), true, sets.Set[string]{}))
 			// notify reconciler to reconcile
 			layer2StatusUpdateChan <- NewL2StatusEvent(testNamespace, testServiceName)
 			Eventually(func() string {
@@ -576,7 +576,7 @@ var _ = Describe("Layer2 Status Controller", func() {
 			interfaces := sets.Set[string]{}
 			newInterface := "eth0"
 			interfaces.Insert(newInterface)
-			updateLayer2Advs([]layer2.IPAdvertisement{layer2.NewIPAdvertisement(net.IP("127.0.0.1"), false, interfaces)})
+			updateLayer2Advs([]layer2.IPAdvertisement{layer2.NewIPAdvertisement(netip.MustParseAddr("127.0.0.1"), false, interfaces)})
 			layer2StatusUpdateChan <- NewL2StatusEvent(testNamespace, testServiceName)
 			Eventually(func() string {
 				statuses, err := statusObjFetcherFunc()
@@ -626,7 +626,7 @@ var _ = Describe("Layer2 Status Controller", func() {
 
 			// Simulate our node becoming the leader for this service
 			updateLayer2Advs([]layer2.IPAdvertisement{
-				layer2.NewIPAdvertisement(net.IP("127.0.0.2"), true, sets.Set[string]{}),
+				layer2.NewIPAdvertisement(netip.MustParseAddr("127.0.0.2"), true, sets.Set[string]{}),
 			})
 
 			// Trigger reconciliation for the same service
