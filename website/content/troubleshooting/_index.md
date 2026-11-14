@@ -107,10 +107,12 @@ NAME      TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)
 example   LoadBalancer   10.107.139.129  192.168.1.101   443:31772/TCP
 ```
 
-In this case, test `https://192.168.1.101:443`. Port `31772` is the NodePort
-and is used with a node IP, such as `<node-ip>:31772`. A failed connection to
-`192.168.1.101:31772` does not show that the LoadBalancer IP is not being
-advertised.
+In this case, test port `443` on `192.168.1.101` using the protocol expected by
+the application. For an HTTPS application, this could be
+`https://192.168.1.101:443`; use the expected hostname when TLS requires it.
+Port `31772` is the NodePort and is used with a node IP, such as
+`<node-ip>:31772`. A failed connection to `192.168.1.101:31772` does not show
+that the LoadBalancer IP is not being advertised.
 
 ### Checking the L2 advertisement works
 
