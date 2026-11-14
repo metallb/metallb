@@ -96,6 +96,22 @@ the issue is to provide the speakers with the `--ignore-exclude-lb` flag (either
 
 ## MetalLB says it advertises the service but reaching the service does not work
 
+### Check the service port
+
+When testing the LoadBalancer IP, use the Service port, not the NodePort.
+The `PORT(S)` column printed by `kubectl get service` uses the format
+`<port>:<nodePort>/<protocol>`. For example:
+
+```text
+NAME      TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)
+example   LoadBalancer   10.107.139.129  192.168.1.101   443:31772/TCP
+```
+
+In this case, test `https://192.168.1.101:443`. Port `31772` is the NodePort
+and is used with a node IP, such as `<node-ip>:31772`. A failed connection to
+`192.168.1.101:31772` does not show that the LoadBalancer IP is not being
+advertised.
+
 ### Checking the L2 advertisement works
 
 In order to have MetalLB advertise via L2, an **L2Advertisement instance must be created**. This is different from the original
