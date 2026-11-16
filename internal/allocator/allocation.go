@@ -60,9 +60,15 @@ func (a *Allocation) selectIPsForFamilyAndPolicy(
 
 	// if we don't have dual cluster ips, we should align the lb ip to the clusterip
 	if serviceIPFamily == ipfamily.IPv4 {
+		if ipv4 == nil {
+			return nil, fmt.Errorf("no available IPv4 in pool %s", a.PoolName)
+		}
 		return []net.IP{ipv4}, nil
 	}
 	if serviceIPFamily == ipfamily.IPv6 {
+		if ipv6 == nil {
+			return nil, fmt.Errorf("no available IPv6 in pool %s", a.PoolName)
+		}
 		return []net.IP{ipv6}, nil
 	}
 
