@@ -397,7 +397,7 @@ spec:
   - vpn-only
 ```
 
-### Peering and annoucing via a VRF
+### Peering and announcing via a VRF
 
 It's possible to establish a BGP connection using interfaces having a [linux vrf](https://docs.kernel.org/networking/vrf.html)
 as master. In order to do so, the `vrf` field of the `BGPPeer` structure must be set:
@@ -423,7 +423,7 @@ session is established from.
 {{% notice note %}}
 MetalLB will attract the traffic toward the interface in the VRF, but some setup on
 the host network is required in order to allow the traffic to reach the CNI.
-This falls outside of the responsabilities of MetalLB.
+This falls outside of the responsibilities of MetalLB.
 {{% /notice %}}
 
 ### Configuring with FRR-K8s

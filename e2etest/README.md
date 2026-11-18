@@ -77,7 +77,7 @@ and the containers involved.
                        └──────────────────────────────────────────────────┘
 ```
 
-The same layout is replicated to validate external routers reacheable via a VRF.
+The same layout is replicated to validate external routers reachable via a VRF.
 
 So, on top of what's described above, there is another set of 4 containers meant
 to be reached using an interface hosted inside a vrf created on the node:
