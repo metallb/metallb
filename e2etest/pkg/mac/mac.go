@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/netip"
 	"regexp"
 	"strings"
 
@@ -28,9 +29,14 @@ type ipIface struct {
 
 // ForIP returns the MAC address of a given IP.
 func ForIP(ip string, exec executor.Executor) (net.HardwareAddr, error) {
+	address, err := netip.ParseAddr(ip)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse address %q: %w", ip, err)
+	}
+	address = address.Unmap()
 	macRe := regexp.MustCompile("([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})")
 
-	res, err := exec.Exec("ip", []string{"neigh", "show", ip}...)
+	res, err := exec.Exec("ip", []string{"neigh", "show", address.String()}...)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +54,7 @@ func ForIP(ip string, exec executor.Executor) (net.HardwareAddr, error) {
 		return mac, nil
 	}
 
-	return nil, fmt.Errorf("could not resolve MAC for ip %s", ip)
+	return nil, fmt.Errorf("could not resolve MAC for ip %s", address)
 }
 
 // MatchNode returns the node with the given MAC address.
@@ -58,11 +64,15 @@ func MatchNode(nodes []corev1.Node, mac net.HardwareAddr, exec executor.Executor
 		return nil, err
 	}
 
-	nodesIPs := map[string]corev1.Node{}
+	nodesIPs := map[netip.Addr]corev1.Node{}
 	for _, n := range nodes {
 		for _, a := range n.Status.Addresses {
 			if a.Type == corev1.NodeInternalIP {
-				nodesIPs[a.Address] = n
+				ip, err := netip.ParseAddr(a.Address)
+				if err != nil {
+					return nil, fmt.Errorf("invalid node internal IP %q on node %s: %w", a.Address, n.Name, err)
+				}
+				nodesIPs[ip.Unmap()] = n
 			}
 		}
 	}
@@ -81,11 +91,11 @@ func MatchNode(nodes []corev1.Node, mac net.HardwareAddr, exec executor.Executor
 		}
 
 		netIP := routes.ParseIPToken(r)
-		if netIP == nil {
+		if !netIP.IsValid() {
 			continue
 		}
 
-		if n, ok := nodesIPs[netIP.String()]; ok {
+		if n, ok := nodesIPs[netIP]; ok {
 			return &n, nil
 		}
 	}
@@ -98,7 +108,11 @@ func UpdateNodeCache(nodes []corev1.Node, exec executor.Executor) error {
 	for _, n := range nodes {
 		for _, a := range n.Status.Addresses {
 			if a.Type == corev1.NodeInternalIP {
-				_, err := exec.Exec("ping", []string{a.Address, "-c", "1"}...)
+				ip, err := netip.ParseAddr(a.Address)
+				if err != nil {
+					return fmt.Errorf("invalid node internal IP %q on node %s: %w", a.Address, n.Name, err)
+				}
+				_, err = exec.Exec("ping", []string{ip.Unmap().String(), "-c", "1"}...)
 				if err != nil {
 					return err
 				}
@@ -111,10 +125,11 @@ func UpdateNodeCache(nodes []corev1.Node, exec executor.Executor) error {
 
 // RequestAddressResolution does an ARP/NS request for the given IP.
 func RequestAddressResolution(ip string, exc executor.Executor) error {
-	netIP := net.ParseIP(ip)
-	if netIP == nil {
-		return fmt.Errorf("failed to convert %s to net.IP", ip)
+	netIP, err := netip.ParseAddr(ip)
+	if err != nil {
+		return fmt.Errorf("failed to parse address %q: %w", ip, err)
 	}
+	netIP = netIP.Unmap()
 
 	iface, err := ifaceForIPNetwork(netIP, exc)
 	if err != nil {
@@ -126,13 +141,14 @@ func RequestAddressResolution(ip string, exc executor.Executor) error {
 
 // RequestAddressResolutionFromIface does an ARP/NS request for the given IP from the given interface.
 func RequestAddressResolutionFromIface(ip string, iface string, exec executor.Executor) error {
-	netIP := net.ParseIP(ip)
-	if netIP == nil {
-		return fmt.Errorf("failed to convert %s to net.IP", ip)
+	netIP, err := netip.ParseAddr(ip)
+	if err != nil {
+		return fmt.Errorf("failed to parse address %q: %w", ip, err)
 	}
+	netIP = netIP.Unmap()
 	var cmd string
 	var args []string
-	if netIP.To4() != nil {
+	if netIP.Is4() {
 		cmd = "arping"
 		args = []string{"-c", "1", "-I", iface, netIP.String()}
 	} else {
@@ -150,7 +166,11 @@ func RequestAddressResolutionFromIface(ip string, iface string, exec executor.Ex
 
 // FlushIPNeigh flush the ip from ip neighbor table.
 func FlushIPNeigh(ip string, exec executor.Executor) error {
-	out, err := exec.Exec("ip", "neigh", "flush", "to", ip)
+	address, err := netip.ParseAddr(ip)
+	if err != nil {
+		return fmt.Errorf("failed to parse address %q: %w", ip, err)
+	}
+	out, err := exec.Exec("ip", "neigh", "flush", "to", address.Unmap().String())
 	if err != nil {
 		return errors.Join(err, errors.New(out))
 	}
@@ -182,7 +202,7 @@ func GetIfaceMac(iface string, exec executor.Executor) (net.HardwareAddr, error)
 }
 
 // ifaceForIPNetwork returns the interface name that is in the same network as the IP.
-func ifaceForIPNetwork(ip net.IP, exec executor.Executor) (string, error) {
+func ifaceForIPNetwork(ip netip.Addr, exec executor.Executor) (string, error) {
 	ifaces := []ipIface{}
 	res, err := exec.Exec("ip", "--json", "address", "show")
 	if err != nil {
@@ -196,11 +216,21 @@ func ifaceForIPNetwork(ip net.IP, exec executor.Executor) (string, error) {
 
 	for _, intf := range ifaces {
 		for _, addr := range intf.AddrInfo {
-			_, ipnet, err := net.ParseCIDR(fmt.Sprintf("%s/%d", addr.Local, addr.Prefixlen))
+			local, err := netip.ParseAddr(addr.Local)
 			if err != nil {
-				return "", errors.Join(err, fmt.Errorf("failed to parse CIDR from interface %s %s", intf.Ifname, fmt.Sprintf("%s/%d", addr.Local, addr.Prefixlen)))
+				return "", errors.Join(err, fmt.Errorf("failed to parse interface address %s %s", intf.Ifname, addr.Local))
 			}
-			if ipnet.Contains(ip) {
+			mapped := local.Is4In6()
+			local = local.Unmap()
+			bits := addr.Prefixlen
+			if mapped {
+				bits -= 96
+			}
+			prefix := netip.PrefixFrom(local, bits)
+			if !prefix.IsValid() {
+				return "", fmt.Errorf("invalid interface prefix %s/%d on %s", addr.Local, addr.Prefixlen, intf.Ifname)
+			}
+			if prefix.Masked().Contains(ip.Unmap()) {
 				return intf.Ifname, nil
 			}
 		}

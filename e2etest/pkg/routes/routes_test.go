@@ -3,7 +3,7 @@
 package routes
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 )
 
@@ -37,11 +37,11 @@ func TestParseIPToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := ParseIPToken(tt.input)
-			if got == nil {
+			if !got.IsValid() {
 				t.Fatalf("ParseIPToken(%q) = nil, want %s", tt.input, tt.want)
 			}
-			wantIP := net.ParseIP(tt.want)
-			if !got.Equal(wantIP) {
+			wantIP := netip.MustParseAddr(tt.want)
+			if got != wantIP {
 				t.Fatalf("ParseIPToken(%q) = %s, want %s", tt.input, got, wantIP)
 			}
 		})
@@ -57,7 +57,7 @@ func TestParseIPTokenInvalid(t *testing.T) {
 		"gggg::1 dev eth0",
 	}
 	for _, input := range invalid {
-		if got := ParseIPToken(input); got != nil {
+		if got := ParseIPToken(input); got.IsValid() {
 			t.Errorf("ParseIPToken(%q) = %s, want nil", input, got)
 		}
 	}

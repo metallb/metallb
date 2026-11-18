@@ -9,17 +9,17 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/memberlist v0.6.0
-	github.com/mdlayher/arp v0.0.0-20220221190821-c37aaafac7f9
+	github.com/mdlayher/arp v0.0.0-20260923112748-e9ee4960293e
 	github.com/mdlayher/ethernet v0.0.0-20220221185849-529eae5b6118
-	github.com/mdlayher/ndp v0.0.0-20200602162440-17ab9e3e5567
+	github.com/mdlayher/ndp v1.1.0
 	github.com/metallb/frr-k8s v0.0.27
-	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.43.0
 	github.com/open-policy-agent/cert-controller v0.16.0
 	github.com/ory/dockertest/v3 v3.12.0
 	github.com/prometheus/client_golang v1.24.1
 	go.uber.org/zap v1.28.0
+	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb
 	golang.org/x/sys v0.48.0
 	k8s.io/api v0.37.1
 	k8s.io/apiextensions-apiserver v0.37.1
@@ -93,11 +93,11 @@ require (
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/josharian/native v1.0.0 // indirect
+	github.com/josharian/native v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/mdlayher/packet v1.0.0 // indirect
-	github.com/mdlayher/socket v0.2.1 // indirect
+	github.com/mdlayher/packet v1.1.2 // indirect
+	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/user v0.4.1 // indirect
@@ -121,7 +121,6 @@ require (
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
-	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
 	go.opentelemetry.io/otel v1.45.0 // indirect

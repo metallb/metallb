@@ -5,7 +5,7 @@ package bgptests
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -198,12 +198,16 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 					for _, ip := range svc.Status.LoadBalancer.Ingress {
 						ingressIP := jigservice.GetIngressPoint(&ip)
 						Eventually(func() error {
-							addressFamily := ipfamily.ForAddress(net.ParseIP(ingressIP))
+							ip, err := netip.ParseAddr(ingressIP)
+							if err != nil {
+								return fmt.Errorf("invalid service ingress IP %q: %w", ingressIP, err)
+							}
+							addressFamily := ipfamily.ForAddress(ip)
 							routes, err := frr.RoutesForCommunity(c, CommunityNoAdv, addressFamily)
 							if err != nil {
 								return err
 							}
-							if _, ok := routes[ingressIP]; !ok {
+							if _, ok := routes[routeKey(ingressIP)]; !ok {
 								return fmt.Errorf("%s route not found for community %s", ingressIP, CommunityNoAdv)
 							}
 							// LocalPref check is only valid for iBGP sessions

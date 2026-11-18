@@ -18,7 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
-	"net"
+	"net/netip"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -314,7 +314,7 @@ type controller struct {
 
 	protocolHandlers map[config.Proto]Protocol
 	announced        map[config.Proto]map[string]bool // for each protocol, says if we are advertising the given service
-	svcIPs           map[string][]net.IP              // service name -> assigned IPs
+	svcIPs           map[string][]netip.Addr          // service name -> assigned IPs
 
 	protocols []config.Proto
 
@@ -394,7 +394,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 		bgpType:               cfg.bgpType,
 		protocolHandlers:      handlers,
 		announced:             map[config.Proto]map[string]bool{},
-		svcIPs:                map[string][]net.IP{},
+		svcIPs:                map[string][]netip.Addr{},
 		protocols:             protocols,
 		layer2StatusFetchFunc: layer2StatusFetcher,
 		bgpPeersFetcher:       bgpPeersFetcher,
@@ -428,13 +428,15 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, epS
 		return c.deleteBalancer(l, name, "noIPAllocated")
 	}
 
-	lbIPs := []net.IP{}
+	lbIPs := []netip.Addr{}
 	for i := range svc.Status.LoadBalancer.Ingress {
-		lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[i].IP)
-		if lbIP == nil {
+		lbIP, err := netip.ParseAddr(svc.Status.LoadBalancer.Ingress[i].IP)
+		if err != nil {
 			level.Error(l).Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[i].IP), "msg", "invalid IP allocated by controller")
 			return c.deleteBalancer(l, name, "invalidIP")
 		}
+		// Normalize before passing IPs to protocol handlers.
+		lbIP = lbIP.Unmap()
 		lbIPs = append(lbIPs, lbIP)
 	}
 
@@ -470,7 +472,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, epS
 
 func (c *controller) handleService(l log.Logger,
 	name string,
-	lbIPs []net.IP,
+	lbIPs []netip.Addr,
 	svc *v1.Service, pool *config.Pool,
 	eps []discovery.EndpointSlice,
 	protocol config.Proto) controllers.SyncState {
@@ -555,7 +557,7 @@ func (c *controller) deleteBalancerProtocol(l log.Logger, protocol config.Proto,
 	return controllers.SyncStateSuccess
 }
 
-func poolFor(pools *config.Pools, ips []net.IP) string {
+func poolFor(pools *config.Pools, ips []netip.Addr) string {
 	if pools == nil {
 		return ""
 	}
@@ -576,7 +578,7 @@ func poolFor(pools *config.Pools, ips []net.IP) string {
 	return ""
 }
 
-func compareIPs(ips1, ips2 []net.IP) bool {
+func compareIPs(ips1, ips2 []netip.Addr) bool {
 	if len(ips1) != len(ips2) {
 		return false
 	}
@@ -584,7 +586,7 @@ func compareIPs(ips1, ips2 []net.IP) bool {
 	for _, ip1 := range ips1 {
 		found := false
 		for _, ip2 := range ips2 {
-			if ip1.Equal(ip2) {
+			if ip1 == ip2 {
 				found = true
 				break
 			}
@@ -683,8 +685,8 @@ func isNodeAvailableChanged(oldNodes map[string]*v1.Node, newNode *v1.Node) bool
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
-	ShouldAnnounce(log.Logger, string, []net.IP, *config.Pool, *v1.Service, []discovery.EndpointSlice, map[string]*v1.Node) string
-	SetBalancer(log.Logger, string, []net.IP, *config.Pool, service, *v1.Service) error
+	ShouldAnnounce(log.Logger, string, []netip.Addr, *config.Pool, *v1.Service, []discovery.EndpointSlice, map[string]*v1.Node) string
+	SetBalancer(log.Logger, string, []netip.Addr, *config.Pool, service, *v1.Service) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
 	SetEventCallback(func(interface{}))

@@ -4,7 +4,7 @@ package routes
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
 	"errors"
 
@@ -13,16 +13,22 @@ import (
 
 // Add route to target via for the given Executor.
 func Add(exec executor.Executor, target, via, routingTable string) error {
-	_, dst, err := net.ParseCIDR(target)
+	dst, err := netip.ParsePrefix(target)
 	if err != nil {
 		return err
 	}
+	dst = dst.Masked()
+	dst = normalizePrefix(dst)
 
-	gw := net.ParseIP(via)
+	gw, err := netip.ParseAddr(via)
+	if err != nil {
+		return fmt.Errorf("invalid gateway address %q: %w", via, err)
+	}
+	gw = gw.Unmap()
 
 	cmd := "ip"
 	args := []string{"route", "add"}
-	if dst.IP.To4() == nil {
+	if !dst.Addr().Is4() {
 		args = []string{"-6", "route", "add"}
 	}
 	if routingTable != "" {
@@ -39,16 +45,22 @@ func Add(exec executor.Executor, target, via, routingTable string) error {
 
 // Delete route to target via for the given Executor.
 func Delete(exec executor.Executor, target, via, routingTable string) error {
-	_, dst, err := net.ParseCIDR(target)
+	dst, err := netip.ParsePrefix(target)
 	if err != nil {
 		return err
 	}
+	dst = dst.Masked()
+	dst = normalizePrefix(dst)
 
-	gw := net.ParseIP(via)
+	gw, err := netip.ParseAddr(via)
+	if err != nil {
+		return fmt.Errorf("invalid gateway address %q: %w", via, err)
+	}
+	gw = gw.Unmap()
 
 	cmd := "ip"
 	args := []string{"route", "del"}
-	if dst.IP.To4() == nil {
+	if !dst.Addr().Is4() {
 		args = []string{"-6", "route", "del"}
 	}
 	if routingTable != "" {
@@ -61,4 +73,11 @@ func Delete(exec executor.Executor, target, via, routingTable string) error {
 	}
 
 	return nil
+}
+
+func normalizePrefix(prefix netip.Prefix) netip.Prefix {
+	if prefix.Addr().Is4In6() && prefix.Bits() >= 96 {
+		return netip.PrefixFrom(prefix.Addr().Unmap(), prefix.Bits()-96)
+	}
+	return prefix
 }

@@ -3,9 +3,8 @@
 package frr
 
 import (
-	"bytes"
 	"fmt"
-	"net"
+	"net/netip"
 	"sort"
 	"strings"
 	"testing"
@@ -547,9 +546,9 @@ func TestNeighbours(t *testing.T) {
 		holdTime  int
 		keepalive int
 	}{
-		"172.18.0.2":           {holdTime: 180000, keepalive: 60000},
-		"172.18.0.3":           {holdTime: 180000, keepalive: 60000},
-		"172.18.0.4":           {holdTime: 180000, keepalive: 60000},
+		"172.18.0.2":            {holdTime: 180000, keepalive: 60000},
+		"172.18.0.3":            {holdTime: 180000, keepalive: 60000},
+		"172.18.0.4":            {holdTime: 180000, keepalive: 60000},
 		"fc00:f853:ccd:e793::4": {holdTime: 90000, keepalive: 30000},
 	}
 
@@ -643,25 +642,47 @@ func TestRoutes(t *testing.T) {
 		t.Fatalf("Failed to parse %s", err)
 	}
 
-	ipRoutes, ok := rr["192.168.10.0"]
+	ipRoutes, ok := rr[netip.MustParseAddr("192.168.10.0")]
 	if !ok {
 		t.Fatalf("Routes for 192.168.10.0/32 not found")
 	}
+	if want := netip.MustParsePrefix("192.168.10.0/32"); ipRoutes.Destination != want {
+		t.Fatalf("route destination = %s, want %s", ipRoutes.Destination, want)
+	}
 
-	ips := make([]net.IP, 0)
+	ips := make([]netip.Addr, 0)
 	ips = append(ips, ipRoutes.NextHops...)
 
 	sort.Slice(ips, func(i, j int) bool {
-		return (bytes.Compare(ips[i], ips[j]) < 0)
+		return ips[i].Compare(ips[j]) < 0
 	})
-	if !ips[0].Equal(net.ParseIP("172.18.0.2")) {
+	if ips[0] != netip.MustParseAddr("172.18.0.2") {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !ips[1].Equal(net.ParseIP("172.18.0.3")) {
+	if ips[1] != netip.MustParseAddr("172.18.0.3") {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !ips[2].Equal(net.ParseIP("172.18.0.4")) {
+	if ips[2] != netip.MustParseAddr("172.18.0.4") {
 		t.Fatal("neighbour ip not matching")
+	}
+}
+
+func TestParseRoutesNormalizesMappedAddresses(t *testing.T) {
+	const input = `{"routes":{"::ffff:192.0.2.0/120":[{"nexthops":[{"ip":"::ffff:192.0.2.1"},{"ip":"fe80::1","scope":"link-local"}]}]}}`
+
+	routes, err := ParseRoutes(input)
+	if err != nil {
+		t.Fatalf("ParseRoutes() error = %v", err)
+	}
+	route, ok := routes[netip.MustParseAddr("192.0.2.0")]
+	if !ok {
+		t.Fatalf("route with normalized IPv4 destination not found: %v", routes)
+	}
+	if want := netip.MustParsePrefix("192.0.2.0/24"); route.Destination != want {
+		t.Errorf("destination = %s, want %s", route.Destination, want)
+	}
+	if len(route.NextHops) != 1 || route.NextHops[0] != netip.MustParseAddr("192.0.2.1") {
+		t.Errorf("next hops = %v, want [192.0.2.1]", route.NextHops)
 	}
 }
 

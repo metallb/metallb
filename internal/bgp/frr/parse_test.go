@@ -3,9 +3,8 @@
 package frr
 
 import (
-	"bytes"
 	"fmt"
-	"net"
+	"net/netip"
 	"sort"
 	"testing"
 
@@ -151,7 +150,7 @@ func TestNeighbour(t *testing.T) {
 			if err != nil {
 				t.Fatal("Failed to parse ", err)
 			}
-			if !n.IP.Equal(net.ParseIP(tt.neighborIP)) {
+			if n.IP != netip.MustParseAddr(tt.neighborIP) {
 				t.Fatal("Expected neighbour ip", tt.neighborIP, "got", n.IP.String())
 			}
 			if n.RemoteAS != tt.remoteAS {
@@ -499,16 +498,16 @@ func TestNeighbours(t *testing.T) {
 		t.Fatalf("Expected 4 neighbours, got %d", len(nn))
 	}
 	sort.Slice(nn, func(i, j int) bool {
-		return (bytes.Compare(nn[i].IP, nn[j].IP) < 0)
+		return (nn[i].IP.Compare(nn[j].IP) < 0)
 	})
 
-	if !nn[0].IP.Equal(net.ParseIP("172.18.0.2")) {
+	if nn[0].IP != netip.MustParseAddr("172.18.0.2") {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !nn[1].IP.Equal(net.ParseIP("172.18.0.3")) {
+	if nn[1].IP != netip.MustParseAddr("172.18.0.3") {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !nn[2].IP.Equal(net.ParseIP("172.18.0.4")) {
+	if nn[2].IP != netip.MustParseAddr("172.18.0.4") {
 		t.Fatal("neighbour ip not matching")
 	}
 
@@ -595,24 +594,24 @@ func TestRoutes(t *testing.T) {
 		t.Fatalf("Failed to parse %s", err)
 	}
 
-	ipRoutes, ok := rr["192.168.10.0"]
+	ipRoutes, ok := rr[netip.MustParseAddr("192.168.10.0")]
 	if !ok {
 		t.Fatalf("Routes for 192.168.10.0/32 not found")
 	}
 
-	ips := make([]net.IP, 0)
+	ips := make([]netip.Addr, 0)
 	ips = append(ips, ipRoutes.NextHops...)
 
 	sort.Slice(ips, func(i, j int) bool {
-		return (bytes.Compare(ips[i], ips[j]) < 0)
+		return (ips[i].Compare(ips[j]) < 0)
 	})
-	if !ips[0].Equal(net.ParseIP("172.18.0.2")) {
+	if ips[0] != netip.MustParseAddr("172.18.0.2") {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !ips[1].Equal(net.ParseIP("172.18.0.3")) {
+	if ips[1] != netip.MustParseAddr("172.18.0.3") {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !ips[2].Equal(net.ParseIP("172.18.0.4")) {
+	if ips[2] != netip.MustParseAddr("172.18.0.4") {
 		t.Fatal("neighbour ip not matching")
 	}
 }

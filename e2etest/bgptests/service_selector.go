@@ -5,7 +5,7 @@ package bgptests
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"time"
 
 	"go.universe.tf/e2etest/pkg/config"
@@ -30,9 +30,9 @@ import (
 )
 
 const (
-	environmentLabelKey         = "environment"
-	environmentLabelProd        = "production"
-	environmentLabelStaged      = "staged"
+	environmentLabelKey    = "environment"
+	environmentLabelProd   = "production"
+	environmentLabelStaged = "staged"
 )
 
 var _ = ginkgo.Describe("BGP Service Selector", func() {
@@ -247,9 +247,9 @@ var _ = ginkgo.Describe("BGP Service Selector", func() {
 					}
 
 					for _, ip := range otherSvc.Status.LoadBalancer.Ingress {
-						_, found := frrRoutesV4[ip.IP]
+						_, found := frrRoutesV4[routeKey(ip.IP)]
 						if pairingIPFamily == ipfamily.IPv6 {
-							_, found = frrRoutesV6[ip.IP]
+							_, found = frrRoutesV6[routeKey(ip.IP)]
 						}
 						if found {
 							return fmt.Errorf("other service IP %s should not be advertised to %s", ip.IP, c.Name)
@@ -514,33 +514,24 @@ var _ = ginkgo.Describe("BGP Service Selector", func() {
 			defer testservice.Delete(cs, svcStaged)
 
 			ginkgo.By("Verifying external FRR receives routes from both services")
-			bits := 32
-			if pairingIPFamily == ipfamily.IPv6 {
-				bits = 128
-			}
-			routeHasAggregationLength := func(routes map[string]frr.Route, aggregatedPrefixIP string) error {
+			routeHasAggregationLength := func(routes map[netip.Addr]frr.Route, aggregatedPrefixIP netip.Addr) error {
 				r, ok := routes[aggregatedPrefixIP]
 				if !ok {
 					return fmt.Errorf("no route for aggregated prefix %q", aggregatedPrefixIP)
 				}
-				if r.Destination == nil {
-					return fmt.Errorf("route for aggregated prefix %q has nil destination", aggregatedPrefixIP)
-				}
-				ones, _ := r.Destination.Mask.Size()
+				ones := r.Destination.Bits()
 				if ones != int(aggLen) {
 					return fmt.Errorf("route for aggregated prefix %q: want /%d advertised prefix, got /%d (%s)", aggregatedPrefixIP, aggLen, ones, r.Destination.String())
 				}
 				return nil
 			}
 			ginkgo.By("Deriving aggregated prefix IP from staged service LoadBalancerIP")
-			ip := net.ParseIP(stagedLBIP)
-			Expect(ip).NotTo(BeNil())
-			subnet := &net.IPNet{
-				IP:   ip.Mask(net.CIDRMask(int(aggLen), bits)),
-				Mask: net.CIDRMask(int(aggLen), bits),
-			}
-			// ParseRoutes indexes maps by destination IP string (not full CIDR).
-			aggregatedPrefixIP := subnet.IP.String()
+			ip := netip.MustParseAddr(stagedLBIP)
+			subnet := netip.PrefixFrom(ip, int(aggLen))
+			Expect(subnet.IsValid()).To(BeTrue())
+			subnet = subnet.Masked()
+			// ParseRoutes indexes maps by destination address (not full prefix).
+			aggregatedPrefixIP := subnet.Addr()
 
 			ginkgo.By("Validating production service and staged aggregated routes on all FRR containers")
 			for _, c := range FRRContainers {
@@ -748,10 +739,10 @@ func checkServiceNotAdvertised(containers []*frrcontainer.FRR, svc *corev1.Servi
 		}
 		for _, ing := range svc.Status.LoadBalancer.Ingress {
 			ingressIP := jigservice.GetIngressPoint(&ing)
-			if _, found := frrRoutesV4[ingressIP]; found {
+			if _, found := frrRoutesV4[routeKey(ingressIP)]; found {
 				return fmt.Errorf("%s IP %s should NOT be advertised to %s (%s)", svc.Name, ingressIP, c.Name, reason)
 			}
-			if _, found := frrRoutesV6[ingressIP]; found {
+			if _, found := frrRoutesV6[routeKey(ingressIP)]; found {
 				return fmt.Errorf("%s IP %s should NOT be advertised to %s (%s)", svc.Name, ingressIP, c.Name, reason)
 			}
 		}

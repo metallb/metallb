@@ -476,7 +476,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 				for i, ip := range nodeIPs {
 					neighbor := &frrconfig.NeighborConfig{
 						ASN:      nodeASNs[allNodes.Items[i].Name],
-						Addr:     ip,
+						Addr:     ip.String(),
 						MultiHop: c.NeighborConfig.MultiHop,
 					}
 					bgpConfig.Neighbors = append(bgpConfig.Neighbors, neighbor)

@@ -4,7 +4,7 @@ package main
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"slices"
 	"sort"
@@ -84,7 +84,7 @@ func TestUsableNodesEPSlicesWithSpeakerlistDisabled(t *testing.T) {
 	conf := &config.Config{
 		Pools: &config.Pools{ByName: map[string]*config.Pool{
 			"default": {
-				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 				L2Advertisements: advertisementsForNode,
 			},
 		}},
@@ -124,12 +124,12 @@ func TestUsableNodesEPSlicesWithSpeakerlistDisabled(t *testing.T) {
 		},
 	}
 
-	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+	lbIP := netip.MustParseAddr(svc.Status.LoadBalancer.Ingress[0].IP)
 	lbIPStr := lbIP.String()
 	l := log.NewNopLogger()
 	response := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l,
 		"test1",
-		[]net.IP{lbIP},
+		[]netip.Addr{lbIP},
 		conf.Pools.ByName["default"],
 		svc,
 		eps[lbIPStr],
@@ -409,7 +409,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -460,7 +460,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -511,7 +511,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -563,7 +563,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -614,7 +614,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -665,7 +665,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -749,7 +749,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -833,7 +833,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -917,7 +917,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -981,7 +981,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -1041,7 +1041,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -1101,7 +1101,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -1161,7 +1161,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: advertisementsForNode,
 					},
 				}},
@@ -1231,10 +1231,10 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 		}
 
 		for _, svc := range test.svcs {
-			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+			lbIP := netip.MustParseAddr(svc.Status.LoadBalancer.Ingress[0].IP)
 			lbIPStr := lbIP.String()
-			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr], nil)
-			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr], nil)
+			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr], nil)
+			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr], nil)
 			if response1 != test.c1ExpectedResult[lbIPStr] {
 				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c1ExpectedResult[lbIPStr], response1)
 			}
@@ -1477,7 +1477,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 		cfg := config.Config{
 			Pools: &config.Pools{ByName: map[string]*config.Pool{
 				"default": {
-					CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+					CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 					L2Advertisements: test.L2Advertisements,
 				},
 			}},
@@ -1520,7 +1520,7 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			Status: statusAssigned("10.20.30.1"),
 		}
 
-		lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+		lbIP := netip.MustParseAddr(svc.Status.LoadBalancer.Ingress[0].IP)
 		lbIPStr := lbIP.String()
 
 		nodes := map[string]*v1.Node{
@@ -1541,8 +1541,8 @@ func TestShouldAnnounceFromNodes(t *testing.T) {
 			}
 		}
 
-		response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
-		response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
+		response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
+		response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
 		if response1 != test.c1ExpectedResult[lbIPStr] {
 			t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c1ExpectedResult[lbIPStr], response1)
 		}
@@ -1584,7 +1584,7 @@ func TestClusterPolicy(t *testing.T) {
 	cfg := &config.Config{
 		Pools: &config.Pools{ByName: map[string]*config.Pool{
 			"default": {
-				CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+				CIDR: []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 				L2Advertisements: []*config.L2Advertisement{
 					{
 						Nodes: map[string]bool{
@@ -1665,12 +1665,12 @@ func TestClusterPolicy(t *testing.T) {
 			Status: statusAssigned(ip),
 		}
 
-		lbIP := net.ParseIP(ip)
-		response1svc1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], svc1, eps1, nil)
-		response2svc1 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], svc1, eps1, nil)
+		lbIP := netip.MustParseAddr(ip)
+		response1svc1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], svc1, eps1, nil)
+		response2svc1 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], svc1, eps1, nil)
 
-		response1svc2 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], svc2, eps2, nil)
-		response2svc2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], svc2, eps2, nil)
+		response1svc2 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], svc2, eps2, nil)
+		response2svc2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], svc2, eps2, nil)
 
 		// We check that only one speaker announces the service, so their response must be different
 		if response1svc1 == response2svc1 {
@@ -1822,7 +1822,7 @@ func TestL2ServiceSelectors(t *testing.T) {
 			cfg := &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: test.L2Advertisements,
 					},
 				}},
@@ -1831,7 +1831,7 @@ func TestL2ServiceSelectors(t *testing.T) {
 				t.Errorf("SetConfig failed")
 			}
 
-			lbIP := net.ParseIP(test.svc.Status.LoadBalancer.Ingress[0].IP)
+			lbIP := netip.MustParseAddr(test.svc.Status.LoadBalancer.Ingress[0].IP)
 			eps := []discovery.EndpointSlice{
 				{
 					Endpoints: []discovery.Endpoint{
@@ -1844,7 +1844,7 @@ func TestL2ServiceSelectors(t *testing.T) {
 				},
 			}
 
-			response := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
+			response := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
 			if response != test.expected {
 				t.Errorf("expected %q, got %q", test.expected, response)
 			}
@@ -2000,7 +2000,7 @@ func TestL2SharedIPWithServiceSelectors(t *testing.T) {
 			cfg := &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: test.L2Advertisements,
 					},
 				}},
@@ -2009,7 +2009,7 @@ func TestL2SharedIPWithServiceSelectors(t *testing.T) {
 				t.Errorf("SetConfig failed")
 			}
 
-			lbIP := net.ParseIP(test.svc.Status.LoadBalancer.Ingress[0].IP)
+			lbIP := netip.MustParseAddr(test.svc.Status.LoadBalancer.Ingress[0].IP)
 			eps := []discovery.EndpointSlice{
 				{
 					Endpoints: []discovery.Endpoint{
@@ -2022,7 +2022,7 @@ func TestL2SharedIPWithServiceSelectors(t *testing.T) {
 				},
 			}
 
-			response := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
+			response := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
 			if response != test.expected {
 				t.Errorf("expected %q, got %q", test.expected, response)
 			}
@@ -2125,7 +2125,7 @@ func TestL2ElectionConsistentButAdsPerNode(t *testing.T) {
 	cfg := &config.Config{
 		Pools: &config.Pools{ByName: map[string]*config.Pool{
 			"default": {
-				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 				L2Advertisements: l2Advertisements,
 			},
 		}},
@@ -2161,7 +2161,7 @@ func TestL2ElectionConsistentButAdsPerNode(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
-	lbIP := net.ParseIP("10.20.30.1")
+	lbIP := netip.MustParseAddr("10.20.30.1")
 	pool := cfg.Pools.ByName["default"]
 
 	c1, err := newController(controllerConfig{
@@ -2194,8 +2194,8 @@ func TestL2ElectionConsistentButAdsPerNode(t *testing.T) {
 	}
 
 	// Exactly one node must win the election.
-	r1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, pool, svc, eps, nil)
-	r2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, pool, svc, eps, nil)
+	r1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, pool, svc, eps, nil)
+	r2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, pool, svc, eps, nil)
 
 	if (r1 == "") == (r2 == "") {
 		t.Fatalf("expected exactly one winner, got c1=%q c2=%q", r1, r2)
@@ -2244,7 +2244,7 @@ func TestL2NoMatchingAdForServiceAndNode(t *testing.T) {
 	cfg := &config.Config{
 		Pools: &config.Pools{ByName: map[string]*config.Pool{
 			"default": {
-				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 				L2Advertisements: l2Advertisements,
 			},
 		}},
@@ -2280,7 +2280,7 @@ func TestL2NoMatchingAdForServiceAndNode(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
-	lbIP := net.ParseIP("10.20.30.1")
+	lbIP := netip.MustParseAddr("10.20.30.1")
 	pool := cfg.Pools.ByName["default"]
 
 	for _, node := range []string{"iris1", "iris2"} {
@@ -2299,7 +2299,7 @@ func TestL2NoMatchingAdForServiceAndNode(t *testing.T) {
 			t.Fatalf("%s SetConfig failed", node)
 		}
 
-		r := c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, pool, svc, eps, nil)
+		r := c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, pool, svc, eps, nil)
 		if r != "noMatchingAdvertisement" {
 			t.Errorf("%s: expected %q, got %q", node, "noMatchingAdvertisement", r)
 		}
@@ -2334,7 +2334,7 @@ func TestL2ServiceSelectorFiltersCandidateNodes(t *testing.T) {
 	cfg := &config.Config{
 		Pools: &config.Pools{ByName: map[string]*config.Pool{
 			"default": {
-				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 				L2Advertisements: l2Advertisements,
 			},
 		}},
@@ -2383,7 +2383,7 @@ func TestL2ServiceSelectorFiltersCandidateNodes(t *testing.T) {
 		},
 	}
 
-	lbIP := net.ParseIP("10.20.30.1")
+	lbIP := netip.MustParseAddr("10.20.30.1")
 
 	tests := []struct {
 		desc             string
@@ -2436,8 +2436,8 @@ func TestL2ServiceSelectorFiltersCandidateNodes(t *testing.T) {
 				t.Fatal("c2 SetConfig failed")
 			}
 
-			r1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
-			r2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
+			r1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
+			r2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], test.svc, eps, nil)
 
 			if r1 != test.c1ExpectedResult {
 				t.Errorf("c1 (iris1): expected %q, got %q", test.c1ExpectedResult, r1)
@@ -2452,34 +2452,34 @@ func TestL2ServiceSelectorFiltersCandidateNodes(t *testing.T) {
 func TestIPAdvertisementFor(t *testing.T) {
 	tests := []struct {
 		desc             string
-		ip               net.IP
+		ip               netip.Addr
 		l2Advertisements []*config.L2Advertisement
 		expect           layer2.IPAdvertisement
 	}{
 		{
 			desc: "AllInterfaces set",
-			ip:   net.IP{192, 168, 10, 3},
+			ip:   netip.MustParseAddr("192.168.10.3"),
 			l2Advertisements: []*config.L2Advertisement{
 				{
 					Interfaces:    []string{},
 					AllInterfaces: true,
 				},
 			},
-			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.Set[string]{}),
+			expect: layer2.NewIPAdvertisement(netip.MustParseAddr("192.168.10.3"), true, sets.Set[string]{}),
 		},
 		{
 			desc: "Single L2Advertisement with interfaces",
-			ip:   net.ParseIP("2000:12"),
+			ip:   netip.MustParseAddr("2000::12"),
 			l2Advertisements: []*config.L2Advertisement{
 				{
 					Interfaces: []string{"eth1", "eth2"},
 				},
 			},
-			expect: layer2.NewIPAdvertisement(net.ParseIP("2000:12"), false, sets.New("eth1", "eth2")),
+			expect: layer2.NewIPAdvertisement(netip.MustParseAddr("2000::12"), false, sets.New("eth1", "eth2")),
 		},
 		{
 			desc: "Multiple L2Advertisements - interfaces merged",
-			ip:   net.IP{192, 168, 10, 3},
+			ip:   netip.MustParseAddr("192.168.10.3"),
 			l2Advertisements: []*config.L2Advertisement{
 				{
 					Interfaces: []string{"eth0", "eth1"},
@@ -2487,11 +2487,11 @@ func TestIPAdvertisementFor(t *testing.T) {
 					Interfaces: []string{"eth0", "eth2"},
 				},
 			},
-			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, false, sets.New("eth0", "eth1", "eth2")),
+			expect: layer2.NewIPAdvertisement(netip.MustParseAddr("192.168.10.3"), false, sets.New("eth0", "eth1", "eth2")),
 		},
 		{
 			desc: "Multiple L2Advertisements - one has AllInterfaces",
-			ip:   net.IP{192, 168, 10, 3},
+			ip:   netip.MustParseAddr("192.168.10.3"),
 			l2Advertisements: []*config.L2Advertisement{
 				{
 					Interfaces: []string{"eth0", "eth1"},
@@ -2499,7 +2499,7 @@ func TestIPAdvertisementFor(t *testing.T) {
 					AllInterfaces: true,
 				},
 			},
-			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.Set[string]{}),
+			expect: layer2.NewIPAdvertisement(netip.MustParseAddr("192.168.10.3"), true, sets.Set[string]{}),
 		},
 	}
 	for _, test := range tests {
@@ -2621,7 +2621,7 @@ func TestPreferredScoresFor(t *testing.T) {
 }
 
 func TestShouldAnnouncePreferredNode(t *testing.T) {
-	lbIP := net.ParseIP("10.20.30.1")
+	lbIP := netip.MustParseAddr("10.20.30.1")
 
 	tests := []struct {
 		desc       string
@@ -2686,7 +2686,7 @@ func TestShouldAnnouncePreferredNode(t *testing.T) {
 			cfg := &config.Config{
 				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 						L2Advertisements: []*config.L2Advertisement{tc.ad},
 					},
 				}},
@@ -2712,7 +2712,7 @@ func TestShouldAnnouncePreferredNode(t *testing.T) {
 				if c.SetConfig(l, cfg) == controllers.SyncStateError {
 					t.Fatalf("SetConfig failed")
 				}
-				if c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "svc1", []net.IP{lbIP}, cfg.Pools.ByName["default"], tc.svc, tc.eps, nodes) == "" {
+				if c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "svc1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], tc.svc, tc.eps, nodes) == "" {
 					winners = append(winners, nodeName)
 				}
 			}
@@ -2750,7 +2750,7 @@ func TestShouldAnnounceSplitBrainWithMixedAds(t *testing.T) {
 	cfg := &config.Config{
 		Pools: &config.Pools{ByName: map[string]*config.Pool{
 			"default": {
-				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 				L2Advertisements: []*config.L2Advertisement{adEdge, adAll, adPoison},
 			},
 		}},
@@ -2772,7 +2772,7 @@ func TestShouldAnnounceSplitBrainWithMixedAds(t *testing.T) {
 	}
 	fakeSL := &fakeSpeakerList{speakers: speakerMap}
 	l := log.NewNopLogger()
-	lbIP := net.ParseIP("10.20.30.1")
+	lbIP := netip.MustParseAddr("10.20.30.1")
 	var winners []string
 	for nodeName := range speakerMap {
 		c, err := newController(controllerConfig{
@@ -2788,7 +2788,7 @@ func TestShouldAnnounceSplitBrainWithMixedAds(t *testing.T) {
 		if c.SetConfig(l, cfg) == controllers.SyncStateError {
 			t.Fatalf("SetConfig failed")
 		}
-		if c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "svc1", []net.IP{lbIP}, cfg.Pools.ByName["default"], svc, eps, nodes) == "" {
+		if c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "svc1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], svc, eps, nodes) == "" {
 			winners = append(winners, nodeName)
 		}
 	}
@@ -2800,7 +2800,7 @@ func TestShouldAnnounceSplitBrainWithMixedAds(t *testing.T) {
 func TestShouldAnnouncePreferredNodeFailover(t *testing.T) {
 	// Three failover stages: preferred node pruned, preferred node returns,
 	// all preferred unavailable. Each stage swaps the speakerMap and re-elects.
-	lbIP := net.ParseIP("10.20.30.1")
+	lbIP := netip.MustParseAddr("10.20.30.1")
 	ad := &config.L2Advertisement{
 		Nodes: map[string]bool{
 			"edge-a":   true,
@@ -2816,7 +2816,7 @@ func TestShouldAnnouncePreferredNodeFailover(t *testing.T) {
 	cfg := &config.Config{
 		Pools: &config.Pools{ByName: map[string]*config.Pool{
 			"default": {
-				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 				L2Advertisements: []*config.L2Advertisement{ad},
 			},
 		}},
@@ -2857,7 +2857,7 @@ func TestShouldAnnouncePreferredNodeFailover(t *testing.T) {
 			if c.SetConfig(l, cfg) == controllers.SyncStateError {
 				t.Fatalf("SetConfig failed")
 			}
-			if c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "svc1", []net.IP{lbIP}, cfg.Pools.ByName["default"], svc, eps, nodes) == "" {
+			if c.protocolHandlers[config.Layer2].ShouldAnnounce(l, "svc1", []netip.Addr{lbIP}, cfg.Pools.ByName["default"], svc, eps, nodes) == "" {
 				winners = append(winners, nodeName)
 			}
 		}
@@ -2900,7 +2900,7 @@ func TestShouldAnnouncePreferredNodeFailover(t *testing.T) {
 		cfgWorkers := &config.Config{
 			Pools: &config.Pools{ByName: map[string]*config.Pool{
 				"default": {
-					CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+					CIDR:             []netip.Prefix{netip.MustParsePrefix("10.20.30.0/24")},
 					L2Advertisements: []*config.L2Advertisement{adAllWorkers},
 				},
 			}},

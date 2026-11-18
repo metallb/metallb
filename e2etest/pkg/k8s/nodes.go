@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
+	"net/netip"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -20,8 +20,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family, vrfName string) ([]string, error) {
-	res := []string{}
+func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family, vrfName string) ([]netip.Addr, error) {
+	if family != ipfamily.IPv4 && family != ipfamily.IPv6 && family != ipfamily.DualStack {
+		return nil, fmt.Errorf("unsupported IP family %v", family)
+	}
+	res := []netip.Addr{}
 	for _, n := range nodes {
 		// If the peer is supposed to be connected via a VRF, taking the node address is not enough.
 		// We need to find the ip associated to the interface inside the VRF
@@ -37,21 +40,53 @@ func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family, vrfName string) (
 			}
 			switch family {
 			case ipfamily.IPv4:
-				res = append(res, addr.IPV4Address)
+				ip, err := netip.ParseAddr(addr.IPV4Address)
+				if err != nil {
+					return nil, fmt.Errorf("invalid IPv4 address %q on node %s: %w", addr.IPV4Address, n.Name, err)
+				}
+				if !ip.Unmap().Is4() {
+					return nil, fmt.Errorf("address %q on node %s is not IPv4", addr.IPV4Address, n.Name)
+				}
+				res = append(res, ip.Unmap())
 			case ipfamily.IPv6:
-				res = append(res, addr.IPV6Address)
+				ip, err := netip.ParseAddr(addr.IPV6Address)
+				if err != nil {
+					return nil, fmt.Errorf("invalid IPv6 address %q on node %s: %w", addr.IPV6Address, n.Name, err)
+				}
+				if !ip.Is6() || ip.Is4In6() {
+					return nil, fmt.Errorf("address %q on node %s is not IPv6", addr.IPV6Address, n.Name)
+				}
+				res = append(res, ip.Unmap())
 			case ipfamily.DualStack:
-				res = append(res, addr.IPV4Address)
-				res = append(res, addr.IPV6Address)
+				ip4, err := netip.ParseAddr(addr.IPV4Address)
+				if err != nil {
+					return nil, fmt.Errorf("invalid IPv4 address %q on node %s: %w", addr.IPV4Address, n.Name, err)
+				}
+				if !ip4.Unmap().Is4() {
+					return nil, fmt.Errorf("address %q on node %s is not IPv4", addr.IPV4Address, n.Name)
+				}
+				ip6, err := netip.ParseAddr(addr.IPV6Address)
+				if err != nil {
+					return nil, fmt.Errorf("invalid IPv6 address %q on node %s: %w", addr.IPV6Address, n.Name, err)
+				}
+				if !ip6.Is6() || ip6.Is4In6() {
+					return nil, fmt.Errorf("address %q on node %s is not IPv6", addr.IPV6Address, n.Name)
+				}
+				res = append(res, ip4.Unmap(), ip6.Unmap())
 			}
 			continue
 		}
 		for _, a := range n.Status.Addresses {
 			if a.Type == v1.NodeInternalIP {
-				if family != ipfamily.DualStack && ipfamily.ForAddress(net.ParseIP(a.Address)) != family {
+				ip, err := netip.ParseAddr(a.Address)
+				if err != nil {
+					return nil, fmt.Errorf("invalid node internal IP %q on node %s: %w", a.Address, n.Name, err)
+				}
+				ip = ip.Unmap()
+				if family != ipfamily.DualStack && ipfamily.ForAddress(ip) != family {
 					continue
 				}
-				res = append(res, a.Address)
+				res = append(res, ip)
 			}
 		}
 	}

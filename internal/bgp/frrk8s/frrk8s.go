@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	"reflect"
 	"sort"
 	"strconv"
@@ -214,7 +214,7 @@ func (sm *sessionManager) updateConfig() error {
 		routerID  string
 		neighbors map[string]frrv1beta1.Neighbor
 		vrf       string
-		prefixes  map[string]string
+		prefixes  map[netip.Prefix]struct{}
 	}
 
 	routers := make(map[string]*router)
@@ -229,10 +229,10 @@ func (sm *sessionManager) updateConfig() error {
 			rout = &router{
 				myASN:     s.MyASN,
 				neighbors: make(map[string]frrv1beta1.Neighbor),
-				prefixes:  make(map[string]string),
+				prefixes:  make(map[netip.Prefix]struct{}),
 				vrf:       s.VRFName,
 			}
-			if s.RouterID != nil {
+			if s.RouterID.IsValid() {
 				rout.routerID = s.RouterID.String()
 			}
 			routers[routerName] = rout
@@ -288,7 +288,8 @@ func (sm *sessionManager) updateConfig() error {
 			}
 		}
 
-		neighborFamily := ipfamily.ForAddress(net.ParseIP(s.PeerAddress))
+		addr, _ := netip.ParseAddr(s.PeerAddress)
+		neighborFamily := ipfamily.ForAddress(addr)
 
 		if s.PeerInterface != "" || s.DualStackAddressFamily {
 			neighborFamily = ipfamily.DualStack
@@ -301,29 +302,29 @@ func (sm *sessionManager) updateConfig() error {
 		prefixesForLocalPref := map[uint32][]string{}
 		prefixesForAsPathPrepend := map[uint8][]string{}
 		for _, adv := range s.advertised {
-			family := ipfamily.ForAddress(adv.Prefix.IP)
+			family := ipfamily.ForAddress(adv.Prefix.Addr())
 
 			if neighborFamily != family &&
 				neighborFamily != ipfamily.DualStack {
 				continue
 			}
 
-			prefix := adv.Prefix.String()
-			neighbor.ToAdvertise.Allowed.Prefixes = append(neighbor.ToAdvertise.Allowed.Prefixes, prefix)
-			rout.prefixes[prefix] = prefix
+			prefix := adv.Prefix
+			neighbor.ToAdvertise.Allowed.Prefixes = append(neighbor.ToAdvertise.Allowed.Prefixes, prefix.String())
+			rout.prefixes[prefix] = struct{}{}
 
 			for _, c := range adv.Communities {
 				comm := c.String()
 				if community.IsLarge(c) {
 					comm = fmt.Sprintf("large:%s", c.String())
 				}
-				prefixesForCommunity[comm] = append(prefixesForCommunity[comm], prefix)
+				prefixesForCommunity[comm] = append(prefixesForCommunity[comm], prefix.String())
 			}
 			if adv.LocalPref != 0 {
-				prefixesForLocalPref[adv.LocalPref] = append(prefixesForLocalPref[adv.LocalPref], prefix)
+				prefixesForLocalPref[adv.LocalPref] = append(prefixesForLocalPref[adv.LocalPref], prefix.String())
 			}
 			if adv.AsPathPrepend != 0 {
-				prefixesForAsPathPrepend[adv.AsPathPrepend] = append(prefixesForAsPathPrepend[adv.AsPathPrepend], prefix)
+				prefixesForAsPathPrepend[adv.AsPathPrepend] = append(prefixesForAsPathPrepend[adv.AsPathPrepend], prefix.String())
 			}
 		}
 		neighbor.ToAdvertise.PrefixesWithCommunity = toAdvertiseWithCommunity(prefixesForCommunity)
@@ -336,12 +337,18 @@ func (sm *sessionManager) updateConfig() error {
 	}
 
 	for _, r := range sortMap(routers) {
+		prefixes := make([]string, 0, len(r.prefixes))
+		for prefix := range r.prefixes {
+			prefixes = append(prefixes, prefix.String())
+		}
+		sort.Strings(prefixes)
+
 		toAdd := frrv1beta1.Router{
 			ASN:       r.myASN,
 			ID:        r.routerID,
 			VRF:       r.vrf,
 			Neighbors: sortMap(r.neighbors),
-			Prefixes:  sortMap(r.prefixes),
+			Prefixes:  prefixes,
 		}
 		newConfig.Spec.BGP.Routers = append(newConfig.Spec.BGP.Routers, toAdd)
 	}

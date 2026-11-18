@@ -3,24 +3,30 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"math"
-	"net"
+	"math/big"
+	"net/netip"
 
-	"errors"
-
-	"github.com/mikioh/ipaddr"
-	. "github.com/onsi/gomega"
+	"go.universe.tf/e2etest/pkg/ipfamily"
 	"go.universe.tf/e2etest/pkg/iprange"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	"go4.org/netipx"
 )
 
 func ValidateIPInRange(addressPools []metallbv1beta1.IPAddressPool, ip string) error {
-	input := net.ParseIP(ip)
+	input, err := netip.ParseAddr(ip)
+	if err != nil {
+		return fmt.Errorf("invalid IP %q: %w", ip, err)
+	}
+	input = input.Unmap()
 	for _, addressPool := range addressPools {
 		for _, address := range addressPool.Spec.Addresses {
 			cidrs, err := iprange.Parse(address)
-			Expect(err).NotTo(HaveOccurred())
+			if err != nil {
+				return fmt.Errorf("invalid address pool range %q: %w", address, err)
+			}
 			for _, cidr := range cidrs {
 				if cidr.Contains(input) {
 					return nil
@@ -32,25 +38,39 @@ func ValidateIPInRange(addressPools []metallbv1beta1.IPAddressPool, ip string) e
 }
 
 func GetIPFromRangeByIndex(ipRange string, index int) (string, error) {
+	originalIndex := index
+	if index < 0 {
+		return "", fmt.Errorf("invalid negative index %d", index)
+	}
 	cidrs, err := iprange.Parse(ipRange)
 	if err != nil {
 		return "", errors.Join(err, errors.New("Failed to parse CIDR while getting IP from range by index"))
 	}
 
-	i := 0
-	var c *ipaddr.Cursor
 	for _, cidr := range cidrs {
-		c = ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-		for i < index && c.Next() != nil {
-			i++
+		cidr = cidr.Masked()
+		hostBits := cidr.Addr().BitLen() - cidr.Bits()
+		// Every non-negative int index fits within a prefix with at least
+		// 63 host bits on supported 64-bit platforms.
+		if hostBits >= 63 {
+			addr, err := addressAtOffset(cidr.Addr(), index)
+			if err != nil {
+				return "", err
+			}
+			return addr.String(), nil
 		}
-		if i == index {
-			return c.Pos().IP.String(), nil
+		count := int64(1) << uint(hostBits)
+		if int64(index) < count {
+			addr, err := addressAtOffset(cidr.Addr(), index)
+			if err != nil {
+				return "", err
+			}
+			return addr.String(), nil
 		}
-		i++
+		index -= int(count)
 	}
 
-	return "", fmt.Errorf("failed to get IP in index %d from range %s", index, ipRange)
+	return "", fmt.Errorf("failed to get IP in index %d from range %s", originalIndex, ipRange)
 }
 
 // PoolCount returns the number of total and ipv4 and ipv6 addresses in a given Pool.
@@ -64,23 +84,24 @@ func PoolCount(p metallbv1beta1.IPAddressPool) (int64, int64, int64, error) {
 			return 0, 0, 0, err
 		}
 		for _, cidr := range cidrs {
-			o, b := cidr.Mask.Size()
-			if b-o >= 62 {
+			cidr = cidr.Masked()
+			prefixBits := cidr.Bits()
+			addressBits := cidr.Addr().BitLen()
+			hostBits := addressBits - prefixBits
+			if hostBits >= 62 {
 				// An enormous ipv6 range is allocated which will never run out.
 				total = math.MaxInt64
 				ipv6 = math.MaxInt64
 				continue
 			}
-			sz := int64(math.Pow(2, float64(b-o)))
-
-			cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-			firstIP := cur.First().IP
-			lastIP := cur.Last().IP
+			sz := int64(1) << uint(hostBits)
+			firstIP := cidr.Addr()
+			lastIP := netipx.PrefixLastIP(cidr)
 
 			if p.Spec.AvoidBuggyIPs {
-				if o <= 24 {
+				if prefixBits <= 24 {
 					// A pair of buggy IPs occur for each /24 present in the range.
-					buggies := int64(math.Pow(2, float64(24-o))) * 2
+					buggies := (int64(1) << uint(24-prefixBits)) * 2
 					sz -= buggies
 				} else {
 					// Ranges smaller than /24 contain 1 buggy IP if they
@@ -89,27 +110,54 @@ func PoolCount(p metallbv1beta1.IPAddressPool) (int64, int64, int64, error) {
 					if ipConfusesBuggyFirmwares(firstIP) {
 						sz--
 					}
-					if ipConfusesBuggyFirmwares(lastIP) {
+					if lastIP != firstIP && ipConfusesBuggyFirmwares(lastIP) {
 						sz--
 					}
 				}
 			}
 
-			total += sz
-			if cidr.IP.To4() == nil {
-				ipv6 += sz
+			total = saturatedAdd(total, sz)
+			if ipfamily.ForCIDR(cidr) == ipfamily.IPv6 {
+				ipv6 = saturatedAdd(ipv6, sz)
 			} else {
-				ipv4 += sz
+				ipv4 = saturatedAdd(ipv4, sz)
 			}
 		}
 	}
 	return total, ipv4, ipv6, nil
 }
 
-func ipConfusesBuggyFirmwares(ip net.IP) bool {
-	ip = ip.To4()
-	if ip == nil {
+func ipConfusesBuggyFirmwares(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	if !ip.Is4() {
 		return false
 	}
-	return ip[3] == 0 || ip[3] == 255
+	addr := ip.As4()
+	return addr[3] == 0 || addr[3] == 255
+}
+
+func addressAtOffset(addr netip.Addr, offset int) (netip.Addr, error) {
+	if !addr.IsValid() || offset < 0 {
+		return netip.Addr{}, fmt.Errorf("invalid address offset %d for %q", offset, addr)
+	}
+	value := new(big.Int).SetBytes(addr.AsSlice())
+	value.Add(value, big.NewInt(int64(offset)))
+	if value.BitLen() > addr.BitLen() {
+		return netip.Addr{}, fmt.Errorf("address offset %d exceeds address range starting at %s", offset, addr)
+	}
+	if addr.Is4() {
+		var bytes [4]byte
+		value.FillBytes(bytes[:])
+		return netip.AddrFrom4(bytes), nil
+	}
+	var bytes [16]byte
+	value.FillBytes(bytes[:])
+	return netip.AddrFrom16(bytes), nil
+}
+
+func saturatedAdd(a, b int64) int64 {
+	if b > 0 && a > math.MaxInt64-b {
+		return math.MaxInt64
+	}
+	return a + b
 }
