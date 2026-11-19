@@ -953,3 +953,55 @@ var _ = Describe("PoolStatus Controller", func() {
 		})
 	})
 })
+
+var _ = Describe("ConfigurationState condition reporter", func() {
+	It("should not change the resource when a restarted reporter applies the same condition", func() {
+		directClient, err := client.NewWithWatch(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).ToNot(HaveOccurred())
+		patches := 0
+		c := withStatusPatchCounter(directClient, &patches)
+
+		configState := &v1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "condition-reporter",
+				Namespace: speakerNamespace,
+			},
+		}
+		err = k8sClient.Create(ctx, configState)
+		Expect(err).ToNot(HaveOccurred())
+		key := client.ObjectKeyFromObject(configState)
+
+		condition := metav1.Condition{
+			Type:   ConditionTypeConfigReconcilerValid,
+			Status: metav1.ConditionTrue,
+			Reason: ErrorTypeNone,
+		}
+		newReporter := func() *configStateConditionReporter {
+			return &configStateConditionReporter{
+				Client:     c,
+				namespace:  key.Namespace,
+				name:       key.Name,
+				fieldOwner: "configReconciler",
+			}
+		}
+
+		err = newReporter().report(ctx, condition)
+		Expect(err).ToNot(HaveOccurred())
+		before := &v1beta1.ConfigurationState{}
+		err = k8sClient.Get(ctx, key, before)
+		Expect(err).ToNot(HaveOccurred())
+
+		// A restarted process doesn't know what it applied before, so it applies
+		// once. Wait for a new LastTransitionTime to be distinguishable.
+		time.Sleep(1500 * time.Millisecond)
+		err = newReporter().report(ctx, condition)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(patches).To(Equal(2))
+
+		after := &v1beta1.ConfigurationState{}
+		err = k8sClient.Get(ctx, key, after)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(after.ResourceVersion).To(Equal(before.ResourceVersion))
+		Expect(after.ManagedFields).To(Equal(before.ManagedFields))
+	})
+})
