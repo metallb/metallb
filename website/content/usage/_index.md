@@ -11,6 +11,10 @@ MetalLB attaches informational events to the services that it's
 controlling. If your LoadBalancer is misbehaving, run `kubectl
 describe service <service name>` and check the event log.
 
+The `metallb.universe.tf/` annotation prefix is deprecated; migrate to `metallb.io/` and remove the legacy keys to avoid warnings.
+The annotation features remain supported; switching to CRD selectors is not required.
+MetalLB manages `ip-allocated-from-pool`; request a pool with `metallb.io/address-pool`.
+
 ## Requesting specific IPs
 
 MetalLB respects the `spec.loadBalancerIP` parameter, so if you want
