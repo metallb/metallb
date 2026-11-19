@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -719,6 +720,40 @@ var _ = ginkgo.Describe("ConfigurationState", func() {
 		}, 60*time.Second, 5*time.Second).Should(Succeed())
 	})
 
+	// The speakers reconcile their configuration on node label changes: this
+	// checks that those reconciles don't write the ConfigurationStates. If node
+	// label changes stopped triggering reconciles, it would pass without checking it.
+	ginkgo.It("should not update ConfigurationStates when a node label changes", func() {
+		ginkgo.By("Waiting for the ConfigurationStates to settle")
+		var before map[string]string
+		Eventually(func() error {
+			versions, err := configStateVersions()
+			if err != nil {
+				return err
+			}
+			if !maps.Equal(versions, before) {
+				before = versions
+				return errors.New("ConfigurationStates are still changing")
+			}
+			return nil
+		}, 60*time.Second, 5*time.Second).Should(Succeed())
+
+		const labelKey = "metallb.io/test-configstate"
+		node := allNodes.Items[0]
+		cs := k8sclient.New()
+		ginkgo.DeferCleanup(func() {
+			k8s.RemoveLabelFromNode(node.Name, labelKey, cs)
+		})
+
+		ginkgo.By("Changing a label on a node")
+		for _, value := range []string{"a", "b", "c"} {
+			k8s.AddLabelToNode(node.Name, labelKey, value, cs)
+		}
+
+		ginkgo.By("Verifying no ConfigurationState is updated")
+		Consistently(configStateVersions, 15*time.Second, time.Second).Should(Equal(before))
+	})
+
 })
 
 func allStatesExist(allNodes *corev1.NodeList) error {
@@ -821,4 +856,17 @@ func stateMatches(stateName string, wantStatus metallbv1beta1.ConfigurationState
 		return fmt.Errorf("expected ErrorSummary=%q, got ErrorSummary=%q", wantStatus.ErrorSummary, got.Status.ErrorSummary)
 	}
 	return nil
+}
+
+// configStateVersions returns the resourceVersion of each ConfigurationState, by name.
+func configStateVersions() (map[string]string, error) {
+	var states metallbv1beta1.ConfigurationStateList
+	if err := ConfigUpdater.Client().List(context.Background(), &states, client.InNamespace(metallb.Namespace)); err != nil {
+		return nil, fmt.Errorf("failed to list ConfigurationStates: %w", err)
+	}
+	versions := make(map[string]string, len(states.Items))
+	for _, state := range states.Items {
+		versions[state.Name] = state.ResourceVersion
+	}
+	return versions, nil
 }
