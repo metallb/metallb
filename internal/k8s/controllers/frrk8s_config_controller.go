@@ -128,26 +128,26 @@ func (r *FRRK8sReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.reconcileChan = make(chan event.GenericEvent)
 	debouncer(r.configChangedChan, r.reconcileChan, 3*time.Second)
 
-	configName := frrk8s.ConfigName(r.NodeName)
-	p := predicate.NewPredicateFuncs(func(obj client.Object) bool {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&frrv1beta1.FRRConfiguration{}).
+		WatchesRawSource(source.Channel(r.reconcileChan, &handler.EnqueueRequestForObject{})).
+		WithEventFilter(NewFRRK8sReconcilerPredicate(r.FRRK8sNamespace)).
+		Complete(r)
+}
+
+// NewFRRK8sReconcilerPredicate accepts every FRRConfiguration in the
+// frr-k8s namespace, not only the one MetalLB owns. The frr-k8s webhook can
+// reject MetalLB's configuration because it conflicts with another one, so a
+// change to any of them must trigger a new attempt. Reconcile always works on
+// MetalLB's own configuration and does nothing if it is already up to date.
+func NewFRRK8sReconcilerPredicate(frrk8sNamespace string) predicate.Predicate {
+	return predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		config, ok := obj.(*frrv1beta1.FRRConfiguration)
 		if !ok {
 			return true
 		}
-		if config.Name != configName {
-			return false
-		}
-		if config.Namespace != r.FRRK8sNamespace {
-			return false
-		}
-		return true
+		return config.Namespace == frrk8sNamespace
 	})
-
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&frrv1beta1.FRRConfiguration{}).
-		WatchesRawSource(source.Channel(r.reconcileChan, &handler.EnqueueRequestForObject{})).
-		WithEventFilter(p).
-		Complete(r)
 }
 
 func (r *FRRK8sReconciler) UpdateConfig(config interface{}) {
