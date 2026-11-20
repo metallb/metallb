@@ -185,7 +185,7 @@ Configmaptocrs tool can also run directly against a cluster,
 and print the CRs corresponding to the configmap deployed on
 the cluster to the standard output.
 ```
-kubectl run configmaptocrs -n metallb-system --restart=Never -it --rm --image overriden --overrides '
+kubectl run configmaptocrs -n metallb-system --restart=Never -it --rm --image overridden --overrides '
 {
   "spec": {
     "containers": [
