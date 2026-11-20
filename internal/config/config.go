@@ -315,8 +315,12 @@ func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile, op
 			// TODO: Be smarter regarding conflicting peers. For example, two
 			// peers could have a different hold time but they'd still result
 			// in two BGP sessions between the speaker and the remote host.
-			if reflect.DeepEqual(peer, ep) {
-				return nil, fmt.Errorf("peer %s already exists", p.Name)
+			// The name is ignored, as two BGPPeer resources always have
+			// different names.
+			other := *ep
+			other.Name = peer.Name
+			if reflect.DeepEqual(*peer, other) {
+				return nil, fmt.Errorf("peer %s already exists as %s", p.Name, ep.Name)
 			}
 		}
 		res[peer.Name] = peer
