@@ -18,6 +18,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 )
 
 func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family, vrfName string) ([]string, error) {
@@ -95,6 +96,57 @@ func RemoveLabelFromNode(nodeName, key string, cs clientset.Interface) {
 	delete(nodeObject.Labels, key)
 	_, err = cs.CoreV1().Nodes().Update(context.Background(), nodeObject, metav1.UpdateOptions{})
 	Expect(err).NotTo(HaveOccurred())
+}
+
+// AddTaintToNode adds the given taint to the node, doing nothing if an identical taint is already there.
+func AddTaintToNode(cs clientset.Interface, nodeName string, taint v1.Taint) (bool, error) {
+	ginkgo.By(fmt.Sprintf("adding the taint %s=%s:%s to node %s", taint.Key, taint.Value, taint.Effect, nodeName))
+
+	added := false
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		node, err := cs.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		for _, t := range node.Spec.Taints {
+			if t.Key == taint.Key && t.Value == taint.Value && t.Effect == taint.Effect {
+				return nil
+			}
+		}
+		node.Spec.Taints = append(append([]v1.Taint(nil), node.Spec.Taints...), taint)
+		_, err = cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+		if err == nil {
+			added = true
+		}
+		return err
+	})
+	return added, err
+}
+
+// RemoveTaintFromNode removes the given taint from the node.
+
+func RemoveTaintFromNode(cs clientset.Interface, nodeName string, taint v1.Taint) error {
+	ginkgo.By(fmt.Sprintf("removing the taint %s=%s:%s from node %s", taint.Key, taint.Value, taint.Effect, nodeName))
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		node, err := cs.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		remaining := []v1.Taint{}
+		for _, t := range node.Spec.Taints {
+			if t.Key == taint.Key && t.Value == taint.Value && t.Effect == taint.Effect {
+				continue
+			}
+			remaining = append(remaining, t)
+		}
+		if len(remaining) == len(node.Spec.Taints) {
+			return nil
+		}
+		node.Spec.Taints = remaining
+		_, err = cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+		return err
+	})
 }
 
 // SetNodeCondition sets the node's condition to the desired status and validates that the change is applied.

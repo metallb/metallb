@@ -327,6 +327,11 @@ func (c *layer2Controller) speakersForAds(l log.Logger, name string, ads []*conf
 			continue
 		}
 
+		if k8snodes.IsNodeOutOfService(nodes[s]) {
+			level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "speaker's node has taint 'node.kubernetes.io/out-of-service=nodeshutdown:NoExecute'")
+			continue
+		}
+
 		if adsMatchNodeL2(ads, s) {
 			res[s] = true
 		}
