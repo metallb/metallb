@@ -157,7 +157,7 @@ func (a *Announce) updateInterfaces() {
 				level.Error(l).Log("op", "createNDPResponder", "error", err, "msg", "failed to create NDP responder")
 				continue
 			}
-			a.ndps[ifi.Index] = resp
+			a.addNDPResponder(ifi.Index, resp)
 			level.Info(l).Log("event", "createNDPResponder", "msg", "created NDP responder for interface")
 		}
 	}
@@ -176,6 +176,28 @@ func (a *Announce) updateInterfaces() {
 			client.Close()
 			delete(a.ndps, i)
 			level.Info(a.logger).Log("interface", client.Interface(), "event", "deleteNDPResponder", "msg", "deleted NDP responder for interface")
+		}
+	}
+}
+
+// addNDPResponder registers resp for the interface with the given index and
+// makes it watch the multicast groups of the IPs that are already announced.
+// SetBalancer only calls Watch on the responders that exist when an IP is
+// first announced, so a responder created later would otherwise never join
+// the solicited-node groups of those IPs and would ignore their Neighbor
+// Solicitations. The caller must hold the lock.
+func (a *Announce) addNDPResponder(index int, resp ndpResponder) {
+	a.ndps[index] = resp
+	for ipStr, cnt := range a.ipRefcnt {
+		if cnt <= 0 {
+			continue
+		}
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			continue
+		}
+		if err := resp.Watch(ip); err != nil {
+			level.Error(a.logger).Log("op", "watchMulticastGroup", "error", err, "ip", ip, "interface", resp.Interface(), "msg", "failed to watch NDP multicast group for IP, NDP responder will not respond to requests for this address")
 		}
 	}
 }
