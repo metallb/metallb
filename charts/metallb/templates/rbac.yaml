@@ -76,6 +76,9 @@ rules:
 - apiGroups: ["frrk8s.metallb.io"]
   resources: ["frrconfigurations"]
   verbs: ["get", "list", "watch","create","update","delete"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets"]
+  verbs: ["get", "list", "watch"]
 {{- end }}
 {{- end }}
 ---

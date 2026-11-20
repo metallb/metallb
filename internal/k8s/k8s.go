@@ -134,6 +134,23 @@ type Config struct {
 	PoolCountersFetcher controllers.PoolCountersFetcher
 }
 
+// daemonSetOwner returns the controlling DaemonSet of pod, when it has one.
+func daemonSetOwner(pod *corev1.Pod) (name, namespace string) {
+	if pod == nil {
+		return "", ""
+	}
+	for _, ref := range pod.OwnerReferences {
+		if ref.APIVersion != appsv1.SchemeGroupVersion.String() || ref.Kind != "DaemonSet" {
+			continue
+		}
+		if ref.Controller == nil || !*ref.Controller {
+			continue
+		}
+		return ref.Name, pod.Namespace
+	}
+	return "", ""
+}
+
 // New connects to masterAddr, using kubeconfig to authenticate.
 //
 // The client uses processName to identify itself to the cluster
@@ -278,18 +295,38 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	if cfg.WithFRRK8s {
+		dsName, dsNamespace := daemonSetOwner(selfPod)
 		frrk8sController := controllers.FRRK8sReconciler{
-			Client:          mgr.GetClient(),
-			Logger:          cfg.Logger,
-			Scheme:          mgr.GetScheme(),
-			FRRK8sNamespace: cfg.FRRK8sNamespace,
-			NodeName:        cfg.NodeName,
+			Client:             mgr.GetClient(),
+			Logger:             cfg.Logger,
+			Scheme:             mgr.GetScheme(),
+			FRRK8sNamespace:    cfg.FRRK8sNamespace,
+			NodeName:           cfg.NodeName,
+			DaemonSetName:      dsName,
+			DaemonSetNamespace: dsNamespace,
 		}
 		if err := frrk8sController.SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "frrk8s")
 			return nil, errors.Join(err, errors.New("failed to create frrk8s reconciler"))
 		}
 		c.BGPEventCallback = frrk8sController.UpdateConfig
+
+		// Other speakers withdraw FRRConfigurations for nodes that lost their
+		// speaker. The pod on that node is deleted when it no longer matches
+		// the DaemonSet, often before it can delete the object itself.
+		if dsName != "" {
+			cleaner := controllers.FRRK8sConfigCleaner{
+				Client:             mgr.GetClient(),
+				Logger:             cfg.Logger,
+				FRRK8sNamespace:    cfg.FRRK8sNamespace,
+				DaemonSetName:      dsName,
+				DaemonSetNamespace: dsNamespace,
+			}
+			if err := cleaner.SetupWithManager(mgr); err != nil {
+				level.Error(c.logger).Log("error", err, "unable to create controller", "frrk8s-cleaner")
+				return nil, errors.Join(err, errors.New("failed to create frrk8s configuration cleaner"))
+			}
+		}
 	}
 
 	if cfg.ReadEndpoints {

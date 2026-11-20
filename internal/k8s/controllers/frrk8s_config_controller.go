@@ -29,11 +29,15 @@ import (
 	frrk8s "go.universe.tf/metallb/internal/bgp/frrk8s"
 	"go.universe.tf/metallb/internal/logging"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -63,11 +67,16 @@ func NewFRRK8sConfigEvent() event.GenericEvent {
 
 type FRRK8sReconciler struct {
 	client.Client
-	Logger               log.Logger
-	LogLevel             logging.Level
-	Scheme               *runtime.Scheme
-	NodeName             string
-	FRRK8sNamespace      string
+	Logger          log.Logger
+	LogLevel        logging.Level
+	Scheme          *runtime.Scheme
+	NodeName        string
+	FRRK8sNamespace string
+	// DaemonSetName and DaemonSetNamespace identify the speaker DaemonSet.
+	// When set, configuration for this node is removed once the DaemonSet
+	// would no longer keep a speaker pod here.
+	DaemonSetName        string
+	DaemonSetNamespace   string
 	reconcileChan        chan event.GenericEvent
 	configChangedChan    chan struct{}
 	desiredConfiguration *frrv1beta1.FRRConfiguration
@@ -81,10 +90,14 @@ func (r *FRRK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	r.Lock()
 	defer r.Unlock()
-	if r.desiredConfiguration == nil {
-		config := &frrv1beta1.FRRConfiguration{ObjectMeta: metav1.ObjectMeta{Name: frrk8s.ConfigName(r.NodeName), Namespace: r.FRRK8sNamespace}}
-		err := r.Delete(ctx, config)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+	// Drop the configuration when this node should not run a speaker. The
+	// check happens before applying desiredConfiguration so a speaker that is
+	// still running cannot recreate an object the cleaner just removed.
+	if r.desiredConfiguration == nil || r.nodeExcluded(ctx) {
+		if r.desiredConfiguration != nil {
+			level.Info(r.Logger).Log("controller", "FRRK8sReconciler", "event", "node is not selected by the speaker daemonset, deleting FRR configuration", "node", r.NodeName)
+		}
+		return r.deleteOwnConfiguration(ctx)
 	}
 
 	current := frrv1beta1.FRRConfiguration{}
@@ -143,11 +156,56 @@ func (r *FRRK8sReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return true
 	})
 
-	return ctrl.NewControllerManagedBy(mgr).
+	bldr := ctrl.NewControllerManagedBy(mgr).
 		For(&frrv1beta1.FRRConfiguration{}).
 		WatchesRawSource(source.Channel(r.reconcileChan, &handler.EnqueueRequestForObject{})).
-		WithEventFilter(p).
-		Complete(r)
+		WithEventFilter(p)
+	if r.DaemonSetName != "" {
+		// Re-apply or withdraw when the speaker's own scheduling inputs change,
+		// so a node that becomes eligible again publishes its configuration
+		// without waiting for an unrelated BGP update.
+		enqueueOwn := handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []ctrl.Request {
+			return []ctrl.Request{{
+				NamespacedName: types.NamespacedName{
+					Name:      frrk8s.ConfigName(r.NodeName),
+					Namespace: r.FRRK8sNamespace,
+				},
+			}}
+		})
+		bldr = bldr.
+			Watches(&corev1.Node{}, enqueueOwn, builder.WithPredicates(nodeSchedulingChangedPredicate(r.NodeName))).
+			Watches(&appsv1.DaemonSet{}, enqueueOwn, builder.WithPredicates(daemonSetSchedulingPredicate(r.DaemonSetNamespace, r.DaemonSetName)))
+	}
+	return bldr.Complete(r)
+}
+
+func (r *FRRK8sReconciler) deleteOwnConfiguration(ctx context.Context) (ctrl.Result, error) {
+	config := &frrv1beta1.FRRConfiguration{ObjectMeta: metav1.ObjectMeta{Name: frrk8s.ConfigName(r.NodeName), Namespace: r.FRRK8sNamespace}}
+	err := r.Delete(ctx, config)
+	return ctrl.Result{}, client.IgnoreNotFound(err)
+}
+
+// nodeExcluded reports whether the speaker DaemonSet would evict the pod on
+// this node. Errors fail open: a failed lookup must not block publishing a
+// configuration the speaker is still responsible for.
+func (r *FRRK8sReconciler) nodeExcluded(ctx context.Context) bool {
+	if r.DaemonSetName == "" || r.DaemonSetNamespace == "" {
+		return false
+	}
+	ds := &appsv1.DaemonSet{}
+	if err := r.Get(ctx, client.ObjectKey{Name: r.DaemonSetName, Namespace: r.DaemonSetNamespace}, ds); err != nil {
+		level.Error(r.Logger).Log("controller", "FRRK8sReconciler", "event", "failed to get speaker daemonset, leaving FRR configuration in place", "error", err)
+		return false
+	}
+	node := &corev1.Node{}
+	if err := r.Get(ctx, client.ObjectKey{Name: r.NodeName}, node); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true
+		}
+		level.Error(r.Logger).Log("controller", "FRRK8sReconciler", "event", "failed to get node, leaving FRR configuration in place", "error", err, "node", r.NodeName)
+		return false
+	}
+	return !nodeContinuesRunningDaemonPod(node, ds)
 }
 
 func (r *FRRK8sReconciler) UpdateConfig(config interface{}) {
