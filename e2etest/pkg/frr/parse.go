@@ -42,6 +42,7 @@ type Route struct {
 	LocalPref   uint32
 	Origin      string
 	Stale       bool
+	AsPath      string
 }
 
 const bgpConnected = "Established"
@@ -129,6 +130,7 @@ type FRRRoute struct {
 	LocalPref uint32 `json:"locPrf"`
 	Origin    string `json:"origin"`
 	PathFrom  string `json:"pathFrom"`
+	AsPath    string `json:"path"`
 	Nexthops  []struct {
 		IP    string `json:"ip"`
 		Scope string `json:"scope"`
@@ -270,6 +272,7 @@ func ParseRoutes(vtyshRes string) (map[string]Route, error) {
 		}
 		for _, n := range frrRoutes {
 			r.LocalPref = n.LocalPref
+			r.AsPath = n.AsPath
 			r.Origin = n.Origin
 			r.Stale = n.Stale
 		out:

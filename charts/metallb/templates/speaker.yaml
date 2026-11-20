@@ -194,7 +194,7 @@ spec:
       {{- if .Values.speaker.excludeInterfaces.enabled }}
         - name: metallb-excludel2
           configMap:
-            defaultMode: 256
+            defaultMode: 292
             name: metallb-excludel2
       {{- end }}
         - name: memberlist-config

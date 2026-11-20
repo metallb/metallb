@@ -276,8 +276,9 @@ func (sm *sessionManager) updateConfig() error {
 					Allowed: frrv1beta1.AllowedOutPrefixes{
 						Prefixes: make([]string, 0),
 					},
-					PrefixesWithLocalPref: make([]frrv1beta1.LocalPrefPrefixes, 0),
-					PrefixesWithCommunity: make([]frrv1beta1.CommunityPrefixes, 0),
+					PrefixesWithLocalPref:     make([]frrv1beta1.LocalPrefPrefixes, 0),
+					PrefixesWithCommunity:     make([]frrv1beta1.CommunityPrefixes, 0),
+					PrefixesWithAsPathPrepend: make([]frrv1beta1.AsPathPrependPrefixes, 0),
 				},
 				Password: s.Password,
 				PasswordSecret: frrv1beta1.SecretReference{
@@ -298,6 +299,7 @@ func (sm *sessionManager) updateConfig() error {
 		   'neighbor.Advertisements' list. */
 		prefixesForCommunity := map[string][]string{}
 		prefixesForLocalPref := map[uint32][]string{}
+		prefixesForAsPathPrepend := map[uint8][]string{}
 		for _, adv := range s.advertised {
 			family := ipfamily.ForAddress(adv.Prefix.IP)
 
@@ -320,9 +322,13 @@ func (sm *sessionManager) updateConfig() error {
 			if adv.LocalPref != 0 {
 				prefixesForLocalPref[adv.LocalPref] = append(prefixesForLocalPref[adv.LocalPref], prefix)
 			}
+			if adv.AsPathPrepend != 0 {
+				prefixesForAsPathPrepend[adv.AsPathPrepend] = append(prefixesForAsPathPrepend[adv.AsPathPrepend], prefix)
+			}
 		}
 		neighbor.ToAdvertise.PrefixesWithCommunity = toAdvertiseWithCommunity(prefixesForCommunity)
 		neighbor.ToAdvertise.PrefixesWithLocalPref = toAdvertiseWithLocalPref(prefixesForLocalPref)
+		neighbor.ToAdvertise.PrefixesWithAsPathPrepend = toAdvertiseWithAsPathPrepend(prefixesForAsPathPrepend)
 		neighbor.ToAdvertise.Allowed.Prefixes = removeDuplicates(neighbor.ToAdvertise.Allowed.Prefixes)
 		sort.Strings(neighbor.ToAdvertise.Allowed.Prefixes)
 
@@ -407,6 +413,18 @@ func toAdvertiseWithLocalPref(prefixesForLocalPref map[uint32][]string) []frrv1b
 	}
 	sort.Slice(res, func(i, j int) bool {
 		return res[i].LocalPref < res[j].LocalPref
+	})
+	return res
+}
+
+func toAdvertiseWithAsPathPrepend(prefixesForAsPathPrepend map[uint8][]string) []frrv1beta1.AsPathPrependPrefixes {
+	res := []frrv1beta1.AsPathPrependPrefixes{}
+	for p, prefixes := range prefixesForAsPathPrepend {
+		sort.Strings(prefixes)
+		res = append(res, frrv1beta1.AsPathPrependPrefixes{AsPathPrepend: p, Prefixes: removeDuplicates(prefixes)})
+	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].AsPathPrepend < res[j].AsPathPrepend
 	})
 	return res
 }

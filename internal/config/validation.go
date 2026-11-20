@@ -20,11 +20,15 @@ type Validate func(ClusterResources) error
 func ValidationFor(bgpImpl string) Validate {
 	switch bgpImpl {
 	case "frr":
-		return DiscardNativeOnly
+		return func(c ClusterResources) error {
+			return errors.Join(DiscardFRRK8sOnly(c), DiscardNativeOnly(c))
+		}
 	case "frr-k8s":
 		return DiscardNativeOnly
 	case "native":
-		return DiscardFRROnly
+		return func(c ClusterResources) error {
+			return errors.Join(DiscardFRRK8sOnly(c), DiscardFRROnly(c))
+		}
 	}
 	return DontValidate
 }
@@ -320,4 +324,15 @@ func poolSelectorsForBGP(c ClusterResources) (poolSelector, error) {
 		byName:   selectedPools,
 		byLabels: poolsSelectors,
 	}, nil
+}
+
+// DiscardFRRK8sOnly returns an error if the current config contains
+// any options that are available only in the frr-k8s implementation.
+func DiscardFRRK8sOnly(c ClusterResources) error {
+	for _, adv := range c.BGPAdvs {
+		if adv.Spec.AsPathPrepend > 0 {
+			return fmt.Errorf("asPathPrepend is only supported by the frr-k8s backend")
+		}
+	}
+	return nil
 }

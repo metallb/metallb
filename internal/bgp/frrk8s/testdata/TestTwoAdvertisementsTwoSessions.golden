@@ -43,6 +43,14 @@
                                         ],
                                         "community": "1111:2222"
                                     }
+                                ],
+                                "withAsPathPrepend": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.10/24"
+                                        ],
+                                        "asPathPrepend": 5
+                                    }
                                 ]
                             },
                             "toReceive": {
@@ -81,6 +89,14 @@
                                             "172.16.1.11/24"
                                         ],
                                         "community": "1111:2222"
+                                    }
+                                ],
+                                "withAsPathPrepend": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.10/24"
+                                        ],
+                                        "asPathPrepend": 5
                                     }
                                 ]
                             },

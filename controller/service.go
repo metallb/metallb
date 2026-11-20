@@ -59,8 +59,8 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		return nil
 	}
 
-	// Return if pools are empty.
-	if len(c.pools.ByName) == 0 {
+	// No config means no pools: clear the service rather than wait.
+	if c.pools == nil || len(c.pools.ByName) == 0 {
 		level.Debug(l).Log("event", "clearAssignment", "reason", "noConfig", "msg", "pools are empty")
 		c.clearServiceState(key, svc)
 		return ErrConverge
@@ -214,6 +214,11 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	}
 	svc.Annotations[AnnotationIPAllocateFromPool] = pool
 
+	// Drop the deprecated managed annotation that may linger on services
+	// allocated by an older MetalLB version, so it does not coexist with the
+	// current one after an upgrade. See https://github.com/metallb/metallb/issues/2642.
+	delete(svc.Annotations, DeprecatedAnnotationIPAllocateFromPool)
+
 	return nil
 }
 
@@ -246,6 +251,10 @@ func serviceFamilyChanged(
 func (c *controller) clearServiceState(key string, svc *v1.Service) {
 	c.ips.Unassign(key)
 	delete(svc.Annotations, AnnotationIPAllocateFromPool)
+	// Also drop the deprecated managed annotation so an unassigned or cleared
+	// service does not keep falsely advertising a pool allocation after an
+	// upgrade. See https://github.com/metallb/metallb/issues/2642.
+	delete(svc.Annotations, DeprecatedAnnotationIPAllocateFromPool)
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
 }
 

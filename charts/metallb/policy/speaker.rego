@@ -32,3 +32,12 @@ deny[msg] {
   not input.spec.template.spec.tolerations[0] == { "key": "node-role.kubernetes.io/master", "effect": "NoSchedule", "operator": "Exists" }
   msg = "controller tolerations does not include node-role.kubernetes.io/master:NoSchedule"
 }
+# validate exclude-L2 config is readable by a non-root speaker
+deny[msg] {
+  input.kind == "DaemonSet"
+  endswith(input.metadata.name, "-speaker")
+  volume := input.spec.template.spec.volumes[_]
+  volume.name == "metallb-excludel2"
+  not volume.configMap.defaultMode == 292
+  msg = "speaker metallb-excludel2 ConfigMap defaultMode must be 292"
+}

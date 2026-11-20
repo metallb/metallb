@@ -255,12 +255,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var validateConfig config.Validate
-	if bgpType == "native" {
-		validateConfig = config.DiscardFRROnly
-	} else {
-		validateConfig = config.DiscardNativeOnly
-	}
+	validateConfig := config.ValidationFor(bgpType)
 
 	listenFRRK8s := bgpType == string(bgpFrrK8s)
 	client, err := k8s.New(&k8s.Config{
@@ -498,6 +493,10 @@ func (c *controller) handleService(l log.Logger,
 	if !c.announced[protocol][name] {
 		c.announced[protocol][name] = true
 		c.svcIPs[name] = lbIPs
+		level.Info(l).Log("event", "serviceAnnounced", "msg", "service has IP, announcing", "protocol", protocol)
+		c.client.Infof(svc, "nodeAssigned", "announcing from node %q with protocol %q", c.myNode, protocol)
+	} else {
+		level.Debug(l).Log("event", "serviceAnnounced", "msg", "service already announced from this node", "protocol", protocol)
 	}
 
 	for _, ip := range lbIPs {
@@ -508,8 +507,6 @@ func (c *controller) handleService(l log.Logger,
 			"ip":       ip.String(),
 		}).Set(1)
 	}
-	level.Info(l).Log("event", "serviceAnnounced", "msg", "service has IP, announcing", "protocol", protocol)
-	c.client.Infof(svc, "nodeAssigned", "announcing from node %q with protocol %q", c.myNode, protocol)
 	return controllers.SyncStateSuccess
 }
 

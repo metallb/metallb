@@ -509,9 +509,10 @@ func TestSingleAdvertisement(t *testing.T) {
 	community2, _ := community.New("3333:4444")
 	communities = append(communities, community2)
 	adv := &bgp.Advertisement{
-		Prefix:      prefix,
-		Communities: communities,
-		LocalPref:   300,
+		Prefix:        prefix,
+		Communities:   communities,
+		LocalPref:     300,
+		AsPathPrepend: 3,
 	}
 
 	err = session.Set(adv)
@@ -829,8 +830,9 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 			community, _ := community.New("1111:2222")
 			communities = append(communities, community)
 			adv1 := &bgp.Advertisement{
-				Prefix:      prefix1,
-				Communities: communities,
+				Prefix:        prefix1,
+				Communities:   communities,
+				AsPathPrepend: 5,
 			}
 
 			prefix2 := &net.IPNet{

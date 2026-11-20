@@ -2,6 +2,52 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.16.2
+
+### Feature
+
+- Add --frrk8s-secret-passthrough for external frr-k8s, allows passing BGP secret references directly instead of resolving them to cleartext under the assumption that they are created in the frr-k8s namespace separately. (#3077, @oribon)
+- Add RISC-V builds. (#2964, @mmoll)
+- Add `revisionHistoryLimit` as a configurable chart value for `controller` and `speaker` (#3078, @NPastorale)
+- Added support for BGP AS-Path Prepending in frr-k8s mode to enable inbound traffic engineering via BGPAdvertisement configurations. (#3162, @psasnal)
+- Allow the controller and speaker metrics endpoints to be disabled by setting the metrics port to 0. (#3101, @Yurii201811)
+- Bump frr-k8s dependency to 0.0.27 (#3155, @oribon)
+- Extend L2Advertisement with PreferredNodeSelectors to steer L2 speaker election toward nodes matching weighted label selectors. When unset, election falls back to the existing hash-based tie-break. (#3044, @jlandersen)
+- Optionally send periodic ARP / NDP messages to refresh the neighbor cache of clients. (#3125, @fedepaol)
+- The tini binary path and docker-start script path for the FRR sidecar
+  container are now configurable via speaker.frr.tiniPath and
+  speaker.frr.dockerStartPath Helm values, enabling use of alternative
+  FRR images such as Docker Hardened Images. Defaults are unchanged.
+  The security context for the FRR sidecar container is now configurable
+  via speaker.frr.securityContext, allowing operators to restrict or
+  adjust for hardened or custom FRR images (e.g. user ID differences). Defaults
+  match the previous hardcoded capabilities and are unchanged. (#3096, @benispeti)
+
+### Bug or Regression
+
+- Bump google.golang.org/grpc to v1.79.3 to fix CVE-2026-33186 (gRPC authorization bypass via :path pseudo-header missing leading slash). (#3093, @funbiscuit)
+- Deny allow-shared-ip with ServiceSelectors on L2. (#3032, @oribon)
+- Fix controller CrashLoopBackOff when using speaker.enabled=false on helm charts. (#3069, @oribon)
+- Fix overflow in pool capacity metrics and available IPv6 counts when an IPAddressPool contains multiple ranges with a very large combined IPv6 capacity. (#3140, @git-jxj)
+- Fix speaker startup when running as non-root by making the exclude-L2 ConfigMap readable. (#3130, @akashchamp)
+- Fix the pod and service monitor relabeling examples in the Helm chart values to use `targetLabel` instead of `target_label`. (#3122, @SaiPisey2)
+- Fix the pool exhaustion Prometheus rules so that the queries retain all labels values which are subsequently used in summary and description fields (#3047, @the-green-man14)
+- Fixed a panic in the configuration parser when an IPAddressPool contains an invalid IP range like "::-0.0.0.0" (start and end addresses of different families). Such ranges are now rejected with a proper error. (#3144, @wooffie)
+- Fixed derivation of the memberlist encryption key, which left part of the key set to a constant instead of hashing the configured secret. Speakers cannot exchange gossip across the version boundary while the rollout is in progress. (#3143, @kali834x)
+- Fixed the ServiceL2Status and ServiceBGPStatus controllers returning "resourceVersion should not be set on objects to be created" instead of re-creating the status when it was deleted while a reconcile was in flight. (#3079, @somaz94)
+- Helm chart: ServiceMonitor helper Services now emit prometheus.io scrape annotations only when prometheus.scrapeAnnotations is enabled, avoiding duplicate scraping when ServiceMonitor and annotation-based discovery are both configured. (#3088, @Soli0222)
+- Helm chart: the PodMonitor template now targets the correct HTTPS metrics port (metricshttps instead of the removed monitoring), includes tlsConfig with insecureSkipVerify: true, and authenticates via a dedicated ServiceAccount with a long-lived bearer token (#3081, @yahlifried)
+- Helm chart: tightened `speaker.bgpDebounceTimeout` schema constraint from `minimum: 0` to `minimum: 1` to match the speaker binary, which rejects 0 with os.Exit(1). The value 0 is now rejected at `helm install` time with a clear schema error. (#3057, @lexfrei)
+- Helm: pass --health-probe-port to controller and speaker (#3073, @oribon)
+- The speaker no longer re-emits the nodeAssigned event on every reconcile. It is now emitted only when the announcement actually changes: on first announce, when the announced IPs change, and when the announcing node changes. (#3134, @Vemula-Rohith)
+
+### Other (Cleanup or Flake)
+
+- Bump Go toolchain to 1.26.5 to fix GO-2026-5856 (crypto/tls ECH privacy leak). (#3100, @funbiscuit)
+
+This release includes contributions from:
+Akash Kumar, Aleksei Sviridkin, Alex Vorona, Anvesh Jaggapatruni, Burkov Egor, Federico Paolinelli, Jeppe Lund Andersen, Mark Sasnal, Michael Moll, NPastorale, Ori Braunshtein, Peter Benis, Pujitha Paladugu, SaiPisey2, Soli0222, Vedant Madane, Vemula-Rohith, Yurii Bakurov, Zibran Khan, cyclinder kuo, dependabot[bot], funbiscuit, git-jxj, mrchatam, renovate[bot], somaz, the-green-man14, xinjun.jiang, yahlifried
+
 ## Version 0.16.1
 
 ### Bug or Regression

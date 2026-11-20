@@ -19,7 +19,7 @@ jobs:
     # classify.yaml is the single source of truth for PR kind; check its
     # kind/feature label directly instead of re-deriving it from the PR body.
     if: >
-      github.actor != 'dependabot[bot]' &&
+      github.actor != 'renovate[bot]' &&
       contains(github.event.pull_request.labels.*.name, 'kind/feature')
     steps:
       - name: Checkout

@@ -71,6 +71,14 @@ spec:
                   for IPv6 addresses.
                 format: int32
                 type: integer
+              asPathPrepend:
+                description: |-
+                  Specifies the number of times to prepend the ASN to the AS-path on outgoing BGP updates,
+                  artificially lengthening the path for traffic engineering.
+                  Supported only in frr-k8s mode.
+                maximum: 10
+                minimum: 1
+                type: integer
               communities:
                 description: |-
                   The BGP communities to be associated with the announcement. Each item can be a standard community of the

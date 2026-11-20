@@ -4,6 +4,84 @@ title: Prometheus Metrics
 
 MetalLB exposes different Prometheus metrics that are listed below.
 
+## Configuring Prometheus
+
+MetalLB does not bundle a full Prometheus stack. You wire your cluster Prometheus
+(or the Prometheus Operator) to scrape MetalLB and optionally load alert rules.
+
+### Scraping with the Prometheus Operator
+
+Manifests under [`config/prometheus-native`](https://github.com/metallb/metallb/tree/main/config/prometheus-native),
+[`config/prometheus-frr`](https://github.com/metallb/metallb/tree/main/config/prometheus-frr), and
+[`config/prometheus-frr-k8s`](https://github.com/metallb/metallb/tree/main/config/prometheus-frr-k8s)
+define `ServiceMonitor` objects plus metrics Services for the controller and speaker.
+Combined install overlays also exist under `config/manifests/` (for example
+`metallb-native-prometheus.yaml`).
+
+Apply the overlay that matches your MetalLB mode, then ensure your Prometheus
+instance selects the MetalLB `ServiceMonitor` labels (and that RBAC allows it to
+read endpoints in the MetalLB namespace).
+
+With Helm, enable scraping via the chart values under `prometheus` (ServiceMonitor
+or PodMonitor, scrape annotations, and related settings). See the
+[Helm chart README](https://github.com/metallb/metallb/blob/main/charts/metallb/README.md).
+
+### Sample alert rules
+
+Deployments should alert on stale config, failed config load, exhausted address
+pools, and down BGP sessions. The Helm chart can emit a `PrometheusRule` when
+`prometheus.prometheusRule.enabled` is true. Equivalent expressions you can load
+into any Prometheus are:
+
+```yaml
+groups:
+  - name: metallb
+    rules:
+      - alert: MetalLBStaleConfig
+        expr: metallb_k8s_client_config_stale_bool == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MetalLB {{ $labels.pod }} is running on a stale config"
+
+      - alert: MetalLBConfigNotLoaded
+        expr: metallb_k8s_client_config_loaded_bool == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MetalLB {{ $labels.pod }} has not loaded a config"
+
+      - alert: MetalLBAddressPoolExhausted
+        expr: metallb_allocator_addresses_in_use_total >= metallb_allocator_addresses_total
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MetalLB pool {{ $labels.pool }} has no free addresses"
+
+      - alert: MetalLBBGPSessionDown
+        expr: metallb_bgp_session_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MetalLB BGP session to {{ $labels.peer }} is down"
+```
+
+{{% notice note %}}
+In FRR-K8s mode, BGP session metrics use the `frrk8s_` prefix (for example
+`frrk8s_bgp_session_up`) unless you relabel them as described
+[below](#backward-compatible-metric-relabeling). Adjust alert expressions to match
+the metric names you actually scrape.
+{{% /notice %}}
+
+Helm users can toggle individual rules and add `extraAlerts` under
+`prometheus.prometheusRule` in chart values. The rule templates live in
+[`charts/metallb/templates/prometheusrules.yaml`](https://github.com/metallb/metallb/blob/main/charts/metallb/templates/prometheusrules.yaml).
+
+
 ## MetalLB Allocator Addresses metrics
 
 | Name                                     | Description                              |
