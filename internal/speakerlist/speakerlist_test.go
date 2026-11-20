@@ -5,7 +5,14 @@ package speakerlist
 import (
 	"bytes"
 	"crypto/sha256"
+	"net"
+	"strconv"
 	"testing"
+	"time"
+
+	"github.com/go-kit/log"
+
+	"go.universe.tf/metallb/internal/k8s"
 )
 
 func TestSecretKeyFor(t *testing.T) {
@@ -44,5 +51,94 @@ func TestSecretKeyFor(t *testing.T) {
 			t.Errorf("secrets %q and %q both derive key %x", other, secret, key)
 		}
 		seen[string(key)] = secret
+	}
+}
+
+// TestStartJoinsBeforeReturning checks that a speaker knows the running
+// speakers as soon as Start returns. Start runs before the Kubernetes client,
+// so a member list that holds only the local node at that point makes the
+// first layer2 reconcile elect the local node for every service.
+func TestStartJoinsBeforeReturning(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("finding a free port: %v", err)
+	}
+	port := strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
+	if err := l.Close(); err != nil {
+		t.Fatalf("closing the port probe: %v", err)
+	}
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	logger := log.NewNopLogger()
+
+	// Two loopback addresses with the same port, as speakers on two nodes:
+	// mlJoin passes bare IPs, which memberlist dials on its own bind port.
+	peer, err := New(logger, "peer", "127.0.0.2", port, "secret", "metallb-system", "app=speaker", false, stopCh)
+	if err != nil {
+		t.Fatalf("creating the peer: %v", err)
+	}
+	defer func() { _ = peer.ml.Shutdown() }()
+
+	self, err := New(logger, "self", "127.0.0.1", port, "secret", "metallb-system", "app=speaker", false, stopCh)
+	if err != nil {
+		t.Fatalf("creating the local speaker: %v", err)
+	}
+	defer func() { _ = self.ml.Shutdown() }()
+
+	self.client = &k8s.Client{ForceSync: func() {}}
+	self.start([]string{"127.0.0.1", "127.0.0.2"})
+
+	nodes := self.UsableSpeakers().Nodes
+	if !nodes["self"] || !nodes["peer"] {
+		t.Fatalf("usable speakers right after start: %v, want both self and peer", nodes)
+	}
+}
+
+// TestJoinWithTimeoutDoesNotWaitForStuckTargets checks that the initial join
+// gives up waiting when a join target accepts the connection but never
+// answers, so the speaker still starts.
+func TestJoinWithTimeoutDoesNotWaitForStuckTargets(t *testing.T) {
+	stuck, err := net.Listen("tcp", "127.0.0.3:0")
+	if err != nil {
+		t.Fatalf("listening for the stuck target: %v", err)
+	}
+	// Hold every accepted connection open without answering.
+	held := make(chan net.Conn, 16)
+	go func() {
+		for {
+			c, err := stuck.Accept()
+			if err != nil {
+				return
+			}
+			held <- c
+		}
+	}()
+	defer func() {
+		_ = stuck.Close()
+		for {
+			select {
+			case c := <-held:
+				_ = c.Close()
+			default:
+				return
+			}
+		}
+	}()
+	port := strconv.Itoa(stuck.Addr().(*net.TCPAddr).Port)
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	self, err := New(log.NewNopLogger(), "self", "127.0.0.1", port, "secret", "metallb-system", "app=speaker", false, stopCh)
+	if err != nil {
+		t.Fatalf("creating the local speaker: %v", err)
+	}
+	defer func() { _ = self.ml.Shutdown() }()
+	self.mlSpeakerIPs = []string{"127.0.0.3"}
+
+	start := time.Now()
+	self.joinWithTimeout(200 * time.Millisecond)
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("joinWithTimeout returned after %v, want about 200ms", elapsed)
 	}
 }
