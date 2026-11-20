@@ -37,3 +37,21 @@ func IsNodeExcludedFromBalancers(n *corev1.Node) bool {
 	}
 	return false
 }
+
+// IsNodeOutOfService returns true if the given node has taint node.kubernetes.io/out-of-service=nodeshutdown:NoExecute".
+func IsNodeOutOfService(n *corev1.Node) bool {
+	if n == nil {
+		return false
+	}
+
+	if n.Spec.Taints == nil {
+		return false
+	}
+
+	for _, taint := range n.Spec.Taints {
+		if taint.Key == corev1.TaintNodeOutOfService && taint.Value == "nodeshutdown" && taint.Effect == corev1.TaintEffectNoExecute {
+			return true
+		}
+	}
+	return false
+}
