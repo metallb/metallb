@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -633,5 +634,82 @@ func TestFilterBGPPeersByNode(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestConfigControllerReportsOnlyConditionChanges checks that reconciles that
+// don't change the condition, such as those caused by node label changes, don't
+// write the status.
+func TestConfigControllerReportsOnlyConditionChanges(t *testing.T) {
+	configStateRef := &v1beta1.ConfigurationState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "speaker-worker01",
+			Namespace: testNamespace,
+		},
+	}
+	otherNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "worker02",
+		},
+	}
+	initObjects := append(objectsFromResources(configControllerValidResources), configStateRef, otherNode)
+	fakeClient, err := newFakeClient(initObjects)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+	patches := 0
+	c := withStatusPatchCounter(fakeClient, &patches)
+
+	r := &ConfigReconciler{
+		Client:          c,
+		Logger:          log.NewNopLogger(),
+		Scheme:          scheme.Scheme,
+		Namespace:       testNamespace,
+		ValidateConfig:  config.DontValidate,
+		Handler:         func(log.Logger, *config.Config) SyncState { return SyncStateSuccess },
+		ForceReload:     func() {},
+		ConfigStateName: configStateRef.Name,
+		NodeName:        configControllerValidResources.Nodes[0].Name,
+	}
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: otherNode.Name}}
+	configStateKey := types.NamespacedName{Name: configStateRef.Name, Namespace: testNamespace}
+
+	if _, err := r.Reconcile(context.TODO(), req); err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+	if patches != 1 {
+		t.Fatalf("expected 1 status patch, got %d", patches)
+	}
+	var before v1beta1.ConfigurationState
+	if err := c.Get(context.TODO(), configStateKey, &before); err != nil {
+		t.Fatalf("failed to get ConfigurationState: %v", err)
+	}
+
+	for i := range 3 {
+		var node corev1.Node
+		if err := c.Get(context.TODO(), types.NamespacedName{Name: otherNode.Name}, &node); err != nil {
+			t.Fatalf("failed to get node: %v", err)
+		}
+		node.Labels = map[string]string{"label": strconv.Itoa(i)}
+		if err := c.Update(context.TODO(), &node); err != nil {
+			t.Fatalf("failed to update node: %v", err)
+		}
+		if _, err := r.Reconcile(context.TODO(), req); err != nil {
+			t.Fatalf("reconcile failed: %v", err)
+		}
+	}
+
+	if patches != 1 {
+		t.Fatalf("expected no status patches after node label changes, got %d", patches-1)
+	}
+	var after v1beta1.ConfigurationState
+	if err := c.Get(context.TODO(), configStateKey, &after); err != nil {
+		t.Fatalf("failed to get ConfigurationState: %v", err)
+	}
+	if after.ResourceVersion != before.ResourceVersion {
+		t.Fatalf("expected resourceVersion %s, got %s", before.ResourceVersion, after.ResourceVersion)
+	}
+	if diff := cmp.Diff(before.Status.Conditions, after.Status.Conditions); diff != "" {
+		t.Fatalf("conditions changed (-before +after):\n%s", diff)
 	}
 }

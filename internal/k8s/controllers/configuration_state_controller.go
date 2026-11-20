@@ -11,8 +11,11 @@ import (
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -151,4 +154,91 @@ func (r *ConfigurationStateReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		WatchesRawSource(source.Channel(reconcileChan, &handler.EnqueueRequestForObject{})).
 		WithEventFilter(p).
 		Complete(r)
+}
+
+// configStateConditionReporter writes the condition of a reconciler to its
+// ConfigurationState via Server-Side Apply. Most reconciles don't change the
+// condition, and every write is delivered to all the watchers of the resource,
+// so it writes only when the condition changed.
+// It is not safe for concurrent use: the reconcilers using it run a single worker.
+type configStateConditionReporter struct {
+	client.Client
+	namespace  string
+	name       string
+	fieldOwner string
+	// lastApplied is the condition last applied by this reporter, to the
+	// resource with UID lastAppliedUID.
+	lastApplied    *metav1.Condition
+	lastAppliedUID types.UID
+	// applyFailed is set when the last apply failed: the resource may hold
+	// either lastApplied or the condition that failed.
+	applyFailed bool
+}
+
+func (c *configStateConditionReporter) report(ctx context.Context, condition metav1.Condition) error {
+	current := &metallbv1beta1.ConfigurationState{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: c.namespace, Name: c.name}, current); err != nil {
+		if apierrors.IsNotFound(err) {
+			// The condition is reported when the resource is created, see
+			// NewConfigStateConditionReporterPredicate.
+			return nil
+		}
+		return fmt.Errorf("get %s/%s: %w", c.namespace, c.name, err)
+	}
+	stored := meta.FindStatusCondition(current.Status.Conditions, condition.Type)
+
+	// What we applied to a resource that was since recreated is not relevant.
+	applied := c.lastApplied
+	if c.lastAppliedUID != current.UID {
+		applied = nil
+	}
+
+	// The cached object alone is not enough to skip the write, as it may not
+	// reflect our last write yet. What we applied last is not enough either, as
+	// the resource may have been recreated without our condition.
+	if !c.applyFailed && applied != nil && sameCondition(*applied, condition) &&
+		stored != nil && sameCondition(*stored, condition) {
+		return nil
+	}
+
+	previous := applied
+	if previous == nil {
+		previous = stored
+	}
+	condition.LastTransitionTime = metav1.Now()
+	if previous != nil && previous.Status == condition.Status {
+		condition.LastTransitionTime = previous.LastTransitionTime
+	}
+
+	configStatus := &metallbv1beta1.ConfigurationState{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "metallb.io/v1beta1",
+			Kind:       "ConfigurationState",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.name,
+			Namespace: c.namespace,
+		},
+		Status: metallbv1beta1.ConfigurationStateStatus{
+			Conditions: []metav1.Condition{condition},
+		},
+	}
+
+	if err := c.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner(c.fieldOwner), client.ForceOwnership); err != nil { //nolint:staticcheck // TODO: migrate to client.Client.Apply()
+		// The write may have been persisted: don't skip the next report. If it
+		// changed the status, what we applied last no longer tells when the
+		// status last changed: rely on the resource instead.
+		c.applyFailed = true
+		if applied == nil || applied.Status != condition.Status {
+			c.lastApplied = nil
+		}
+		return fmt.Errorf("patch %s/%s: %w", c.namespace, c.name, err)
+	}
+	c.lastApplied, c.lastAppliedUID, c.applyFailed = &condition, current.UID, false
+
+	return nil
+}
+
+func sameCondition(a, b metav1.Condition) bool {
+	return a.Type == b.Type && a.Status == b.Status && a.Reason == b.Reason && a.Message == b.Message
 }

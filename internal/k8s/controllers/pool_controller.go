@@ -47,6 +47,7 @@ type PoolReconciler struct {
 	ForceReload     func()
 	ConfigStateName string
 	currentConfig   *config.Config
+	statusReporter  *configStateConditionReporter
 }
 
 func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retError error) {
@@ -170,8 +171,6 @@ func (r *PoolReconciler) reportCondition(ctx context.Context, conditionErr error
 		Status:  metav1.ConditionTrue,
 		Reason:  ErrorTypeNone,
 		Message: "",
-		// Always set to now (tracks last reconciliation, not last status change).
-		LastTransitionTime: metav1.Now(),
 	}
 
 	switch {
@@ -185,23 +184,13 @@ func (r *PoolReconciler) reportCondition(ctx context.Context, conditionErr error
 		condition.Message = conditionErr.Error()
 	}
 
-	configStatus := &metallbv1beta1.ConfigurationState{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "metallb.io/v1beta1",
-			Kind:       "ConfigurationState",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.ConfigStateName,
-			Namespace: r.Namespace,
-		},
-		Status: metallbv1beta1.ConfigurationStateStatus{
-			Conditions: []metav1.Condition{condition},
-		},
+	if r.statusReporter == nil {
+		r.statusReporter = &configStateConditionReporter{
+			Client:     r.Client,
+			namespace:  r.Namespace,
+			name:       r.ConfigStateName,
+			fieldOwner: "poolReconciler",
+		}
 	}
-
-	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("poolReconciler"), client.ForceOwnership); err != nil { //nolint:staticcheck // TODO: migrate to client.Client.Apply()
-		return fmt.Errorf("patch %s/%s: %w", r.Namespace, r.ConfigStateName, err)
-	}
-
-	return nil
+	return r.statusReporter.report(ctx, condition)
 }
