@@ -452,6 +452,12 @@
               "items": {
                 "type": "object"
               }
+            },
+            "extraEnv": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
             }
           },
           "required": [ "tolerateMaster" ]
