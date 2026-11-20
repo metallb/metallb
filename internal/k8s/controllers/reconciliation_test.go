@@ -204,6 +204,15 @@ var _ = BeforeSuite(func() {
 	err = frrk8sReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&FRRK8sConfigCleaner{
+		Client:             k8sManager.GetClient(),
+		Logger:             log.NewNopLogger(),
+		FRRK8sNamespace:    testNamespace,
+		DaemonSetName:      cleanerDaemonSetName,
+		DaemonSetNamespace: speakerNamespace,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	layer2StatusReconciler = &Layer2StatusReconciler{
 		Client:        k8sManager.GetClient(),
 		Logger:        log.NewNopLogger(),
