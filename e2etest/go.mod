@@ -2,7 +2,7 @@ module go.universe.tf/e2etest
 
 go 1.26.0
 
-toolchain go1.26.9
+toolchain go1.26.11
 
 require (
 	github.com/google/go-cmp v0.7.0
