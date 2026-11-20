@@ -2440,3 +2440,70 @@ func validateCounters(c PoolCounters, avIPv4, avIPv6, asIPv4, asIPv6 int64) erro
 	}
 	return nil
 }
+
+func TestSelectIPsForFamilyAndPolicyMissingFamily(t *testing.T) {
+	ipv4 := net.ParseIP("1.2.3.4")
+	ipv6 := net.ParseIP("1000::")
+
+	tests := []struct {
+		desc            string
+		allocation      Allocation
+		serviceIPFamily ipfamily.Family
+		policy          v1.IPFamilyPolicy
+		wantErr         bool
+		wantIPs         []net.IP
+	}{
+		{
+			desc:            "ipv4 service, pool has only ipv6",
+			allocation:      Allocation{PoolName: "test", IPV6: ipv6},
+			serviceIPFamily: ipfamily.IPv4,
+			policy:          v1.IPFamilyPolicySingleStack,
+			wantErr:         true,
+		},
+		{
+			desc:            "ipv6 service, pool has only ipv4",
+			allocation:      Allocation{PoolName: "test", IPV4: ipv4},
+			serviceIPFamily: ipfamily.IPv6,
+			policy:          v1.IPFamilyPolicySingleStack,
+			wantErr:         true,
+		},
+		{
+			desc:            "ipv4 service, pool has ipv4",
+			allocation:      Allocation{PoolName: "test", IPV4: ipv4},
+			serviceIPFamily: ipfamily.IPv4,
+			policy:          v1.IPFamilyPolicySingleStack,
+			wantIPs:         []net.IP{ipv4},
+		},
+		{
+			desc:            "ipv6 service, pool has ipv6",
+			allocation:      Allocation{PoolName: "test", IPV6: ipv6},
+			serviceIPFamily: ipfamily.IPv6,
+			policy:          v1.IPFamilyPolicySingleStack,
+			wantIPs:         []net.IP{ipv6},
+		},
+	}
+
+	for _, test := range tests {
+		alloc := test.allocation
+		ips, err := alloc.selectIPsForFamilyAndPolicy(test.serviceIPFamily, test.policy)
+		if test.wantErr {
+			if err == nil {
+				t.Errorf("%s: expected an error, got ips %v", test.desc, ips)
+			}
+			// Even on error we must never hand back a slice holding a nil IP.
+			for _, ip := range ips {
+				if ip == nil {
+					t.Errorf("%s: returned a nil IP in the result slice", test.desc)
+				}
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%s: unexpected error: %s", test.desc, err)
+			continue
+		}
+		if !reflect.DeepEqual(ips, test.wantIPs) {
+			t.Errorf("%s: got %v, want %v", test.desc, ips, test.wantIPs)
+		}
+	}
+}
