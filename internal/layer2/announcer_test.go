@@ -6,6 +6,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/go-kit/log"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -262,4 +263,30 @@ func (f *fakeNDPResponder) gratuitousCalls() map[string]int {
 		m[ip.String()]++
 	}
 	return m
+}
+
+func TestNewListsInterfacesBeforeReturning(t *testing.T) {
+	ifs, err := net.Interfaces()
+	if err != nil {
+		t.Fatalf("listing interfaces: %v", err)
+	}
+	if len(ifs) == 0 {
+		t.Skip("no network interfaces on this host")
+	}
+	// updateInterfaces keeps the old list when it can't read an interface's
+	// addresses, so this check only holds where every interface can be read.
+	for _, ifi := range ifs {
+		if _, err := ifi.Addrs(); err != nil {
+			t.Skipf("can't list the addresses of %s on this host: %v", ifi.Name, err)
+		}
+	}
+
+	announce, err := New(log.NewNopLogger(), nil, 0)
+	if err != nil {
+		t.Fatalf("creating announcer: %v", err)
+	}
+
+	if got := announce.GetInterfaces(); len(got) == 0 {
+		t.Fatal("GetInterfaces() is empty right after New(), want the node's interfaces")
+	}
 }

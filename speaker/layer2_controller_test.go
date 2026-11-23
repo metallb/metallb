@@ -2926,3 +2926,28 @@ func TestShouldAnnouncePreferredNodeFailover(t *testing.T) {
 		}
 	})
 }
+
+func TestLayer2SetBalancerRetriesWhenNoInterfacesAreKnown(t *testing.T) {
+	ads := map[string]*config.L2Advertisement{
+		"selected interfaces": {Nodes: map[string]bool{"iris1": true}, Interfaces: []string{"eth0"}},
+		"all interfaces":      {Nodes: map[string]bool{"iris1": true}, AllInterfaces: true},
+	}
+	for name, ad := range ads {
+		t.Run(name, func(t *testing.T) {
+			c := &layer2Controller{
+				announcer: &layer2.Announce{},
+				myNode:    "iris1",
+			}
+			pool := &config.Pool{L2Advertisements: []*config.L2Advertisement{ad}}
+			k8sClient := &testK8S{t: t}
+
+			err := c.SetBalancer(log.NewNopLogger(), "test1", []net.IP{net.ParseIP("10.20.30.1")}, pool, k8sClient, &v1.Service{})
+			if err == nil {
+				t.Fatal("SetBalancer succeeded with no known interfaces, want an error so the service is retried")
+			}
+			if k8sClient.loggedWarning {
+				t.Fatal("SetBalancer reported announceFailed before the node's interfaces were known")
+			}
+		})
+	}
+}

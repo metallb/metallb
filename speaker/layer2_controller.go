@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"fmt"
 	"maps"
 	"net"
 	"sort"
@@ -134,6 +135,12 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 
 func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, client service, svc *v1.Service) error {
 	ifs := c.announcer.GetInterfaces()
+	if len(ifs) == 0 {
+		// The node's interfaces are not known yet. Return an error so the
+		// service is retried, instead of announcing it without responders or
+		// giving up on it until it changes.
+		return fmt.Errorf("no network interfaces known yet, cannot announce %s", name)
+	}
 	updateStatus := false
 	allAdsForService := l2AdsForService(pool.L2Advertisements, svc)
 	myAdsForService := l2AdsForNode(allAdsForService, c.myNode)
