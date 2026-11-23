@@ -67,6 +67,9 @@ func New(l log.Logger, excludeRegexp *regexp.Regexp, gratuitousARPInterval time.
 		excludeRegexp:  excludeRegexp,
 	}
 
+	// Scan once before returning, so that the speaker never reconciles a
+	// service against an empty interface list right after it starts.
+	ret.updateInterfaces()
 	go ret.interfaceScan()
 	go ret.spamLoop()
 	if gratuitousARPInterval > 0 {
@@ -79,8 +82,8 @@ func New(l log.Logger, excludeRegexp *regexp.Regexp, gratuitousARPInterval time.
 
 func (a *Announce) interfaceScan() {
 	for {
-		a.updateInterfaces()
 		time.Sleep(10 * time.Second)
+		a.updateInterfaces()
 	}
 }
 
