@@ -204,7 +204,7 @@ func TestValidateBGPPeerCreateWithDisableMP(t *testing.T) {
 				Name:      "test-peer",
 				Namespace: test.namespace,
 			},
-			Spec: v1beta2.BGPPeerSpec{DisableMP: true},
+			Spec: v1beta2.BGPPeerSpec{DisableMP: true}, //nolint:staticcheck // kept for backwards compatibility
 		})
 		if test.expectErr && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)
