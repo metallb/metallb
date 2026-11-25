@@ -105,6 +105,24 @@ var (
 			totalSent:            15,
 			totalReceived:        15,
 		},
+		{
+			desc:                 "Output contains an unnumbered neighbor keyed by interface",
+			vtyshOutput:          neighborsUnnumbered,
+			neighborIP:           "net0:179",
+			neighborVRF:          "default",
+			announcedPrefixes:    3,
+			sessionUp:            1,
+			updatesTotal:         3,
+			updatesTotalReceived: 3,
+			keepalivesSent:       4,
+			keepalivesReceived:   4,
+			opensSent:            1,
+			opensReceived:        1,
+			routeRefreshSent:     5,
+			notificationsSent:    2,
+			totalSent:            15,
+			totalReceived:        15,
+		},
 	}
 	neighborsIPv4Only = `
 	{
@@ -369,6 +387,41 @@ var (
 		  "writeThread":"on"
 		}
 	  }	  
+	`
+	neighborsUnnumbered = `
+	{
+		"net0":{
+		  "remoteAs":64512,
+		  "localAs":64513,
+		  "nbrExternalLink":true,
+		  "bgpVersion":4,
+		  "remoteRouterId":"172.18.0.4",
+		  "localRouterId":"172.18.0.3",
+		  "bgpState":"Established",
+		  "bgpNeighborAddr":"fe80::a8bb:ccff:fedd:eeff",
+		  "messageStats":{
+			"opensSent":1,
+			"opensRecv":1,
+			"notificationsSent":2,
+			"notificationsRecv":2,
+			"updatesSent":3,
+			"updatesRecv":3,
+			"keepalivesSent":4,
+			"keepalivesRecv":4,
+			"routeRefreshSent":5,
+			"routeRefreshRecv":5,
+			"totalSent":15,
+			"totalRecv":15
+		  },
+		  "addressFamilyInfo":{
+			"ipv4Unicast":{
+			  "acceptedPrefixCounter":0,
+			  "sentPrefixCounter":3
+			}
+		  },
+		  "portForeign":179
+		}
+	  }
 	`
 	vrfVtysh = `{
 		"default":{
