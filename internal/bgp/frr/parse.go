@@ -13,7 +13,9 @@ import (
 )
 
 type Neighbor struct {
-	IP             net.IP
+	// ID is the key vtysh returns for the neighbor. It is the peer address
+	// for a regular session and the interface name for an unnumbered one.
+	ID             string
 	VRF            string
 	Connected      bool
 	LocalAS        string
@@ -115,10 +117,6 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 		return nil, errors.New("no peers were returned")
 	}
 	for k, n := range res {
-		ip := net.ParseIP(k)
-		if ip == nil {
-			return nil, fmt.Errorf("failed to parse %s as ip", ip)
-		}
 		connected := true
 		if n.BgpState != bgpConnected {
 			connected = false
@@ -128,7 +126,7 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 			prefixSent += s.SentPrefixCounter
 		}
 		return &Neighbor{
-			IP:             ip,
+			ID:             k,
 			Connected:      connected,
 			LocalAS:        strconv.Itoa(n.LocalAs),
 			RemoteAS:       strconv.Itoa(n.RemoteAs),
@@ -152,10 +150,6 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 
 	res := make([]*Neighbor, 0)
 	for k, n := range toParse {
-		ip := net.ParseIP(k)
-		if ip == nil {
-			return nil, fmt.Errorf("failed to parse %s as ip", ip)
-		}
 		connected := true
 		if n.BgpState != bgpConnected {
 			connected = false
@@ -165,7 +159,7 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			prefixSent += s.SentPrefixCounter
 		}
 		res = append(res, &Neighbor{
-			IP:             ip,
+			ID:             k,
 			Connected:      connected,
 			LocalAS:        strconv.Itoa(n.LocalAs),
 			RemoteAS:       strconv.Itoa(n.RemoteAs),

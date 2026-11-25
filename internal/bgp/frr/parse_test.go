@@ -151,8 +151,8 @@ func TestNeighbour(t *testing.T) {
 			if err != nil {
 				t.Fatal("Failed to parse ", err)
 			}
-			if !n.IP.Equal(net.ParseIP(tt.neighborIP)) {
-				t.Fatal("Expected neighbour ip", tt.neighborIP, "got", n.IP.String())
+			if n.ID != tt.neighborIP {
+				t.Fatal("Expected neighbour id", tt.neighborIP, "got", n.ID)
 			}
 			if n.RemoteAS != tt.remoteAS {
 				t.Fatal("Expected remote as", tt.remoteAS, "got", n.RemoteAS)
@@ -499,17 +499,17 @@ func TestNeighbours(t *testing.T) {
 		t.Fatalf("Expected 4 neighbours, got %d", len(nn))
 	}
 	sort.Slice(nn, func(i, j int) bool {
-		return (bytes.Compare(nn[i].IP, nn[j].IP) < 0)
+		return nn[i].ID < nn[j].ID
 	})
 
-	if !nn[0].IP.Equal(net.ParseIP("172.18.0.2")) {
-		t.Fatal("neighbour ip not matching")
+	if nn[0].ID != "172.18.0.2" {
+		t.Fatal("neighbour id not matching")
 	}
-	if !nn[1].IP.Equal(net.ParseIP("172.18.0.3")) {
-		t.Fatal("neighbour ip not matching")
+	if nn[1].ID != "172.18.0.3" {
+		t.Fatal("neighbour id not matching")
 	}
-	if !nn[2].IP.Equal(net.ParseIP("172.18.0.4")) {
-		t.Fatal("neighbour ip not matching")
+	if nn[2].ID != "172.18.0.4" {
+		t.Fatal("neighbour id not matching")
 	}
 
 	for i, n := range nn {
