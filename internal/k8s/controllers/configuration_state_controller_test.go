@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -205,7 +206,22 @@ func TestNewConfigStateConditionReporterPredicate(t *testing.T) {
 		targetName      = "controller"
 	)
 
-	p := NewConfigStateConditionReporterPredicate(targetNamespace, targetName)
+	p := NewConfigStateConditionReporterPredicate(targetNamespace, targetName, ConditionTypePoolReconcilerValid)
+
+	valid := metav1.Condition{Type: ConditionTypePoolReconcilerValid, Status: metav1.ConditionTrue, Reason: ErrorTypeNone}
+	invalid := metav1.Condition{Type: ConditionTypePoolReconcilerValid, Status: metav1.ConditionFalse, Reason: ErrorTypeConfiguration, Message: "broken"}
+	otherValid := metav1.Condition{Type: ConditionTypeConfigReconcilerValid, Status: metav1.ConditionTrue, Reason: ErrorTypeNone}
+	otherInvalid := metav1.Condition{Type: ConditionTypeConfigReconcilerValid, Status: metav1.ConditionFalse, Reason: ErrorTypeConfiguration, Message: "broken"}
+	configState := func(name string, conditions ...metav1.Condition) *metallbv1beta1.ConfigurationState {
+		return &metallbv1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: targetNamespace},
+			Status:     metallbv1beta1.ConfigurationStateStatus{Conditions: conditions},
+		}
+	}
+	withResult := func(state *metallbv1beta1.ConfigurationState, result metallbv1beta1.ConfigurationResult) *metallbv1beta1.ConfigurationState {
+		state.Status.Result = result
+		return state
+	}
 
 	tests := map[string]struct {
 		event any
@@ -244,22 +260,32 @@ func TestNewConfigStateConditionReporterPredicate(t *testing.T) {
 			},
 			want: false,
 		},
-		"Update always returns false": {
+		"Update changing the condition": {
+			event: event.UpdateEvent{ObjectOld: configState(targetName, valid), ObjectNew: configState(targetName, invalid)},
+			want:  true,
+		},
+		"Update adding the condition": {
+			event: event.UpdateEvent{ObjectOld: configState(targetName), ObjectNew: configState(targetName, valid)},
+			want:  true,
+		},
+		"Update removing the condition": {
+			event: event.UpdateEvent{ObjectOld: configState(targetName, valid, otherValid), ObjectNew: configState(targetName, otherValid)},
+			want:  true,
+		},
+		"Update keeping the condition": {
 			event: event.UpdateEvent{
-				ObjectOld: &metallbv1beta1.ConfigurationState{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      targetName,
-						Namespace: targetNamespace,
-					},
-				},
-				ObjectNew: &metallbv1beta1.ConfigurationState{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      targetName,
-						Namespace: targetNamespace,
-					},
-				},
+				ObjectOld: configState(targetName, valid),
+				ObjectNew: withResult(configState(targetName, valid), metallbv1beta1.ConfigurationResultValid),
 			},
 			want: false,
+		},
+		"Update changing another condition": {
+			event: event.UpdateEvent{ObjectOld: configState(targetName, valid, otherValid), ObjectNew: configState(targetName, valid, otherInvalid)},
+			want:  false,
+		},
+		"Update changing the condition of a different CR": {
+			event: event.UpdateEvent{ObjectOld: configState("other", valid), ObjectNew: configState("other", invalid)},
+			want:  false,
 		},
 		"Delete matching CR": {
 			event: event.DeleteEvent{
@@ -444,7 +470,7 @@ func TestNewConfigurationStateReconcilerPredicate(t *testing.T) {
 	}
 }
 
-func TestConfigStateConditionReporter(t *testing.T) {
+func TestReportConfigStateCondition(t *testing.T) {
 	key := types.NamespacedName{Name: "speaker-node1", Namespace: testNamespace}
 	oneHourAgo := metav1.NewTime(time.Now().Add(-time.Hour).Truncate(time.Second))
 
@@ -472,29 +498,20 @@ func TestConfigStateConditionReporter(t *testing.T) {
 	}
 
 	// newClient returns a fake client holding the given objects, wrapped by
-	// funcs, and a counter of the status patches sent through it.
+	// funcs, and a counter of the status writes sent through it.
 	newClient := func(t *testing.T, funcs interceptor.Funcs, objects ...client.Object) (client.WithWatch, *int) {
 		t.Helper()
 		fakeClient, err := newFakeClient(objects)
 		if err != nil {
 			t.Fatalf("failed to create fake client: %v", err)
 		}
-		patches := 0
-		return withStatusPatchCounter(interceptor.NewClient(fakeClient, funcs), &patches), &patches
+		writes := 0
+		return withStatusWriteCounter(interceptor.NewClient(fakeClient, funcs), &writes), &writes
 	}
 
-	newReporter := func(c client.Client) *configStateConditionReporter {
-		return &configStateConditionReporter{
-			Client:     c,
-			namespace:  key.Namespace,
-			name:       key.Name,
-			fieldOwner: "configReconciler",
-		}
-	}
-
-	report := func(t *testing.T, reporter *configStateConditionReporter, condition metav1.Condition) {
+	report := func(t *testing.T, c client.Client, condition metav1.Condition) {
 		t.Helper()
-		if err := reporter.report(context.Background(), condition); err != nil {
+		if err := reportConfigStateCondition(context.Background(), c, key, "configReconciler", condition); err != nil {
 			t.Fatalf("failed to report condition: %v", err)
 		}
 	}
@@ -517,24 +534,23 @@ func TestConfigStateConditionReporter(t *testing.T) {
 		return *condition
 	}
 
-	expectPatches := func(t *testing.T, got *int, want int) {
+	expectWrites := func(t *testing.T, got *int, want int) {
 		t.Helper()
 		if *got != want {
-			t.Fatalf("expected %d status patches, got %d", want, *got)
+			t.Fatalf("expected %d status writes, got %d", want, *got)
 		}
 	}
 
-	t.Run("unchanged condition is applied once", func(t *testing.T) {
-		c, patches := newClient(t, interceptor.Funcs{}, newConfigState())
-		reporter := newReporter(c)
+	t.Run("unchanged condition is written once", func(t *testing.T) {
+		c, writes := newClient(t, interceptor.Funcs{}, newConfigState())
 
-		report(t, reporter, valid)
-		expectPatches(t, patches, 1)
+		report(t, c, valid)
+		expectWrites(t, writes, 1)
 		before := get(t, c)
 
-		report(t, reporter, valid)
-		report(t, reporter, valid)
-		expectPatches(t, patches, 1)
+		report(t, c, valid)
+		report(t, c, valid)
+		expectWrites(t, writes, 1)
 
 		after := get(t, c)
 		if after.ResourceVersion != before.ResourceVersion {
@@ -548,20 +564,14 @@ func TestConfigStateConditionReporter(t *testing.T) {
 	t.Run("LastTransitionTime moves only when the status changes", func(t *testing.T) {
 		stored := valid
 		stored.LastTransitionTime = oneHourAgo
-		c, patches := newClient(t, interceptor.Funcs{}, newConfigState(stored))
-		reporter := newReporter(c)
+		c, writes := newClient(t, interceptor.Funcs{}, newConfigState(stored))
 
-		// Nothing was applied by this reporter yet (e.g. after a restart): apply,
-		// keeping the stored LastTransitionTime.
-		report(t, reporter, valid)
-		expectPatches(t, patches, 1)
-		if got := getCondition(t, c, valid.Type); !got.LastTransitionTime.Equal(&oneHourAgo) {
-			t.Fatalf("expected LastTransitionTime %v, got %v", oneHourAgo, got.LastTransitionTime)
-		}
+		report(t, c, valid)
+		expectWrites(t, writes, 0)
 
-		report(t, reporter, invalid)
-		report(t, reporter, invalid)
-		expectPatches(t, patches, 2)
+		report(t, c, invalid)
+		report(t, c, invalid)
+		expectWrites(t, writes, 1)
 		got := getCondition(t, c, invalid.Type)
 		if !got.LastTransitionTime.After(oneHourAgo.Time) {
 			t.Fatalf("expected LastTransitionTime after %v, got %v", oneHourAgo, got.LastTransitionTime)
@@ -570,9 +580,8 @@ func TestConfigStateConditionReporter(t *testing.T) {
 			t.Fatalf("condition mismatch (-want +got):\n%s", diff)
 		}
 
-		report(t, reporter, valid)
-		report(t, reporter, valid)
-		expectPatches(t, patches, 3)
+		report(t, c, valid)
+		expectWrites(t, writes, 2)
 		got = getCondition(t, c, valid.Type)
 		if got.Status != metav1.ConditionTrue || got.LastTransitionTime.Equal(&oneHourAgo) {
 			t.Fatalf("expected a new True condition, got %+v", got)
@@ -582,14 +591,11 @@ func TestConfigStateConditionReporter(t *testing.T) {
 	t.Run("LastTransitionTime is kept when only the message or reason changes", func(t *testing.T) {
 		stored := invalid
 		stored.LastTransitionTime = oneHourAgo
-		c, patches := newClient(t, interceptor.Funcs{}, newConfigState(stored))
-		reporter := newReporter(c)
+		c, writes := newClient(t, interceptor.Funcs{}, newConfigState(stored))
 
-		// The first report compares with the stored condition, the second with
-		// the one applied last.
 		for i, condition := range []metav1.Condition{invalidOtherMessage, invalidOtherReason} {
-			report(t, reporter, condition)
-			expectPatches(t, patches, 1+i)
+			report(t, c, condition)
+			expectWrites(t, writes, 1+i)
 			got := getCondition(t, c, condition.Type)
 			if diff := cmp.Diff(condition, got, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
 				t.Fatalf("condition mismatch (-want +got):\n%s", diff)
@@ -600,59 +606,42 @@ func TestConfigStateConditionReporter(t *testing.T) {
 		}
 	})
 
-	t.Run("missing resource gets the condition once created", func(t *testing.T) {
-		c, patches := newClient(t, interceptor.Funcs{})
-		reporter := newReporter(c)
+	t.Run("other conditions are kept", func(t *testing.T) {
+		other := metav1.Condition{
+			Type:               ConditionTypePoolReconcilerValid,
+			Status:             metav1.ConditionTrue,
+			Reason:             ErrorTypeNone,
+			LastTransitionTime: oneHourAgo,
+		}
+		c, writes := newClient(t, interceptor.Funcs{}, newConfigState(other))
 
-		// The reporter runs before the resource is created: nothing to patch,
+		report(t, c, invalid)
+		expectWrites(t, writes, 1)
+		if diff := cmp.Diff(other, getCondition(t, c, other.Type)); diff != "" {
+			t.Fatalf("other condition changed (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("missing resource gets the condition once created", func(t *testing.T) {
+		c, writes := newClient(t, interceptor.Funcs{})
+
+		// The reporter runs before the resource is created: nothing to write,
 		// the creation triggers a new report.
-		report(t, reporter, valid)
-		expectPatches(t, patches, 0)
+		report(t, c, valid)
+		expectWrites(t, writes, 0)
 
 		if err := c.Create(context.Background(), newConfigState()); err != nil {
 			t.Fatalf("failed to create ConfigurationState: %v", err)
 		}
-		report(t, reporter, valid)
-		expectPatches(t, patches, 1)
+		report(t, c, valid)
+		expectWrites(t, writes, 1)
 		getCondition(t, c, valid.Type)
 	})
 
-	t.Run("recreated resource gets the condition again", func(t *testing.T) {
-		stored := valid
-		stored.LastTransitionTime = oneHourAgo
-		first := newConfigState(stored)
-		first.UID = "uid-1"
-		c, patches := newClient(t, interceptor.Funcs{}, first)
-		reporter := newReporter(c)
-
-		report(t, reporter, valid)
-		report(t, reporter, valid)
-		expectPatches(t, patches, 1)
-
-		if err := c.Delete(context.Background(), get(t, c)); err != nil {
-			t.Fatalf("failed to delete ConfigurationState: %v", err)
-		}
-		report(t, reporter, valid)
-		expectPatches(t, patches, 1)
-
-		// The condition is new to the recreated resource: LastTransitionTime
-		// is not carried from the deleted one.
-		second := newConfigState()
-		second.UID = "uid-2"
-		if err := c.Create(context.Background(), second); err != nil {
-			t.Fatalf("failed to create ConfigurationState: %v", err)
-		}
-		report(t, reporter, valid)
-		expectPatches(t, patches, 2)
-		if got := getCondition(t, c, valid.Type); !got.LastTransitionTime.After(oneHourAgo.Time) {
-			t.Fatalf("expected LastTransitionTime after %v, got %v", oneHourAgo, got.LastTransitionTime)
-		}
-	})
-
-	t.Run("stale read does not hide a transition", func(t *testing.T) {
+	t.Run("stale read does not overwrite the resource", func(t *testing.T) {
 		var stale *metallbv1beta1.ConfigurationState
-		// Mimics a cache that has not observed our last writes yet.
-		c, patches := newClient(t, interceptor.Funcs{
+		// Mimics a cache that has not observed the last writes yet.
+		c, writes := newClient(t, interceptor.Funcs{
 			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 				if configState, ok := obj.(*metallbv1beta1.ConfigurationState); ok && stale != nil {
 					stale.DeepCopyInto(configState)
@@ -661,187 +650,33 @@ func TestConfigStateConditionReporter(t *testing.T) {
 				return cl.Get(ctx, key, obj, opts...)
 			},
 		}, newConfigState())
-		reporter := newReporter(c)
 
-		report(t, reporter, valid)
+		report(t, c, valid)
 		validState := get(t, c)
-		report(t, reporter, invalid)
-		expectPatches(t, patches, 2)
-		becameInvalid := getCondition(t, c, invalid.Type).LastTransitionTime
+		report(t, c, invalid)
+		expectWrites(t, writes, 2)
 
-		// The stale read shows an older invalid condition: LastTransitionTime is
-		// carried from what was applied last.
-		staleInvalid := invalid
-		staleInvalid.LastTransitionTime = oneHourAgo
-		stale = newConfigState(staleInvalid)
-		report(t, reporter, invalidOtherMessage)
-		expectPatches(t, patches, 3)
-		stale = nil
-		if got := getCondition(t, c, invalid.Type); !got.LastTransitionTime.Equal(&becameInvalid) {
-			t.Fatalf("expected LastTransitionTime %v, got %v", becameInvalid, got.LastTransitionTime)
-		}
-
-		// The stale read still shows valid, but invalid was applied last.
 		stale = validState
-		report(t, reporter, valid)
-		expectPatches(t, patches, 4)
+		err := reportConfigStateCondition(context.Background(), c, key, "configReconciler", invalidOtherMessage)
+		if !apierrors.IsConflict(err) {
+			t.Fatalf("expected a conflict, got %v", err)
+		}
 		stale = nil
-		if got := getCondition(t, c, valid.Type); got.Status != metav1.ConditionTrue {
-			t.Fatalf("expected condition status True, got %+v", got)
+		if diff := cmp.Diff(invalid, getCondition(t, c, invalid.Type), cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+			t.Fatalf("condition mismatch (-want +got):\n%s", diff)
 		}
 	})
 
-	t.Run("failed apply is retried", func(t *testing.T) {
-		failPatch := true
-		c, patches := newClient(t, interceptor.Funcs{
-			SubResourcePatch: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
-				if failPatch {
-					return errors.New("injected patch error")
-				}
-				return cl.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
-			},
-		}, newConfigState(invalid))
-		reporter := newReporter(c)
-
-		if err := reporter.report(context.Background(), valid); err == nil {
-			t.Fatalf("expected the patch error to be returned")
-		}
-		expectPatches(t, patches, 1)
-
-		failPatch = false
-		report(t, reporter, valid)
-		report(t, reporter, valid)
-		expectPatches(t, patches, 2)
-		if got := getCondition(t, c, valid.Type); got.Status != metav1.ConditionTrue {
-			t.Fatalf("expected condition status True, got %+v", got)
-		}
-	})
-
-	t.Run("failed apply keeps LastTransitionTime under a stale read", func(t *testing.T) {
-		var stale *metallbv1beta1.ConfigurationState
-		failPatch := false
-		stored := invalid
-		stored.LastTransitionTime = oneHourAgo
-		c, patches := newClient(t, interceptor.Funcs{
-			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-				if configState, ok := obj.(*metallbv1beta1.ConfigurationState); ok && stale != nil {
-					stale.DeepCopyInto(configState)
-					return nil
-				}
-				return cl.Get(ctx, key, obj, opts...)
-			},
-			SubResourcePatch: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
-				if failPatch {
-					return errors.New("injected patch error")
-				}
-				return cl.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
-			},
-		}, newConfigState(stored))
-		reporter := newReporter(c)
-
-		report(t, reporter, invalid)
-
-		// The cache shows an older valid condition, and a message change fails
-		// before being persisted: the status never changed.
-		stale = newConfigState(valid)
-		failPatch = true
-		if err := reporter.report(context.Background(), invalidOtherMessage); err == nil {
-			t.Fatalf("expected the patch error to be returned")
-		}
-		failPatch = false
-		report(t, reporter, invalidOtherMessage)
-		stale = nil
-		expectPatches(t, patches, 3)
-		if got := getCondition(t, c, invalid.Type); !got.LastTransitionTime.Equal(&oneHourAgo) {
-			t.Fatalf("expected LastTransitionTime %v, got %v", oneHourAgo, got.LastTransitionTime)
-		}
-	})
-
-	t.Run("apply that fails after being persisted is not trusted", func(t *testing.T) {
-		var stale *metallbv1beta1.ConfigurationState
-		failAfterPatch := false
-		stored := valid
-		stored.LastTransitionTime = oneHourAgo
-		c, patches := newClient(t, interceptor.Funcs{
-			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-				if configState, ok := obj.(*metallbv1beta1.ConfigurationState); ok && stale != nil {
-					stale.DeepCopyInto(configState)
-					return nil
-				}
-				return cl.Get(ctx, key, obj, opts...)
-			},
-			SubResourcePatch: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
-				if err := cl.SubResource(subResourceName).Patch(ctx, obj, patch, opts...); err != nil {
-					return err
-				}
-				if failAfterPatch {
-					return errors.New("injected timeout after the write was persisted")
-				}
-				return nil
-			},
-		}, newConfigState(stored))
-		reporter := newReporter(c)
-
-		report(t, reporter, valid)
-		validState := get(t, c)
-
-		failAfterPatch = true
-		if err := reporter.report(context.Background(), invalid); err == nil {
-			t.Fatalf("expected the patch error to be returned")
-		}
-		failAfterPatch = false
-
-		// The retry is valid again, and the cache has not observed the invalid write.
-		stale = validState
-		report(t, reporter, valid)
-		stale = nil
-		expectPatches(t, patches, 3)
-		if got := getCondition(t, c, valid.Type); got.Status != metav1.ConditionTrue {
-			t.Fatalf("expected condition status True, got %+v", got)
-		}
-
-		// The same, but the cache has observed the invalid write: the status
-		// changed twice, so LastTransitionTime moves.
-		failAfterPatch = true
-		if err := reporter.report(context.Background(), invalid); err == nil {
-			t.Fatalf("expected the patch error to be returned")
-		}
-		failAfterPatch = false
-		report(t, reporter, valid)
-		expectPatches(t, patches, 5)
-		if got := getCondition(t, c, valid.Type); got.Status != metav1.ConditionTrue || !got.LastTransitionTime.After(oneHourAgo.Time) {
-			t.Fatalf("expected a new True condition, got %+v", got)
-		}
-
-		// A message-only change persisted despite the error, then reverted while
-		// the cache still shows the previous message.
-		report(t, reporter, invalid)
-		invalidState := get(t, c)
-		failAfterPatch = true
-		if err := reporter.report(context.Background(), invalidOtherMessage); err == nil {
-			t.Fatalf("expected the patch error to be returned")
-		}
-		failAfterPatch = false
-		stale = invalidState
-		report(t, reporter, invalid)
-		stale = nil
-		expectPatches(t, patches, 8)
-		if got := getCondition(t, c, invalid.Type); got.Message != invalid.Message {
-			t.Fatalf("expected message %q, got %+v", invalid.Message, got)
-		}
-	})
-
-	t.Run("failed read is returned without applying", func(t *testing.T) {
-		c, patches := newClient(t, interceptor.Funcs{
+	t.Run("failed read is returned without writing", func(t *testing.T) {
+		c, writes := newClient(t, interceptor.Funcs{
 			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 				return errors.New("injected get error")
 			},
 		}, newConfigState())
-		reporter := newReporter(c)
 
-		if err := reporter.report(context.Background(), valid); err == nil {
+		if err := reportConfigStateCondition(context.Background(), c, key, "configReconciler", valid); err == nil {
 			t.Fatalf("expected the get error to be returned")
 		}
-		expectPatches(t, patches, 0)
+		expectWrites(t, writes, 0)
 	})
 }

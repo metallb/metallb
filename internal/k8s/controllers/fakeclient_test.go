@@ -64,10 +64,16 @@ func newFakeClient(initObjects []client.Object) (client.WithWatch, error) {
 		Build(), nil
 }
 
-// withStatusPatchCounter wraps the given client, counting the patches to
-// status subresources.
-func withStatusPatchCounter(c client.WithWatch, count *int) client.WithWatch {
+// withStatusWriteCounter wraps the given client, counting the updates and
+// patches to status subresources.
+func withStatusWriteCounter(c client.WithWatch, count *int) client.WithWatch {
 	return interceptor.NewClient(c, interceptor.Funcs{
+		SubResourceUpdate: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+			if subResourceName == "status" {
+				*count++
+			}
+			return cl.SubResource(subResourceName).Update(ctx, obj, opts...)
+		},
 		SubResourcePatch: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 			if subResourceName == "status" {
 				*count++

@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -955,11 +956,22 @@ var _ = Describe("PoolStatus Controller", func() {
 })
 
 var _ = Describe("ConfigurationState condition reporter", func() {
-	It("should not change the resource when a restarted reporter applies the same condition", func() {
+	It("should write only changed conditions, and never from a stale resource", func() {
 		directClient, err := client.NewWithWatch(cfg, client.Options{Scheme: scheme.Scheme})
 		Expect(err).ToNot(HaveOccurred())
-		patches := 0
-		c := withStatusPatchCounter(directClient, &patches)
+		var stale *v1beta1.ConfigurationState
+		// Mimics a cache that has not observed the last writes yet.
+		staleClient := interceptor.NewClient(directClient, interceptor.Funcs{
+			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if configState, ok := obj.(*v1beta1.ConfigurationState); ok && stale != nil {
+					stale.DeepCopyInto(configState)
+					return nil
+				}
+				return cl.Get(ctx, key, obj, opts...)
+			},
+		})
+		writes := 0
+		c := withStatusWriteCounter(staleClient, &writes)
 
 		configState := &v1beta1.ConfigurationState{
 			ObjectMeta: metav1.ObjectMeta{
@@ -971,37 +983,43 @@ var _ = Describe("ConfigurationState condition reporter", func() {
 		Expect(err).ToNot(HaveOccurred())
 		key := client.ObjectKeyFromObject(configState)
 
-		condition := metav1.Condition{
+		valid := metav1.Condition{
 			Type:   ConditionTypeConfigReconcilerValid,
 			Status: metav1.ConditionTrue,
 			Reason: ErrorTypeNone,
 		}
-		newReporter := func() *configStateConditionReporter {
-			return &configStateConditionReporter{
-				Client:     c,
-				namespace:  key.Namespace,
-				name:       key.Name,
-				fieldOwner: "configReconciler",
-			}
+		invalid := metav1.Condition{
+			Type:    ConditionTypeConfigReconcilerValid,
+			Status:  metav1.ConditionFalse,
+			Reason:  ErrorTypeConfiguration,
+			Message: "configuration error: peer1 is broken",
+		}
+		get := func() *v1beta1.ConfigurationState {
+			got := &v1beta1.ConfigurationState{}
+			Expect(k8sClient.Get(ctx, key, got)).To(Succeed())
+			return got
 		}
 
-		err = newReporter().report(ctx, condition)
-		Expect(err).ToNot(HaveOccurred())
-		before := &v1beta1.ConfigurationState{}
-		err = k8sClient.Get(ctx, key, before)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(reportConfigStateCondition(ctx, c, key, "configReconciler", valid)).To(Succeed())
+		Expect(writes).To(Equal(1))
+		validState := get()
 
-		// A restarted process doesn't know what it applied before, so it applies
-		// once. Wait for a new LastTransitionTime to be distinguishable.
-		time.Sleep(1500 * time.Millisecond)
-		err = newReporter().report(ctx, condition)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(patches).To(Equal(2))
+		Expect(reportConfigStateCondition(ctx, c, key, "configReconciler", valid)).To(Succeed())
+		Expect(writes).To(Equal(1))
+		Expect(get().ResourceVersion).To(Equal(validState.ResourceVersion))
 
-		after := &v1beta1.ConfigurationState{}
-		err = k8sClient.Get(ctx, key, after)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(after.ResourceVersion).To(Equal(before.ResourceVersion))
-		Expect(after.ManagedFields).To(Equal(before.ManagedFields))
+		Expect(reportConfigStateCondition(ctx, c, key, "configReconciler", invalid)).To(Succeed())
+		Expect(writes).To(Equal(2))
+		invalidState := get()
+
+		// The write based on the stale resource is rejected, and the resource
+		// keeps the last condition.
+		stale = validState
+		invalidOtherMessage := invalid
+		invalidOtherMessage.Message = "configuration error: peer2 is broken"
+		err = reportConfigStateCondition(ctx, c, key, "configReconciler", invalidOtherMessage)
+		Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected a conflict, got %v", err)
+		stale = nil
+		Expect(get().ResourceVersion).To(Equal(invalidState.ResourceVersion))
 	})
 })

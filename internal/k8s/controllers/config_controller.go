@@ -55,7 +55,6 @@ type ConfigReconciler struct {
 	currentConfig           *config.Config
 	NodeName                string
 	FRRK8sSecretPassthrough bool
-	statusReporter          *configStateConditionReporter
 }
 
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -247,7 +246,7 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.ConfigMap{}, &handler.EnqueueRequestForObject{}).
 		Watches(&metallbv1beta1.ConfigurationState{}, &handler.EnqueueRequestForObject{},
-			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName))).
+			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName, ConditionTypeConfigReconcilerValid))).
 		WithEventFilter(p).
 		Complete(r)
 }
@@ -330,15 +329,8 @@ func (r *ConfigReconciler) reportCondition(ctx context.Context, conditionErr err
 		condition.Message = conditionErr.Error()
 	}
 
-	if r.statusReporter == nil {
-		r.statusReporter = &configStateConditionReporter{
-			Client:     r.Client,
-			namespace:  r.Namespace,
-			name:       r.ConfigStateName,
-			fieldOwner: "configReconciler",
-		}
-	}
-	return r.statusReporter.report(ctx, condition)
+	key := client.ObjectKey{Namespace: r.Namespace, Name: r.ConfigStateName}
+	return reportConfigStateCondition(ctx, r.Client, key, "configReconciler", condition)
 }
 
 // filterBGPAdvertisementsByNode takes a slice of bgpAdvertisements and a node. It will return all

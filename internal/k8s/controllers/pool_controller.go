@@ -47,7 +47,6 @@ type PoolReconciler struct {
 	ForceReload     func()
 	ConfigStateName string
 	currentConfig   *config.Config
-	statusReporter  *configStateConditionReporter
 }
 
 func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retError error) {
@@ -142,7 +141,7 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&metallbv1beta1.Community{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
 		Watches(&metallbv1beta1.ConfigurationState{}, &handler.EnqueueRequestForObject{},
-			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName))).
+			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName, ConditionTypePoolReconcilerValid))).
 		WithEventFilter(p).
 		Complete(r)
 }
@@ -184,13 +183,6 @@ func (r *PoolReconciler) reportCondition(ctx context.Context, conditionErr error
 		condition.Message = conditionErr.Error()
 	}
 
-	if r.statusReporter == nil {
-		r.statusReporter = &configStateConditionReporter{
-			Client:     r.Client,
-			namespace:  r.Namespace,
-			name:       r.ConfigStateName,
-			fieldOwner: "poolReconciler",
-		}
-	}
-	return r.statusReporter.report(ctx, condition)
+	key := client.ObjectKey{Namespace: r.Namespace, Name: r.ConfigStateName}
+	return reportConfigStateCondition(ctx, r.Client, key, "poolReconciler", condition)
 }

@@ -657,8 +657,8 @@ func TestConfigControllerReportsOnlyConditionChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
-	patches := 0
-	c := withStatusPatchCounter(fakeClient, &patches)
+	writes := 0
+	c := withStatusWriteCounter(fakeClient, &writes)
 
 	r := &ConfigReconciler{
 		Client:          c,
@@ -677,8 +677,8 @@ func TestConfigControllerReportsOnlyConditionChanges(t *testing.T) {
 	if _, err := r.Reconcile(context.TODO(), req); err != nil {
 		t.Fatalf("reconcile failed: %v", err)
 	}
-	if patches != 1 {
-		t.Fatalf("expected 1 status patch, got %d", patches)
+	if writes != 1 {
+		t.Fatalf("expected 1 status write, got %d", writes)
 	}
 	var before v1beta1.ConfigurationState
 	if err := c.Get(context.TODO(), configStateKey, &before); err != nil {
@@ -699,8 +699,8 @@ func TestConfigControllerReportsOnlyConditionChanges(t *testing.T) {
 		}
 	}
 
-	if patches != 1 {
-		t.Fatalf("expected no status patches after node label changes, got %d", patches-1)
+	if writes != 1 {
+		t.Fatalf("expected no status writes after node label changes, got %d", writes-1)
 	}
 	var after v1beta1.ConfigurationState
 	if err := c.Get(context.TODO(), configStateKey, &after); err != nil {

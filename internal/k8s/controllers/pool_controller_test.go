@@ -256,8 +256,8 @@ func TestPoolControllerReportsOnlyConditionChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
-	patches := 0
-	c := withStatusPatchCounter(fakeClient, &patches)
+	writes := 0
+	c := withStatusWriteCounter(fakeClient, &writes)
 
 	r := &PoolReconciler{
 		Client:          c,
@@ -284,17 +284,17 @@ func TestPoolControllerReportsOnlyConditionChanges(t *testing.T) {
 	}
 
 	steps := []struct {
-		desc        string
-		update      func()
-		wantStatus  v1.ConditionStatus
-		wantPatches int
+		desc       string
+		update     func()
+		wantStatus v1.ConditionStatus
+		wantWrites int
 	}{
-		{desc: "first reconcile", wantStatus: v1.ConditionTrue, wantPatches: 1},
-		{desc: "valid again", wantStatus: v1.ConditionTrue, wantPatches: 1},
-		{desc: "pool becomes invalid", update: func() { setPoolAddresses(nil) }, wantStatus: v1.ConditionFalse, wantPatches: 2},
-		{desc: "invalid again", wantStatus: v1.ConditionFalse, wantPatches: 2},
-		{desc: "pool becomes valid", update: func() { setPoolAddresses([]string{"10.20.0.0/16"}) }, wantStatus: v1.ConditionTrue, wantPatches: 3},
-		{desc: "valid again after recovery", wantStatus: v1.ConditionTrue, wantPatches: 3},
+		{desc: "first reconcile", wantStatus: v1.ConditionTrue, wantWrites: 1},
+		{desc: "valid again", wantStatus: v1.ConditionTrue, wantWrites: 1},
+		{desc: "pool becomes invalid", update: func() { setPoolAddresses(nil) }, wantStatus: v1.ConditionFalse, wantWrites: 2},
+		{desc: "invalid again", wantStatus: v1.ConditionFalse, wantWrites: 2},
+		{desc: "pool becomes valid", update: func() { setPoolAddresses([]string{"10.20.0.0/16"}) }, wantStatus: v1.ConditionTrue, wantWrites: 3},
+		{desc: "valid again after recovery", wantStatus: v1.ConditionTrue, wantWrites: 3},
 	}
 	for _, step := range steps {
 		if step.update != nil {
@@ -303,8 +303,8 @@ func TestPoolControllerReportsOnlyConditionChanges(t *testing.T) {
 		if _, err := r.Reconcile(context.TODO(), req); err != nil {
 			t.Fatalf("%s: reconcile failed: %v", step.desc, err)
 		}
-		if patches != step.wantPatches {
-			t.Fatalf("%s: expected %d status patches, got %d", step.desc, step.wantPatches, patches)
+		if writes != step.wantWrites {
+			t.Fatalf("%s: expected %d status writes, got %d", step.desc, step.wantWrites, writes)
 		}
 		var got v1beta1.ConfigurationState
 		if err := c.Get(context.TODO(), types.NamespacedName{Name: configStateRef.Name, Namespace: testNamespace}, &got); err != nil {
