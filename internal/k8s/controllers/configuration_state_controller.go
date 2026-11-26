@@ -11,6 +11,9 @@ import (
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -103,10 +106,12 @@ func NewConfigurationStateReconcilerPredicate(namespace, name string) predicate.
 }
 
 // NewConfigStateConditionReporterPredicate returns a predicate for controllers that write
-// conditions to a ConfigurationState CR. It fires only on Create events for the
-// target CR, so that conditions are re-reported after the resource is recreated.
-// Updates are handled by Server-Side Apply field ownership.
-func NewConfigStateConditionReporterPredicate(namespace, name string) predicate.Predicate {
+// the condition conditionType to a ConfigurationState CR. It fires on Create events for
+// the target CR, so that the condition is reported again after the resource is recreated,
+// and on Update events that change the condition: reportConfigStateCondition doesn't
+// write a condition the cache already holds, and the cache may not reflect the last
+// write yet.
+func NewConfigStateConditionReporterPredicate(namespace, name, conditionType string) predicate.Predicate {
 	matchesTarget := func(obj client.Object) bool {
 		return obj.GetNamespace() == namespace && obj.GetName() == name
 	}
@@ -116,7 +121,17 @@ func NewConfigStateConditionReporterPredicate(namespace, name string) predicate.
 			return matchesTarget(e.Object)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return false
+			oldState, ok := e.ObjectOld.(*metallbv1beta1.ConfigurationState)
+			if !ok {
+				return false
+			}
+			newState, ok := e.ObjectNew.(*metallbv1beta1.ConfigurationState)
+			if !ok || !matchesTarget(newState) {
+				return false
+			}
+			return !equality.Semantic.DeepEqual(
+				meta.FindStatusCondition(oldState.Status.Conditions, conditionType),
+				meta.FindStatusCondition(newState.Status.Conditions, conditionType))
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false
@@ -151,4 +166,32 @@ func (r *ConfigurationStateReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		WatchesRawSource(source.Channel(reconcileChan, &handler.EnqueueRequestForObject{})).
 		WithEventFilter(p).
 		Complete(r)
+}
+
+// reportConfigStateCondition sets condition in the status of the ConfigurationState
+// key. Most reconciles don't change the condition, and every write is delivered to
+// all the watchers of the resource, so it writes only when the condition differs
+// from the one in the resource; LastTransitionTime moves only when the status
+// changes. The resource may come from a cache that doesn't reflect the last write
+// yet: then a write fails on the stale resourceVersion, and a skipped write is
+// done once the cache catches up, see NewConfigStateConditionReporterPredicate.
+func reportConfigStateCondition(ctx context.Context, cl client.Client, key client.ObjectKey, fieldOwner string, condition metav1.Condition) error {
+	configState := &metallbv1beta1.ConfigurationState{}
+	if err := cl.Get(ctx, key, configState); err != nil {
+		if apierrors.IsNotFound(err) {
+			// The condition is reported when the resource is created, see
+			// NewConfigStateConditionReporterPredicate.
+			return nil
+		}
+		return fmt.Errorf("get %s: %w", key, err)
+	}
+
+	if !meta.SetStatusCondition(&configState.Status.Conditions, condition) {
+		return nil
+	}
+
+	if err := cl.Status().Update(ctx, configState, client.FieldOwner(fieldOwner)); err != nil {
+		return fmt.Errorf("update %s status: %w", key, err)
+	}
+	return nil
 }

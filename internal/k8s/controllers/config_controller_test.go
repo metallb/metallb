@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -633,5 +634,161 @@ func TestFilterBGPPeersByNode(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestConfigControllerReportsOnlyConditionChanges checks that reconciles that
+// don't change the condition, such as those caused by node label changes, don't
+// write the status.
+func TestConfigControllerReportsOnlyConditionChanges(t *testing.T) {
+	configStateRef := &v1beta1.ConfigurationState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "speaker-worker01",
+			Namespace: testNamespace,
+		},
+	}
+	otherNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "worker02",
+		},
+	}
+	initObjects := append(objectsFromResources(configControllerValidResources), configStateRef, otherNode)
+	fakeClient, err := newFakeClient(initObjects)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+	writes := 0
+	c := withStatusWriteCounter(fakeClient, &writes)
+
+	r := &ConfigReconciler{
+		Client:          c,
+		Logger:          log.NewNopLogger(),
+		Scheme:          scheme.Scheme,
+		Namespace:       testNamespace,
+		ValidateConfig:  config.DontValidate,
+		Handler:         func(log.Logger, *config.Config) SyncState { return SyncStateSuccess },
+		ForceReload:     func() {},
+		ConfigStateName: configStateRef.Name,
+		NodeName:        configControllerValidResources.Nodes[0].Name,
+	}
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: otherNode.Name}}
+	configStateKey := types.NamespacedName{Name: configStateRef.Name, Namespace: testNamespace}
+
+	if _, err := r.Reconcile(context.TODO(), req); err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+	if writes != 1 {
+		t.Fatalf("expected 1 status write, got %d", writes)
+	}
+	var before v1beta1.ConfigurationState
+	if err := c.Get(context.TODO(), configStateKey, &before); err != nil {
+		t.Fatalf("failed to get ConfigurationState: %v", err)
+	}
+
+	for i := range 3 {
+		var node corev1.Node
+		if err := c.Get(context.TODO(), types.NamespacedName{Name: otherNode.Name}, &node); err != nil {
+			t.Fatalf("failed to get node: %v", err)
+		}
+		node.Labels = map[string]string{"label": strconv.Itoa(i)}
+		if err := c.Update(context.TODO(), &node); err != nil {
+			t.Fatalf("failed to update node: %v", err)
+		}
+		if _, err := r.Reconcile(context.TODO(), req); err != nil {
+			t.Fatalf("reconcile failed: %v", err)
+		}
+	}
+
+	if writes != 1 {
+		t.Fatalf("expected no status writes after node label changes, got %d", writes-1)
+	}
+	var after v1beta1.ConfigurationState
+	if err := c.Get(context.TODO(), configStateKey, &after); err != nil {
+		t.Fatalf("failed to get ConfigurationState: %v", err)
+	}
+	if after.ResourceVersion != before.ResourceVersion {
+		t.Fatalf("expected resourceVersion %s, got %s", before.ResourceVersion, after.ResourceVersion)
+	}
+	if diff := cmp.Diff(before.Status.Conditions, after.Status.Conditions); diff != "" {
+		t.Fatalf("conditions changed (-before +after):\n%s", diff)
+	}
+}
+
+// TestConfigControllerReportsRejectedConfigAfterReconcile checks that a
+// configuration rejected by the handler is still reported invalid by the
+// reconciles that find it unchanged.
+func TestConfigControllerReportsRejectedConfigAfterReconcile(t *testing.T) {
+	configStateRef := &v1beta1.ConfigurationState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "speaker-worker01",
+			Namespace: testNamespace,
+		},
+	}
+	initObjects := append(objectsFromResources(configControllerValidResources), configStateRef)
+	fakeClient, err := newFakeClient(initObjects)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+	writes := 0
+	c := withStatusWriteCounter(fakeClient, &writes)
+
+	handlerResult := SyncStateErrorNoRetry
+	r := &ConfigReconciler{
+		Client:          c,
+		Logger:          log.NewNopLogger(),
+		Scheme:          scheme.Scheme,
+		Namespace:       testNamespace,
+		ValidateConfig:  config.DontValidate,
+		Handler:         func(log.Logger, *config.Config) SyncState { return handlerResult },
+		ForceReload:     func() {},
+		ConfigStateName: configStateRef.Name,
+		NodeName:        configControllerValidResources.Nodes[0].Name,
+	}
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace}}
+
+	steps := []struct {
+		desc       string
+		update     func()
+		wantStatus metav1.ConditionStatus
+		wantReason string
+		wantWrites int
+	}{
+		{desc: "config rejected", wantStatus: metav1.ConditionFalse, wantReason: ErrorTypeConfiguration, wantWrites: 1},
+		{desc: "same config", wantStatus: metav1.ConditionFalse, wantReason: ErrorTypeConfiguration, wantWrites: 1},
+		{
+			desc: "changed config accepted",
+			update: func() {
+				handlerResult = SyncStateSuccess
+				var pool v1beta1.IPAddressPool
+				if err := c.Get(context.TODO(), types.NamespacedName{Name: "pool1", Namespace: testNamespace}, &pool); err != nil {
+					t.Fatalf("failed to get pool: %v", err)
+				}
+				pool.Spec.Addresses = []string{"10.30.0.0/16"}
+				if err := c.Update(context.TODO(), &pool); err != nil {
+					t.Fatalf("failed to update pool: %v", err)
+				}
+			},
+			wantStatus: metav1.ConditionTrue,
+			wantReason: ErrorTypeNone,
+			wantWrites: 2,
+		},
+	}
+	for _, step := range steps {
+		if step.update != nil {
+			step.update()
+		}
+		if _, err := r.Reconcile(context.TODO(), req); err != nil {
+			t.Fatalf("%s: reconcile failed: %v", step.desc, err)
+		}
+		if writes != step.wantWrites {
+			t.Fatalf("%s: expected %d status writes, got %d", step.desc, step.wantWrites, writes)
+		}
+		var got v1beta1.ConfigurationState
+		if err := c.Get(context.TODO(), types.NamespacedName{Name: configStateRef.Name, Namespace: testNamespace}, &got); err != nil {
+			t.Fatalf("%s: failed to get ConfigurationState: %v", step.desc, err)
+		}
+		if len(got.Status.Conditions) != 1 || got.Status.Conditions[0].Status != step.wantStatus || got.Status.Conditions[0].Reason != step.wantReason {
+			t.Fatalf("%s: expected one condition with status %s and reason %s, got %+v", step.desc, step.wantStatus, step.wantReason, got.Status.Conditions)
+		}
 	}
 }

@@ -243,3 +243,75 @@ var (
 		},
 	}
 )
+
+func TestPoolControllerReportsOnlyConditionChanges(t *testing.T) {
+	configStateRef := &v1beta1.ConfigurationState{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "controller",
+			Namespace: testNamespace,
+		},
+	}
+	initObjects := append(objectsFromResources(poolControllerValidResources), configStateRef)
+	fakeClient, err := newFakeClient(initObjects)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+	writes := 0
+	c := withStatusWriteCounter(fakeClient, &writes)
+
+	r := &PoolReconciler{
+		Client:          c,
+		Logger:          log.NewNopLogger(),
+		Scheme:          scheme.Scheme,
+		Namespace:       testNamespace,
+		ValidateConfig:  metallbcfg.DontValidate,
+		Handler:         func(log.Logger, *metallbcfg.Pools) SyncState { return SyncStateSuccess },
+		ForceReload:     func() {},
+		ConfigStateName: configStateRef.Name,
+	}
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace}}
+
+	setPoolAddresses := func(addresses []string) {
+		t.Helper()
+		var pool v1beta1.IPAddressPool
+		if err := c.Get(context.TODO(), types.NamespacedName{Name: "pool1", Namespace: testNamespace}, &pool); err != nil {
+			t.Fatalf("failed to get pool: %v", err)
+		}
+		pool.Spec.Addresses = addresses
+		if err := c.Update(context.TODO(), &pool); err != nil {
+			t.Fatalf("failed to update pool: %v", err)
+		}
+	}
+
+	steps := []struct {
+		desc       string
+		update     func()
+		wantStatus v1.ConditionStatus
+		wantWrites int
+	}{
+		{desc: "first reconcile", wantStatus: v1.ConditionTrue, wantWrites: 1},
+		{desc: "valid again", wantStatus: v1.ConditionTrue, wantWrites: 1},
+		{desc: "pool becomes invalid", update: func() { setPoolAddresses(nil) }, wantStatus: v1.ConditionFalse, wantWrites: 2},
+		{desc: "invalid again", wantStatus: v1.ConditionFalse, wantWrites: 2},
+		{desc: "pool becomes valid", update: func() { setPoolAddresses([]string{"10.20.0.0/16"}) }, wantStatus: v1.ConditionTrue, wantWrites: 3},
+		{desc: "valid again after recovery", wantStatus: v1.ConditionTrue, wantWrites: 3},
+	}
+	for _, step := range steps {
+		if step.update != nil {
+			step.update()
+		}
+		if _, err := r.Reconcile(context.TODO(), req); err != nil {
+			t.Fatalf("%s: reconcile failed: %v", step.desc, err)
+		}
+		if writes != step.wantWrites {
+			t.Fatalf("%s: expected %d status writes, got %d", step.desc, step.wantWrites, writes)
+		}
+		var got v1beta1.ConfigurationState
+		if err := c.Get(context.TODO(), types.NamespacedName{Name: configStateRef.Name, Namespace: testNamespace}, &got); err != nil {
+			t.Fatalf("%s: failed to get ConfigurationState: %v", step.desc, err)
+		}
+		if len(got.Status.Conditions) != 1 || got.Status.Conditions[0].Status != step.wantStatus {
+			t.Fatalf("%s: expected one condition with status %s, got %+v", step.desc, step.wantStatus, got.Status.Conditions)
+		}
+	}
+}

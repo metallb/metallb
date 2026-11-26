@@ -4,17 +4,23 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -200,7 +206,22 @@ func TestNewConfigStateConditionReporterPredicate(t *testing.T) {
 		targetName      = "controller"
 	)
 
-	p := NewConfigStateConditionReporterPredicate(targetNamespace, targetName)
+	p := NewConfigStateConditionReporterPredicate(targetNamespace, targetName, ConditionTypePoolReconcilerValid)
+
+	valid := metav1.Condition{Type: ConditionTypePoolReconcilerValid, Status: metav1.ConditionTrue, Reason: ErrorTypeNone}
+	invalid := metav1.Condition{Type: ConditionTypePoolReconcilerValid, Status: metav1.ConditionFalse, Reason: ErrorTypeConfiguration, Message: "broken"}
+	otherValid := metav1.Condition{Type: ConditionTypeConfigReconcilerValid, Status: metav1.ConditionTrue, Reason: ErrorTypeNone}
+	otherInvalid := metav1.Condition{Type: ConditionTypeConfigReconcilerValid, Status: metav1.ConditionFalse, Reason: ErrorTypeConfiguration, Message: "broken"}
+	configState := func(name string, conditions ...metav1.Condition) *metallbv1beta1.ConfigurationState {
+		return &metallbv1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: targetNamespace},
+			Status:     metallbv1beta1.ConfigurationStateStatus{Conditions: conditions},
+		}
+	}
+	withResult := func(state *metallbv1beta1.ConfigurationState, result metallbv1beta1.ConfigurationResult) *metallbv1beta1.ConfigurationState {
+		state.Status.Result = result
+		return state
+	}
 
 	tests := map[string]struct {
 		event any
@@ -239,22 +260,32 @@ func TestNewConfigStateConditionReporterPredicate(t *testing.T) {
 			},
 			want: false,
 		},
-		"Update always returns false": {
+		"Update changing the condition": {
+			event: event.UpdateEvent{ObjectOld: configState(targetName, valid), ObjectNew: configState(targetName, invalid)},
+			want:  true,
+		},
+		"Update adding the condition": {
+			event: event.UpdateEvent{ObjectOld: configState(targetName), ObjectNew: configState(targetName, valid)},
+			want:  true,
+		},
+		"Update removing the condition": {
+			event: event.UpdateEvent{ObjectOld: configState(targetName, valid, otherValid), ObjectNew: configState(targetName, otherValid)},
+			want:  true,
+		},
+		"Update keeping the condition": {
 			event: event.UpdateEvent{
-				ObjectOld: &metallbv1beta1.ConfigurationState{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      targetName,
-						Namespace: targetNamespace,
-					},
-				},
-				ObjectNew: &metallbv1beta1.ConfigurationState{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      targetName,
-						Namespace: targetNamespace,
-					},
-				},
+				ObjectOld: configState(targetName, valid),
+				ObjectNew: withResult(configState(targetName, valid), metallbv1beta1.ConfigurationResultValid),
 			},
 			want: false,
+		},
+		"Update changing another condition": {
+			event: event.UpdateEvent{ObjectOld: configState(targetName, valid, otherValid), ObjectNew: configState(targetName, valid, otherInvalid)},
+			want:  false,
+		},
+		"Update changing the condition of a different CR": {
+			event: event.UpdateEvent{ObjectOld: configState("other", valid), ObjectNew: configState("other", invalid)},
+			want:  false,
 		},
 		"Delete matching CR": {
 			event: event.DeleteEvent{
@@ -437,4 +468,215 @@ func TestNewConfigurationStateReconcilerPredicate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReportConfigStateCondition(t *testing.T) {
+	key := types.NamespacedName{Name: "speaker-node1", Namespace: testNamespace}
+	oneHourAgo := metav1.NewTime(time.Now().Add(-time.Hour).Truncate(time.Second))
+
+	valid := metav1.Condition{
+		Type:   ConditionTypeConfigReconcilerValid,
+		Status: metav1.ConditionTrue,
+		Reason: ErrorTypeNone,
+	}
+	invalid := metav1.Condition{
+		Type:    ConditionTypeConfigReconcilerValid,
+		Status:  metav1.ConditionFalse,
+		Reason:  ErrorTypeConfiguration,
+		Message: "configuration error: peer1 is broken",
+	}
+	invalidOtherMessage := invalid
+	invalidOtherMessage.Message = "configuration error: peer2 is broken"
+	invalidOtherReason := invalidOtherMessage
+	invalidOtherReason.Reason = ErrorTypeUnknown
+
+	newConfigState := func(conditions ...metav1.Condition) *metallbv1beta1.ConfigurationState {
+		return &metallbv1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
+			Status:     metallbv1beta1.ConfigurationStateStatus{Conditions: conditions},
+		}
+	}
+
+	// newClient returns a fake client holding the given objects, wrapped by
+	// funcs, and a counter of the status writes sent through it.
+	newClient := func(t *testing.T, funcs interceptor.Funcs, objects ...client.Object) (client.WithWatch, *int) {
+		t.Helper()
+		fakeClient, err := newFakeClient(objects)
+		if err != nil {
+			t.Fatalf("failed to create fake client: %v", err)
+		}
+		writes := 0
+		return withStatusWriteCounter(interceptor.NewClient(fakeClient, funcs), &writes), &writes
+	}
+
+	report := func(t *testing.T, c client.Client, condition metav1.Condition) {
+		t.Helper()
+		if err := reportConfigStateCondition(context.Background(), c, key, "configReconciler", condition); err != nil {
+			t.Fatalf("failed to report condition: %v", err)
+		}
+	}
+
+	get := func(t *testing.T, c client.Client) *metallbv1beta1.ConfigurationState {
+		t.Helper()
+		configState := &metallbv1beta1.ConfigurationState{}
+		if err := c.Get(context.Background(), key, configState); err != nil {
+			t.Fatalf("failed to get ConfigurationState: %v", err)
+		}
+		return configState
+	}
+
+	getCondition := func(t *testing.T, c client.Client, conditionType string) metav1.Condition {
+		t.Helper()
+		condition := meta.FindStatusCondition(get(t, c).Status.Conditions, conditionType)
+		if condition == nil {
+			t.Fatalf("condition %s not found", conditionType)
+		}
+		return *condition
+	}
+
+	expectWrites := func(t *testing.T, got *int, want int) {
+		t.Helper()
+		if *got != want {
+			t.Fatalf("expected %d status writes, got %d", want, *got)
+		}
+	}
+
+	t.Run("unchanged condition is written once", func(t *testing.T) {
+		c, writes := newClient(t, interceptor.Funcs{}, newConfigState())
+
+		report(t, c, valid)
+		expectWrites(t, writes, 1)
+		before := get(t, c)
+
+		report(t, c, valid)
+		report(t, c, valid)
+		expectWrites(t, writes, 1)
+
+		after := get(t, c)
+		if after.ResourceVersion != before.ResourceVersion {
+			t.Fatalf("expected resourceVersion %s, got %s", before.ResourceVersion, after.ResourceVersion)
+		}
+		if diff := cmp.Diff(before.Status.Conditions, after.Status.Conditions); diff != "" {
+			t.Fatalf("conditions changed (-before +after):\n%s", diff)
+		}
+	})
+
+	t.Run("LastTransitionTime moves only when the status changes", func(t *testing.T) {
+		stored := valid
+		stored.LastTransitionTime = oneHourAgo
+		c, writes := newClient(t, interceptor.Funcs{}, newConfigState(stored))
+
+		report(t, c, valid)
+		expectWrites(t, writes, 0)
+
+		report(t, c, invalid)
+		report(t, c, invalid)
+		expectWrites(t, writes, 1)
+		got := getCondition(t, c, invalid.Type)
+		if !got.LastTransitionTime.After(oneHourAgo.Time) {
+			t.Fatalf("expected LastTransitionTime after %v, got %v", oneHourAgo, got.LastTransitionTime)
+		}
+		if diff := cmp.Diff(invalid, got, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+			t.Fatalf("condition mismatch (-want +got):\n%s", diff)
+		}
+
+		report(t, c, valid)
+		expectWrites(t, writes, 2)
+		got = getCondition(t, c, valid.Type)
+		if got.Status != metav1.ConditionTrue || got.LastTransitionTime.Equal(&oneHourAgo) {
+			t.Fatalf("expected a new True condition, got %+v", got)
+		}
+	})
+
+	t.Run("LastTransitionTime is kept when only the message or reason changes", func(t *testing.T) {
+		stored := invalid
+		stored.LastTransitionTime = oneHourAgo
+		c, writes := newClient(t, interceptor.Funcs{}, newConfigState(stored))
+
+		for i, condition := range []metav1.Condition{invalidOtherMessage, invalidOtherReason} {
+			report(t, c, condition)
+			expectWrites(t, writes, 1+i)
+			got := getCondition(t, c, condition.Type)
+			if diff := cmp.Diff(condition, got, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+				t.Fatalf("condition mismatch (-want +got):\n%s", diff)
+			}
+			if !got.LastTransitionTime.Equal(&oneHourAgo) {
+				t.Fatalf("expected LastTransitionTime %v, got %v", oneHourAgo, got.LastTransitionTime)
+			}
+		}
+	})
+
+	t.Run("other conditions are kept", func(t *testing.T) {
+		other := metav1.Condition{
+			Type:               ConditionTypePoolReconcilerValid,
+			Status:             metav1.ConditionTrue,
+			Reason:             ErrorTypeNone,
+			LastTransitionTime: oneHourAgo,
+		}
+		c, writes := newClient(t, interceptor.Funcs{}, newConfigState(other))
+
+		report(t, c, invalid)
+		expectWrites(t, writes, 1)
+		if diff := cmp.Diff(other, getCondition(t, c, other.Type)); diff != "" {
+			t.Fatalf("other condition changed (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("missing resource gets the condition once created", func(t *testing.T) {
+		c, writes := newClient(t, interceptor.Funcs{})
+
+		// The reporter runs before the resource is created: nothing to write,
+		// the creation triggers a new report.
+		report(t, c, valid)
+		expectWrites(t, writes, 0)
+
+		if err := c.Create(context.Background(), newConfigState()); err != nil {
+			t.Fatalf("failed to create ConfigurationState: %v", err)
+		}
+		report(t, c, valid)
+		expectWrites(t, writes, 1)
+		getCondition(t, c, valid.Type)
+	})
+
+	t.Run("stale read does not overwrite the resource", func(t *testing.T) {
+		var stale *metallbv1beta1.ConfigurationState
+		// Mimics a cache that has not observed the last writes yet.
+		c, writes := newClient(t, interceptor.Funcs{
+			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if configState, ok := obj.(*metallbv1beta1.ConfigurationState); ok && stale != nil {
+					stale.DeepCopyInto(configState)
+					return nil
+				}
+				return cl.Get(ctx, key, obj, opts...)
+			},
+		}, newConfigState())
+
+		report(t, c, valid)
+		validState := get(t, c)
+		report(t, c, invalid)
+		expectWrites(t, writes, 2)
+
+		stale = validState
+		err := reportConfigStateCondition(context.Background(), c, key, "configReconciler", invalidOtherMessage)
+		if !apierrors.IsConflict(err) {
+			t.Fatalf("expected a conflict, got %v", err)
+		}
+		stale = nil
+		if diff := cmp.Diff(invalid, getCondition(t, c, invalid.Type), cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+			t.Fatalf("condition mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("failed read is returned without writing", func(t *testing.T) {
+		c, writes := newClient(t, interceptor.Funcs{
+			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				return errors.New("injected get error")
+			},
+		}, newConfigState())
+
+		if err := reportConfigStateCondition(context.Background(), c, key, "configReconciler", valid); err == nil {
+			t.Fatalf("expected the get error to be returned")
+		}
+		expectWrites(t, writes, 0)
+	})
 }

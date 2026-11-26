@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -951,5 +952,74 @@ var _ = Describe("PoolStatus Controller", func() {
 			Expect(err).To(Not(HaveOccurred()))
 			validateStatus(expectedStatus)
 		})
+	})
+})
+
+var _ = Describe("ConfigurationState condition reporter", func() {
+	It("should write only changed conditions, and never from a stale resource", func() {
+		directClient, err := client.NewWithWatch(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).ToNot(HaveOccurred())
+		var stale *v1beta1.ConfigurationState
+		// Mimics a cache that has not observed the last writes yet.
+		staleClient := interceptor.NewClient(directClient, interceptor.Funcs{
+			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if configState, ok := obj.(*v1beta1.ConfigurationState); ok && stale != nil {
+					stale.DeepCopyInto(configState)
+					return nil
+				}
+				return cl.Get(ctx, key, obj, opts...)
+			},
+		})
+		writes := 0
+		c := withStatusWriteCounter(staleClient, &writes)
+
+		configState := &v1beta1.ConfigurationState{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "condition-reporter",
+				Namespace: speakerNamespace,
+			},
+		}
+		err = k8sClient.Create(ctx, configState)
+		Expect(err).ToNot(HaveOccurred())
+		key := client.ObjectKeyFromObject(configState)
+
+		valid := metav1.Condition{
+			Type:   ConditionTypeConfigReconcilerValid,
+			Status: metav1.ConditionTrue,
+			Reason: ErrorTypeNone,
+		}
+		invalid := metav1.Condition{
+			Type:    ConditionTypeConfigReconcilerValid,
+			Status:  metav1.ConditionFalse,
+			Reason:  ErrorTypeConfiguration,
+			Message: "configuration error: peer1 is broken",
+		}
+		get := func() *v1beta1.ConfigurationState {
+			got := &v1beta1.ConfigurationState{}
+			Expect(k8sClient.Get(ctx, key, got)).To(Succeed())
+			return got
+		}
+
+		Expect(reportConfigStateCondition(ctx, c, key, "configReconciler", valid)).To(Succeed())
+		Expect(writes).To(Equal(1))
+		validState := get()
+
+		Expect(reportConfigStateCondition(ctx, c, key, "configReconciler", valid)).To(Succeed())
+		Expect(writes).To(Equal(1))
+		Expect(get().ResourceVersion).To(Equal(validState.ResourceVersion))
+
+		Expect(reportConfigStateCondition(ctx, c, key, "configReconciler", invalid)).To(Succeed())
+		Expect(writes).To(Equal(2))
+		invalidState := get()
+
+		// The write based on the stale resource is rejected, and the resource
+		// keeps the last condition.
+		stale = validState
+		invalidOtherMessage := invalid
+		invalidOtherMessage.Message = "configuration error: peer2 is broken"
+		err = reportConfigStateCondition(ctx, c, key, "configReconciler", invalidOtherMessage)
+		Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected a conflict, got %v", err)
+		stale = nil
+		Expect(get().ResourceVersion).To(Equal(invalidState.ResourceVersion))
 	})
 })

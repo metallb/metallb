@@ -141,7 +141,7 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&metallbv1beta1.Community{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
 		Watches(&metallbv1beta1.ConfigurationState{}, &handler.EnqueueRequestForObject{},
-			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName))).
+			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName, ConditionTypePoolReconcilerValid))).
 		WithEventFilter(p).
 		Complete(r)
 }
@@ -170,8 +170,6 @@ func (r *PoolReconciler) reportCondition(ctx context.Context, conditionErr error
 		Status:  metav1.ConditionTrue,
 		Reason:  ErrorTypeNone,
 		Message: "",
-		// Always set to now (tracks last reconciliation, not last status change).
-		LastTransitionTime: metav1.Now(),
 	}
 
 	switch {
@@ -185,23 +183,6 @@ func (r *PoolReconciler) reportCondition(ctx context.Context, conditionErr error
 		condition.Message = conditionErr.Error()
 	}
 
-	configStatus := &metallbv1beta1.ConfigurationState{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "metallb.io/v1beta1",
-			Kind:       "ConfigurationState",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.ConfigStateName,
-			Namespace: r.Namespace,
-		},
-		Status: metallbv1beta1.ConfigurationStateStatus{
-			Conditions: []metav1.Condition{condition},
-		},
-	}
-
-	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("poolReconciler"), client.ForceOwnership); err != nil { //nolint:staticcheck // TODO: migrate to client.Client.Apply()
-		return fmt.Errorf("patch %s/%s: %w", r.Namespace, r.ConfigStateName, err)
-	}
-
-	return nil
+	key := client.ObjectKey{Namespace: r.Namespace, Name: r.ConfigStateName}
+	return reportConfigStateCondition(ctx, r.Client, key, "poolReconciler", condition)
 }

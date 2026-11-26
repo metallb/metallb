@@ -53,6 +53,7 @@ type ConfigReconciler struct {
 	BGPType                 string
 	ConfigStateName         string
 	currentConfig           *config.Config
+	currentConfigErr        error
 	NodeName                string
 	FRRK8sSecretPassthrough bool
 }
@@ -194,10 +195,14 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "rendered config", dumpConfig(cfg))
 	if r.currentConfig != nil && reflect.DeepEqual(r.currentConfig, cfg) {
 		level.Debug(r.Logger).Log("controller", "ConfigReconciler", "event", "configuration did not change, ignoring")
+		// Report the outcome of the handler for this configuration again, so
+		// that a configuration it rejected is not reported as valid.
+		conditionErr = r.currentConfigErr
 		return ctrl.Result{}, nil
 	}
 
 	r.currentConfig = cfg
+	r.currentConfigErr = nil
 
 	res := r.Handler(r.Logger, cfg)
 	switch res {
@@ -218,6 +223,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 		configStale.Set(1)
 		updateErrors.Inc()
 		conditionErr = fmt.Errorf("%w: general handler sync state error", ErrConfiguration)
+		r.currentConfigErr = conditionErr
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
@@ -246,7 +252,7 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.ConfigMap{}, &handler.EnqueueRequestForObject{}).
 		Watches(&metallbv1beta1.ConfigurationState{}, &handler.EnqueueRequestForObject{},
-			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName))).
+			builder.WithPredicates(NewConfigStateConditionReporterPredicate(r.Namespace, r.ConfigStateName, ConditionTypeConfigReconcilerValid))).
 		WithEventFilter(p).
 		Complete(r)
 }
@@ -316,8 +322,6 @@ func (r *ConfigReconciler) reportCondition(ctx context.Context, conditionErr err
 		Status:  metav1.ConditionTrue,
 		Reason:  ErrorTypeNone,
 		Message: "",
-		// Always set to now (tracks last reconciliation, not last status change).
-		LastTransitionTime: metav1.Now(),
 	}
 
 	switch {
@@ -331,25 +335,8 @@ func (r *ConfigReconciler) reportCondition(ctx context.Context, conditionErr err
 		condition.Message = conditionErr.Error()
 	}
 
-	configStatus := &metallbv1beta1.ConfigurationState{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "metallb.io/v1beta1",
-			Kind:       "ConfigurationState",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.ConfigStateName,
-			Namespace: r.Namespace,
-		},
-		Status: metallbv1beta1.ConfigurationStateStatus{
-			Conditions: []metav1.Condition{condition},
-		},
-	}
-
-	if err := r.Status().Patch(ctx, configStatus, client.Apply, client.FieldOwner("configReconciler"), client.ForceOwnership); err != nil { //nolint:staticcheck // TODO: migrate to client.Client.Apply()
-		return fmt.Errorf("patch %s/%s: %w", r.Namespace, r.ConfigStateName, err)
-	}
-
-	return nil
+	key := client.ObjectKey{Namespace: r.Namespace, Name: r.ConfigStateName}
+	return reportConfigStateCondition(ctx, r.Client, key, "configReconciler", condition)
 }
 
 // filterBGPAdvertisementsByNode takes a slice of bgpAdvertisements and a node. It will return all

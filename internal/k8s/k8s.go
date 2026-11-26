@@ -87,6 +87,35 @@ func metricsBindAddress(port int) string {
 	return fmt.Sprintf("0.0.0.0:%d", port)
 }
 
+// cacheByObject returns the cache restrictions of the component whose
+// ConfigurationState is configStateName.
+func cacheByObject(namespace, configStateName string) map[client.Object]cache.ByObject {
+	namespaceSelector := cache.ByObject{
+		Field: fields.ParseSelectorOrDie(fmt.Sprintf("metadata.namespace=%s", namespace)),
+	}
+
+	return map[client.Object]cache.ByObject{
+		&metallbv1beta1.BFDProfile{}:       namespaceSelector,
+		&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
+		&metallbv1beta1.BGPPeer{}:          namespaceSelector,
+		&metallbv1beta1.IPAddressPool{}:    namespaceSelector,
+		&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
+		&metallbv1beta2.BGPPeer{}:          namespaceSelector,
+		&metallbv1beta1.Community{}:        namespaceSelector,
+		&metallbv1beta1.ServiceBGPStatus{}: namespaceSelector,
+		&corev1.Secret{}:                   namespaceSelector,
+		&corev1.ConfigMap{}:                namespaceSelector,
+		// Each component reads only its own ConfigurationState, while all the
+		// speakers write theirs: don't receive the updates of the others.
+		&metallbv1beta1.ConfigurationState{}: {
+			Field: fields.SelectorFromSet(fields.Set{
+				"metadata.namespace": namespace,
+				"metadata.name":      configStateName,
+			}),
+		},
+	}
+}
+
 // Client watches a Kubernetes cluster and translates events into
 // Controller method calls.
 type Client struct {
@@ -139,21 +168,17 @@ type Config struct {
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
 func New(cfg *Config) (*Client, error) {
-	namespaceSelector := cache.ByObject{
-		Field: fields.ParseSelectorOrDie(fmt.Sprintf("metadata.namespace=%s", cfg.Namespace)),
+	configStateName := "controller"
+	configStateLabels := map[string]string{
+		"metallb.io/component-type": "controller",
 	}
 
-	objectsPerNamespace := map[client.Object]cache.ByObject{
-		&metallbv1beta1.BFDProfile{}:       namespaceSelector,
-		&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
-		&metallbv1beta1.BGPPeer{}:          namespaceSelector,
-		&metallbv1beta1.IPAddressPool{}:    namespaceSelector,
-		&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
-		&metallbv1beta2.BGPPeer{}:          namespaceSelector,
-		&metallbv1beta1.Community{}:        namespaceSelector,
-		&metallbv1beta1.ServiceBGPStatus{}: namespaceSelector,
-		&corev1.Secret{}:                   namespaceSelector,
-		&corev1.ConfigMap{}:                namespaceSelector,
+	if cfg.ProcessName == "metallb-speaker" {
+		configStateName = "speaker-" + cfg.NodeName
+		configStateLabels = map[string]string{
+			"metallb.io/component-type": "speaker",
+			"metallb.io/node-name":      cfg.NodeName,
+		}
 	}
 
 	metricsOpts := metricsserver.Options{
@@ -167,7 +192,7 @@ func New(cfg *Config) (*Client, error) {
 	mgrOpts := ctrl.Options{
 		Scheme:                 scheme,
 		LeaderElection:         false,
-		Cache:                  cache.Options{ByObject: objectsPerNamespace},
+		Cache:                  cache.Options{ByObject: cacheByObject(cfg.Namespace, configStateName)},
 		WebhookServer:          webhookServer(cfg),
 		Metrics:                metricsOpts,
 		HealthProbeBindAddress: cfg.HealthProbeBindAddress,
@@ -204,19 +229,6 @@ func New(cfg *Config) (*Client, error) {
 	if err != nil {
 		level.Error(cfg.Logger).Log("op", "startup", "error", err, "msg", "unable to get own pod for owner references")
 		return nil, err
-	}
-
-	configStateName := "controller"
-	configStateLabels := map[string]string{
-		"metallb.io/component-type": "controller",
-	}
-
-	if cfg.ProcessName == "metallb-speaker" {
-		configStateName = "speaker-" + cfg.NodeName
-		configStateLabels = map[string]string{
-			"metallb.io/component-type": "speaker",
-			"metallb.io/node-name":      cfg.NodeName,
-		}
 	}
 
 	if cfg.ConfigChanged != nil {

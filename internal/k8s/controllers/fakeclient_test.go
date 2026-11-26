@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 
 	v1beta1 "go.universe.tf/metallb/api/v1beta1"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func newFakeClient(initObjects []client.Object) (client.WithWatch, error) {
@@ -60,6 +62,25 @@ func newFakeClient(initObjects []client.Object) (client.WithWatch, error) {
 			return res
 		}).
 		Build(), nil
+}
+
+// withStatusWriteCounter wraps the given client, counting the updates and
+// patches to status subresources.
+func withStatusWriteCounter(c client.WithWatch, count *int) client.WithWatch {
+	return interceptor.NewClient(c, interceptor.Funcs{
+		SubResourceUpdate: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+			if subResourceName == "status" {
+				*count++
+			}
+			return cl.SubResource(subResourceName).Update(ctx, obj, opts...)
+		},
+		SubResourcePatch: func(ctx context.Context, cl client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+			if subResourceName == "status" {
+				*count++
+			}
+			return cl.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+		},
+	})
 }
 
 func objectsFromResources(r config.ClusterResources) []client.Object {
