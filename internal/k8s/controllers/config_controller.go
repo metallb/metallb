@@ -53,6 +53,7 @@ type ConfigReconciler struct {
 	BGPType                 string
 	ConfigStateName         string
 	currentConfig           *config.Config
+	currentConfigErr        error
 	NodeName                string
 	FRRK8sSecretPassthrough bool
 }
@@ -194,10 +195,14 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "rendered config", dumpConfig(cfg))
 	if r.currentConfig != nil && reflect.DeepEqual(r.currentConfig, cfg) {
 		level.Debug(r.Logger).Log("controller", "ConfigReconciler", "event", "configuration did not change, ignoring")
+		// Report the outcome of the handler for this configuration again, so
+		// that a configuration it rejected is not reported as valid.
+		conditionErr = r.currentConfigErr
 		return ctrl.Result{}, nil
 	}
 
 	r.currentConfig = cfg
+	r.currentConfigErr = nil
 
 	res := r.Handler(r.Logger, cfg)
 	switch res {
@@ -218,6 +223,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 		configStale.Set(1)
 		updateErrors.Inc()
 		conditionErr = fmt.Errorf("%w: general handler sync state error", ErrConfiguration)
+		r.currentConfigErr = conditionErr
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
