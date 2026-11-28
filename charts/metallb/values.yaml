@@ -234,6 +234,7 @@ controller:
   priorityClassName: ""
   runtimeClassName: ""
   affinity: {}
+  deploymentAnnotations: {}
   podAnnotations: {}
   labels: {}
   livenessProbe:
@@ -313,6 +314,7 @@ speaker:
   affinity: {}
   ## Selects which runtime class will be used by the pod.
   runtimeClassName: ""
+  deploymentAnnotations: {}
   podAnnotations: {}
   labels: {}
   livenessProbe:
