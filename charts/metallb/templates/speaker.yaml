@@ -128,6 +128,10 @@ kind: DaemonSet
 metadata:
   name: {{ template "metallb.fullname" . }}-speaker
   namespace: {{ .Release.Namespace | quote }}
+  {{- with .Values.speaker.deploymentAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: speaker
